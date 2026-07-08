@@ -135,12 +135,12 @@ Phase 8: 統合・E2E・リリース確認
    - [ui_interaction_spec.md §10](ui_interaction_spec.md): 右上に「保存中...」/「保存済み」/「保存できませんでした」
 3. **即時保存とflush**
    - [autosave_spec.md §2.2/§4](autosave_spec.md): 追加/削除/完了/並替/変換/持ち越しは即時保存
-   - flush トリガ: モード切替・日付移動・アプリ終了（[§4](autosave_spec.md)）。遷移の完了条件はlocalStorageへの対象別スナップショット同期であり、サーバーリトライ完了ではない
+   - flush トリガ: 日付移動・アプリ終了（[§4](autosave_spec.md)）。モード切替は Phase 4 で接続する。遷移の完了条件はlocalStorageへの対象別スナップショット同期であり、サーバーリトライ完了ではない
 4. **リトライ**
    - 指数バックオフ 1s/2s/4s、最大3回（[§7](autosave_spec.md)）
    - 上限到達で「再試行」ボタン
 5. **localStorage フォールバック**
-   - [autosave_spec.md §6.2](autosave_spec.md): `dayborad:pending:${date}` への対象別dirty書込・部分成功時の対象単位削除・起動時リカバリ
+   - [autosave_spec.md §6.2](autosave_spec.md): Rendererで `dayborad:pending:${date}` への対象別dirty書込・部分成功時の対象単位削除・起動時リカバリを行う。domainは `PendingSnapshot` 型と対象別マージ/削除の純粋関数だけを持つ
 
 ### バックエンド
 
@@ -152,7 +152,7 @@ Phase 8: 統合・E2E・リリース確認
 
 ### テスト
 
-- Unit: 自動保存FSM、デバウンス、リトライ、localStorage（[§3.7](test_strategy.md)）
+- Unit: 自動保存FSM、デバウンス、リトライ、PendingSnapshot純粋関数（[§3.7](test_strategy.md)）
 - Integration: 部分保存の確実性
 - E2E（段階導入）: アプリ再起動で入力保持（[§5.2 4.1](test_strategy.md)）
 

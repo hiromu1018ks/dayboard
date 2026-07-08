@@ -373,7 +373,7 @@ US-MVP-014 Open Questions「設定画面の開き方」を固定する。
 
 ### 11.5 Post-MVP（実装しない、AC-22）
 
-`⌘K`（コマンドパレット）、`⌘Shift+R`（振り返り送信）、`⌘Shift+M`（時刻見出し）、Vimの `gg/G/A/o/O/dd/u/Ctrl+r/n/N/Space r/Space k` は押しても何も起きない（ただし入力内容は破壊しない）。
+`⌘/Ctrl+K`（コマンドパレット）、`⌘/Ctrl+Shift+R`（振り返り送信）、`⌘/Ctrl+Shift+M`（時刻見出し）、Vim Normal の `gg`, `G`, `A`, `o`, `O`, `dd`, `u`, `Ctrl+r`, `/`, `n`, `N`, `Space r`, `Space k` は押しても何も起きない（ただし入力内容は破壊しない）。
 
 ---
 
