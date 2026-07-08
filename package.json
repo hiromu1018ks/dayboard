@@ -13,7 +13,7 @@
     "dev": "pnpm --filter desktop dev",
     "dev:api": "pnpm --filter api dev",
     "dev:renderer": "pnpm --filter desktop dev:renderer",
-    "build": "pnpm -r --filter='./packages/*' build && pnpm -r --filter='./apps/*' build",
+    "build": "pnpm -r --filter='./packages/*' --if-present build && pnpm -r --filter='./apps/*' build",
     "build:api": "pnpm --filter api build",
     "build:renderer": "pnpm --filter desktop build",
     "package": "pnpm --filter desktop package",
@@ -25,7 +25,7 @@
     "typecheck": "pnpm -r typecheck",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:integration": "vitest run --config vitest.integration.config.ts",
+    "test:integration": "vitest run --workspace vitest.integration.config.ts --project integration",
     "test:e2e": "echo 'E2E tests are configured in Phase 1+' && exit 0",
     "format": "prettier --write .",
     "format:check": "prettier --check ."

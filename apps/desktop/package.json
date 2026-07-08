@@ -6,7 +6,7 @@
   "main": "./out/main/index.js",
   "scripts": {
     "dev": "electron-vite dev",
-    "dev:renderer": "electron-vite dev --mode=renderer",
+    "dev:renderer": "electron-vite dev --rendererOnly",
     "build": "electron-vite build",
     "preview": "electron-vite preview",
     "package": "echo 'packaging is configured in Phase 8' && exit 0",

@@ -1,4 +1,4 @@
-import { defineWorkspace } from 'vitest/config';
+import { configDefaults, defineWorkspace } from 'vitest/config';
 
 /**
  * Vitest workspace 設定
@@ -14,6 +14,7 @@ export default defineWorkspace([
       name: 'unit',
       environment: 'node',
       include: ['packages/*/test/**/*.test.ts'],
+      exclude: [...configDefaults.exclude, '**/*.integration.test.ts'],
       coverage: {
         provider: 'v8',
         reporter: ['text', 'lcov'],

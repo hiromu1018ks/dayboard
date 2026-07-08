@@ -55,7 +55,7 @@ async function bootstrap(): Promise<StartedServer> {
   console.log('[main] migrations applied');
 
   // 3. Hono API 起動（動的ポート: port=0 で空きポート取得）
-  apiServer = await startServer({ port: 0 });
+  apiServer = await startServer({ host: '127.0.0.1', port: 0 });
   console.log(`[main] API server started at ${apiServer.baseUrl}`);
 
   return apiServer;
