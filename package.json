@@ -1,0 +1,46 @@
+{
+  "name": "dayborad",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "PC画面を「その日の仕事ノート1枚」として使う日次業務管理アプリ",
+  "packageManager": "pnpm@11.7.0",
+  "engines": {
+    "node": ">=20",
+    "pnpm": ">=9"
+  },
+  "scripts": {
+    "dev": "pnpm --filter desktop dev",
+    "dev:api": "pnpm --filter api dev",
+    "dev:renderer": "pnpm --filter desktop dev:renderer",
+    "build": "pnpm -r --filter='./packages/*' --if-present build && pnpm -r --filter='./apps/*' build",
+    "build:api": "pnpm --filter api build",
+    "build:renderer": "pnpm --filter desktop build",
+    "package": "pnpm --filter desktop package",
+    "db:generate": "pnpm --filter repository db:generate",
+    "db:migrate": "pnpm --filter repository db:migrate",
+    "db:seed": "pnpm --filter repository db:seed",
+    "db:reset": "pnpm --filter repository db:reset",
+    "lint": "eslint .",
+    "typecheck": "pnpm -r typecheck",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:integration": "vitest run --workspace vitest.integration.config.ts --project integration",
+    "test:e2e": "echo 'E2E tests are configured in Phase 1+' && exit 0",
+    "format": "prettier --write .",
+    "format:check": "prettier --check ."
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.10.0",
+    "@types/node": "^20.14.0",
+    "@vitest/coverage-v8": "^2.1.0",
+    "eslint": "^9.10.0",
+    "eslint-plugin-react": "^7.35.0",
+    "eslint-plugin-react-hooks": "^4.6.0",
+    "globals": "^15.9.0",
+    "prettier": "^3.3.0",
+    "typescript": "^5.5.0",
+    "typescript-eslint": "^8.5.0",
+    "vitest": "^2.1.0"
+  }
+}

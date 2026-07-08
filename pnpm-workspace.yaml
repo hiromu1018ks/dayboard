@@ -1,0 +1,12 @@
+packages:
+  - 'packages/*'
+  - 'apps/*'
+
+allowBuilds:
+  electron: set this to true or false
+  esbuild: true
+
+# Electron / esbuild のインストール時ビルドスクリプトを許可
+onlyBuiltDependencies:
+  - electron
+  - esbuild

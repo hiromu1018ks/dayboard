@@ -1,0 +1,18 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "composite": false,
+    "noEmit": true,
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "types": ["electron-vite/node", "node"],
+    "baseUrl": ".",
+    "paths": {
+      "shared-types": ["../../packages/shared-types/src/index.ts"],
+      "domain": ["../../packages/domain/src/index.ts"],
+      "repository": ["../../packages/repository/src/index.ts"],
+      "api": ["../../apps/api/src/index.ts"]
+    }
+  },
+  "include": ["src/main/**/*", "src/preload/**/*", "electron.vite.config.ts"]
+}

@@ -1,2 +1,31 @@
 /.agents/
 .DS_Store
+.zcode/
+
+# 依存関係
+node_modules/
+
+# ビルド成果物
+dist/
+out/
+*.tsbuildinfo
+
+# 環境変数（ローカル環境の接続情報を含むため除外）
+.env
+.env.local
+.env.*.local
+
+# ログ
+*.log
+npm-debug.log*
+pnpm-debug.log*
+
+# テスト・カバレッジ
+coverage/
+
+# Electron / Vite キャッシュ
+.vite/
+.electron-vite/
+
+# OS
+Thumbs.db

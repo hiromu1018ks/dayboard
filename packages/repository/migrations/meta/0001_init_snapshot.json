@@ -1,0 +1,697 @@
+{
+  "id": "d9480d46-0fcb-4c34-b958-9dca7995e674",
+  "prevId": "00000000-0000-0000-0000-000000000000",
+  "version": "7",
+  "dialect": "postgresql",
+  "tables": {
+    "public.blocker_items": {
+      "name": "blocker_items",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "day_note_id": {
+          "name": "day_note_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "text": {
+          "name": "text",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "linked_todo_id": {
+          "name": "linked_todo_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "source_note_line_meta_id": {
+          "name": "source_note_line_meta_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "resolved": {
+          "name": "resolved",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "order": {
+          "name": "order",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "resolved_at": {
+          "name": "resolved_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "idx_blocker_items_day_note_id_order": {
+          "name": "idx_blocker_items_day_note_id_order",
+          "columns": [
+            {
+              "expression": "day_note_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "order",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "blocker_items_day_note_id_day_notes_id_fk": {
+          "name": "blocker_items_day_note_id_day_notes_id_fk",
+          "tableFrom": "blocker_items",
+          "tableTo": "day_notes",
+          "columnsFrom": [
+            "day_note_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {}
+    },
+    "public.day_notes": {
+      "name": "day_notes",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "date": {
+          "name": "date",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "theme": {
+          "name": "theme",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "last_opened_mode": {
+          "name": "last_opened_mode",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'work'"
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "uq_day_notes_date": {
+          "name": "uq_day_notes_date",
+          "columns": [
+            {
+              "expression": "date",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {}
+    },
+    "public.note_entries": {
+      "name": "note_entries",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "day_note_id": {
+          "name": "day_note_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "body": {
+          "name": "body",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "''"
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "uq_note_entries_day_note_id": {
+          "name": "uq_note_entries_day_note_id",
+          "columns": [
+            {
+              "expression": "day_note_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "note_entries_day_note_id_day_notes_id_fk": {
+          "name": "note_entries_day_note_id_day_notes_id_fk",
+          "tableFrom": "note_entries",
+          "tableTo": "day_notes",
+          "columnsFrom": [
+            "day_note_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {}
+    },
+    "public.note_line_metas": {
+      "name": "note_line_metas",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "note_entry_id": {
+          "name": "note_entry_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "line_number_at_conversion": {
+          "name": "line_number_at_conversion",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "normalized_line_text": {
+          "name": "normalized_line_text",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "line_hash": {
+          "name": "line_hash",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "line_text": {
+          "name": "line_text",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "converted_to_todo_id": {
+          "name": "converted_to_todo_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "converted_to_blocker_id": {
+          "name": "converted_to_blocker_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "converted_to_reflection": {
+          "name": "converted_to_reflection",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "converted_at": {
+          "name": "converted_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "idx_note_line_metas_note_entry_id": {
+          "name": "idx_note_line_metas_note_entry_id",
+          "columns": [
+            {
+              "expression": "note_entry_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "idx_note_line_metas_todo_duplicate_lookup": {
+          "name": "idx_note_line_metas_todo_duplicate_lookup",
+          "columns": [
+            {
+              "expression": "note_entry_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "line_hash",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "idx_note_line_metas_blocker_duplicate_lookup": {
+          "name": "idx_note_line_metas_blocker_duplicate_lookup",
+          "columns": [
+            {
+              "expression": "note_entry_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "line_hash",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "uq_note_line_metas_converted_to_todo_id": {
+          "name": "uq_note_line_metas_converted_to_todo_id",
+          "columns": [
+            {
+              "expression": "converted_to_todo_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "uq_note_line_metas_converted_to_blocker_id": {
+          "name": "uq_note_line_metas_converted_to_blocker_id",
+          "columns": [
+            {
+              "expression": "converted_to_blocker_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "note_line_metas_note_entry_id_note_entries_id_fk": {
+          "name": "note_line_metas_note_entry_id_note_entries_id_fk",
+          "tableFrom": "note_line_metas",
+          "tableTo": "note_entries",
+          "columnsFrom": [
+            "note_entry_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {}
+    },
+    "public.reflections": {
+      "name": "reflections",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "day_note_id": {
+          "name": "day_note_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "done_text": {
+          "name": "done_text",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "''"
+        },
+        "stuck_text": {
+          "name": "stuck_text",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "''"
+        },
+        "tomorrow_action_text": {
+          "name": "tomorrow_action_text",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "''"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "reflections_day_note_id_day_notes_id_fk": {
+          "name": "reflections_day_note_id_day_notes_id_fk",
+          "tableFrom": "reflections",
+          "tableTo": "day_notes",
+          "columnsFrom": [
+            "day_note_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "reflections_day_note_id_unique": {
+          "name": "reflections_day_note_id_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "day_note_id"
+          ]
+        }
+      }
+    },
+    "public.todo_items": {
+      "name": "todo_items",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "day_note_id": {
+          "name": "day_note_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "title": {
+          "name": "title",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "status": {
+          "name": "status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'todo'"
+        },
+        "order": {
+          "name": "order",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "source_note_line_meta_id": {
+          "name": "source_note_line_meta_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "carried_from_todo_id": {
+          "name": "carried_from_todo_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "carried_from_date": {
+          "name": "carried_from_date",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "completed_at": {
+          "name": "completed_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "idx_todo_items_day_note_id_order": {
+          "name": "idx_todo_items_day_note_id_order",
+          "columns": [
+            {
+              "expression": "day_note_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "order",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "idx_todo_items_carried_from_todo_id": {
+          "name": "idx_todo_items_carried_from_todo_id",
+          "columns": [
+            {
+              "expression": "carried_from_todo_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "todo_items_day_note_id_day_notes_id_fk": {
+          "name": "todo_items_day_note_id_day_notes_id_fk",
+          "tableFrom": "todo_items",
+          "tableTo": "day_notes",
+          "columnsFrom": [
+            "day_note_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {}
+    },
+    "public.user_settings": {
+      "name": "user_settings",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "keybinding_mode": {
+          "name": "keybinding_mode",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'standard'"
+        },
+        "vim_default_state": {
+          "name": "vim_default_state",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'normal'"
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {}
+    }
+  },
+  "enums": {},
+  "schemas": {},
+  "sequences": {},
+  "_meta": {
+    "columns": {},
+    "schemas": {},
+    "tables": {}
+  }
+}

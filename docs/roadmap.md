@@ -57,62 +57,62 @@
 
 ### タスク
 
-- [ ] **T-0-01** [infra] モノレポ初期化
+- [x] **T-0-01** [infra] モノレポ初期化
   - 依存: なし
   - 対象AC: (間接 AC-21)
   - 出力: `package.json` / `pnpm-workspace.yaml` / `tsconfig.base.json` / `.nvmrc` / `.gitignore` / `.env.example`
   - 完了条件: [dev_setup.md §2](dev_setup.md) の構成を生成し、`pnpm install` が成功する。`engines: { node: ">=20", pnpm: ">=9" }` を含む
-- [ ] **T-0-02** [pkg] shared-types パッケージ作成
+- [x] **T-0-02** [pkg] shared-types パッケージ作成
   - 依存: T-0-01
   - 対象AC: -
   - 出力: `packages/shared-types/src/index.ts`（[api_contract.md §2](api_contract.md) のリソース型をエクスポート）、`packages/shared-types/package.json`、`tsconfig.json`
   - 完了条件: `pnpm --filter shared-types typecheck` が通る
-- [ ] **T-0-03** [domain] domain パッケージスケルトン
+- [x] **T-0-03** [domain] domain パッケージスケルトン
   - 依存: T-0-02
   - 対象AC: -
   - 出力: `packages/domain/src/index.ts`、エンティティ型 re-export、`packages/domain/package.json`
   - 完了条件: ピュアTSでHono/Reactに依存しない ([architecture.md §4](architecture.md))。`pnpm --filter domain typecheck` が通る
-- [ ] **T-0-04** [repo] repository パッケージスケルトン + DB接続
+- [x] **T-0-04** [repo] repository パッケージスケルトン + DB接続
   - 依存: T-0-03
   - 対象AC: AC-21
   - 出力: `packages/repository/src/db.ts`（`pg.Pool`、`max:5`、[dev_setup.md §6.1](dev_setup.md)）、`packages/repository/package.json`
   - 完了条件: `DATABASE_URL` からPoolを生成でき、`SELECT 1` が通るヘルパーがある
-- [ ] **T-0-05** [db] 初期マイグレーション `0001_init.sql`
+- [x] **T-0-05** [db] 初期マイグレーション `0001_init.sql`
   - 依存: T-0-04
   - 対象AC: AC-21
   - 出力: `packages/repository/migrations/0001_init.sql`（[database_schema.md §3](database_schema.md) 全テーブル、[§7.3 循環FK](database_schema.md) の作成順を遵守）
   - 完了条件: `pnpm db:migrate` で `day_notes` / `user_settings` / `todo_items` / `blocker_items` / `reflections` / `note_entries` / `note_line_metas` と全インデックス・制約が作成される
-- [ ] **T-0-06** [db] シード `user_settings` デフォルト行
+- [x] **T-0-06** [db] シード `user_settings` デフォルト行
   - 依存: T-0-05
   - 対象AC: -
   - 出力: `packages/repository/seed.sql` または `scripts/seed.ts`（id=`default`, `keybinding_mode='standard'`, `vim_default_state='normal'`）
   - 完了条件: `pnpm db:seed` で `user_settings` に1行挿入される（[database_schema.md §6](database_schema.md)）
-- [ ] **T-0-07** [api] Hono API スケルトン
+- [x] **T-0-07** [api] Hono API スケルトン
   - 依存: T-0-04
   - 対象AC: -
   - 出力: `apps/api/src/index.ts`（Honoアプリ）、`apps/api/src/routes/health.ts`（`GET /api/health` → `{status:"ok"}`）、CORSミドルウェア（[architecture.md §7](architecture.md)）、統一エラーハンドラ（[api_contract.md §1.4/§8](api_contract.md)）
   - 完了条件: `pnpm dev:api` で `http://127.0.0.1:8787/api/health` が 200 を返す
-- [ ] **T-0-08** [infra] Electron main プロセス（起動フロー）
+- [x] **T-0-08** [infra] Electron main プロセス（起動フロー）
   - 依存: T-0-07
   - 対象AC: -
   - 出力: `apps/desktop/main/index.ts`（[architecture.md §6.1](architecture.md): DB接続→マイグレーション→Hono起動（動的ポート）→BrowserWindow）、`window.__API_BASE_URL__` 注入
   - 完了条件: `pnpm dev` でElectronウィンドウが開き、DevToolsに `window.__API_BASE_URL__` が表示される
-- [ ] **T-0-09** [ui] Renderer スケルトン（React + Vite + Tailwind）
+- [x] **T-0-09** [ui] Renderer スケルトン（React + Vite + Tailwind）
   - 依存: T-0-08
   - 対象AC: -
   - 出力: `apps/desktop/renderer/index.html`、`src/main.tsx`、`src/App.tsx`（API URL受け取り→`/api/health` をfetchして表示）、Tailwind設定
   - 完了条件: RendererがAPIから `{status:"ok"}` を取得して画面に表示する
-- [ ] **T-0-10** [infra] package.json scripts 整備
+- [x] **T-0-10** [infra] package.json scripts 整備
   - 依存: T-0-09
   - 対象AC: -
   - 出力: ルート `package.json` の `scripts`（[dev_setup.md §4](dev_setup.md) の `dev`/`dev:api`/`dev:renderer`/`db:*`/`lint`/`typecheck`/`test` 全系）
   - 完了条件: 全コマンドが存在し、実行可能である
-- [ ] **T-0-11** [infra] 品質ゲート設定（ESLint / Prettier / Vitest）
+- [x] **T-0-11** [infra] 品質ゲート設定（ESLint / Prettier / Vitest）
   - 依存: T-0-01
   - 対象AC: -
   - 出力: ルート `.eslintrc` / `.prettierrc` / Vitest設定（workspace対応）
   - 完了条件: `pnpm lint` / `pnpm format:check` / `pnpm test` が空パスで通る（[test_strategy.md §8](test_strategy.md)）
-- [ ] **T-0-12** [test] CI定義（GitHub Actions 等）
+- [x] **T-0-12** [test] CI定義（GitHub Actions 等）
   - 依存: T-0-11
   - 対象AC: -
   - 出力: `.github/workflows/ci.yml`（[dev_setup.md §8](dev_setup.md): lint / typecheck / unit-test / integration-test、PostgreSQLサービスコンテナ）
@@ -120,10 +120,10 @@
 
 ### Phase 0 のチェック基準
 
-- [ ] `pnpm dev` でアプリが起動する
-- [ ] `GET /api/health` が応答する
-- [ ] `user_settings` にデフォルト行がある
-- [ ] CI（lint/typecheck/test/integration）が緑
+- [x] `pnpm dev` でアプリが起動する
+- [x] `GET /api/health` が応答する
+- [x] `user_settings` にデフォルト行がある
+- [x] CI（lint/typecheck/test/integration）が緑
 
 ---
 
@@ -869,7 +869,7 @@ T-0-01 → T-0-05 → T-1-04 → T-1-07 → T-1-08 → T-2-07 → T-3-10 → T-4
 
 | フェーズ | タスク総数 | 完了 | 状態 |
 |----------|------------|------|------|
-| Phase 0 | 12 | 0 | 未着手 |
+| Phase 0 | 12 | 12 | 完了 |
 | Phase 1 | 14 | 0 | 未着手 |
 | Phase 2 | 15 | 0 | 未着手 |
 | Phase 3 | 14 | 0 | 未着手 |
@@ -878,7 +878,7 @@ T-0-01 → T-0-05 → T-1-04 → T-1-07 → T-1-08 → T-2-07 → T-3-10 → T-4
 | Phase 6 | 6 | 0 | 未着手 |
 | Phase 7 | 11 | 0 | 未着手 |
 | Phase 8 | 7 | 0 | 未着手 |
-| **合計** | **103** | **0** | — |
+| **合計** | **103** | **12** | — |
 
 ---
 
