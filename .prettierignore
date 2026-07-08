@@ -1,0 +1,11 @@
+node_modules
+dist
+out
+coverage
+**/*.sql
+migrations
+pnpm-lock.yaml
+docs
+.agents
+.zcode
+skills-lock.json
