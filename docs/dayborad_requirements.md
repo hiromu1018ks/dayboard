@@ -826,6 +826,7 @@ type TodoItem = {
   order: number
   sourceNoteLineMetaId?: string
   carriedFromTodoId?: string
+  carriedFromDate?: string
   createdAt: string
   completedAt?: string
   updatedAt: string
