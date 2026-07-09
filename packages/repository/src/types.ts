@@ -10,7 +10,15 @@
  * 実装側でオプション引数として受け取る。
  */
 
-import type { BlockerItem, DayNote, NoteEntry, Reflection, TodoItem, TodoStatus, ViewMode } from 'shared-types';
+import type {
+  BlockerItem,
+  DayNote,
+  NoteEntry,
+  Reflection,
+  TodoItem,
+  TodoStatus,
+  ViewMode,
+} from 'shared-types';
 
 /** DayNote の部分更新入力（[api_contract.md §4]） */
 export type DayNoteUpdateInput = {
@@ -104,8 +112,16 @@ export interface ReflectionRepository {
   update(dayNoteId: string, input: ReflectionUpdateInput, tx?: Tx): Promise<Reflection | null>;
 }
 
+/** NoteEntry 本文の部分更新入力（[api_contract.md §7]） */
+export type NoteEntryUpdateInput = {
+  /** ノート本文全文。上限50000文字（呼出元で VALIDATION_ERROR 判定済みの前提） */
+  body?: string;
+};
+
 /** NoteEntryRepository IF（[database_schema.md §3.6/§11]） */
 export interface NoteEntryRepository {
   findByDayNote(dayNoteId: string): Promise<NoteEntry | null>;
   create(id: string, dayNoteId: string, tx?: Tx): Promise<NoteEntry>;
+  /** 本文の部分更新（[api_contract.md §7]）。空 input は現状維持 */
+  update(dayNoteId: string, input: NoteEntryUpdateInput, tx?: Tx): Promise<NoteEntry | null>;
 }

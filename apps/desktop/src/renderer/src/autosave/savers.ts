@@ -6,7 +6,7 @@
  *
  * Phase 2: テーマ（dayNote:theme）
  * Phase 3: TODO/Blocker（既存 id の PATCH）、Reflection、並替（todoOrder/blockerOrder）
- * Phase 4: NoteEntry 本文（追加予定）
+ * Phase 4: NoteEntry 本文（body 全文）
  */
 
 import type { Saver, SaverError } from './types.js';
@@ -14,6 +14,7 @@ import {
   ApiClientError,
   patchBlocker,
   patchDayNote,
+  patchNoteEntry,
   patchReflection,
   patchTodo,
   reorderBlockers,
@@ -168,6 +169,30 @@ export function createBlockerOrderSaver(date: string): Saver {
     const orderedIds = payload as string[];
     try {
       await reorderBlockers(date, orderedIds);
+      return { ok: true };
+    } catch (err) {
+      return saverError(err);
+    }
+  };
+}
+
+// ============================================================================
+// Phase 4: NoteEntry 本文
+// ============================================================================
+
+/**
+ * ノート本文保存の Saver（[roadmap.md T-4-04]）。
+ *
+ * 対象別 payload（[pendingSnapshot.ts TargetPayload['noteEntry']]）: { body: string }
+ * CodeMirror の全文を一括送信（[autosave_spec.md §3.4]、[api_contract.md §7]）。
+ *
+ * @param date YYYY-MM-DD
+ */
+export function createNoteEntrySaver(date: string): Saver {
+  return async (payload) => {
+    const data = payload as { body?: string };
+    try {
+      await patchNoteEntry(date, data);
       return { ok: true };
     } catch (err) {
       return saverError(err);

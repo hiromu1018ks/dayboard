@@ -39,6 +39,37 @@ export const create: INoteEntryRepository['create'] = async (id, dayNoteId, tx?)
   return mapNoteEntry(row);
 };
 
+/**
+ * ノート本文を部分更新する（[api_contract.md §7]）。
+ *
+ * DayNote と 1:1（dayNoteId は UNIQUE）で、DayNote 生成時に空行が作成済みのため、
+ * 厳密には UPSERT ではなく部分 UPDATE。
+ *
+ * @param dayNoteId 紐づく DayNote ID（識別子）
+ * @param input     更新内容。本文（body）のみ。
+ * @param tx        任意。トランザクション内で実行する場合に指定。
+ * @returns 更新後の NoteEntry。存在しない dayNoteId の場合は null。
+ */
+export const update: INoteEntryRepository['update'] = async (dayNoteId, input, tx?) => {
+  const conn = tx ?? getDb();
+
+  const patch: Partial<typeof noteEntries.$inferInsert> = {};
+  if (input.body !== undefined) patch.body = input.body;
+
+  if (Object.keys(patch).length === 0) {
+    return findByDayNote(dayNoteId);
+  }
+
+  const rows = await conn
+    .update(noteEntries)
+    .set({ ...patch, updatedAt: new Date() })
+    .where(eq(noteEntries.dayNoteId, dayNoteId))
+    .returning();
+
+  if (rows.length === 0) return null;
+  return mapNoteEntry(rows[0]!);
+};
+
 /** IF準拠をコンパイル時に検証（実行時には影響しない） */
-export const _implements: INoteEntryRepository = { findByDayNote, create };
+export const _implements: INoteEntryRepository = { findByDayNote, create, update };
 void _implements;

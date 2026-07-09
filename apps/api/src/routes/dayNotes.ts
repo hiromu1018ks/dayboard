@@ -9,6 +9,7 @@
  * - POST  /api/day-notes/:date/blockers          — 障害追加（[api_contract.md §6]）
  * - POST  /api/day-notes/:date/blockers/reorder  — 障害並替（[api_contract.md §6]）
  * - PATCH /api/day-notes/:date/reflection        — 振り返り3セクション部分更新（[api_contract.md §7]）
+ * - PATCH /api/day-notes/:date/note-entry        — ノート本文の全文更新（[api_contract.md §7]）
  *
  * 日付のローカル計算は `domain/date.ts`（サーバー now() 非依存、[database_schema.md §8]）。
  * エラーは errorHandler（[api_contract.md §1.4]）が統一形式で返す。
@@ -21,6 +22,7 @@ import {
   blockerRepository,
   dayNoteRepository,
   getOrCreateFull,
+  noteEntryRepository,
   patchDayNote,
   reflectionRepository,
   todoRepository,
@@ -205,9 +207,7 @@ dayNoteRoutes.post('/:date/todos/reorder', async (c) => {
   // 過不足チェック（[edge_cases.md §10.4]）
   const receivedSet = new Set(orderedIds);
   if (orderedIds.length !== currentIds.size || [...currentIds].some((id) => !receivedSet.has(id))) {
-    throw ApiHttpError.validation([
-      { field: 'orderedIds', message: 'TODOの過不足があります。' },
-    ]);
+    throw ApiHttpError.validation([{ field: 'orderedIds', message: 'TODOの過不足があります。' }]);
   }
 
   const reordered = await todoRepository.reorder(dayNoteId, orderedIds);
@@ -312,9 +312,7 @@ dayNoteRoutes.post('/:date/blockers/reorder', async (c) => {
 
   const receivedSet = new Set(orderedIds);
   if (orderedIds.length !== currentIds.size || [...currentIds].some((id) => !receivedSet.has(id))) {
-    throw ApiHttpError.validation([
-      { field: 'orderedIds', message: '障害の過不足があります。' },
-    ]);
+    throw ApiHttpError.validation([{ field: 'orderedIds', message: '障害の過不足があります。' }]);
   }
 
   const reordered = await blockerRepository.reorder(dayNoteId, orderedIds);
@@ -357,5 +355,38 @@ dayNoteRoutes.patch('/:date/reflection', async (c) => {
   const dayNoteId = await requireDayNoteIdByDate(date);
   const updated = await reflectionRepository.update(dayNoteId, parsed.data);
   if (!updated) throw ApiHttpError.notFound('指定された日付の振り返りが見つかりません。');
+  return c.json(updated);
+});
+
+/** PATCH /api/day-notes/:date/note-entry のボディスキーマ（body 任意、上限50000文字、[api_contract.md §7]）。省略時は現状維持 */
+const patchNoteEntryBodySchema = z.object({ body: z.string().max(50000).optional() }).strict();
+
+/**
+ * PATCH /api/day-notes/:date/note-entry
+ *
+ * ノート本文（NoteEntry.body）の全文一括更新（[api_contract.md §7]）。
+ * CodeMirror の全文を送る（部分 diff は MVP では扱わない）。存在しない date は 404。
+ */
+dayNoteRoutes.patch('/:date/note-entry', async (c) => {
+  const date = c.req.param('date');
+  if (!isValidDateString(date)) {
+    throw ApiHttpError.validation([
+      { field: 'date', message: '日付は YYYY-MM-DD 形式で指定してください。' },
+    ]);
+  }
+
+  const raw = await c.req.json().catch(() => ({}));
+  const parsed = patchNoteEntryBodySchema.safeParse(raw);
+  if (!parsed.success) {
+    const fields = parsed.error.issues.map((issue) => ({
+      field: issue.path.join('.') || 'body',
+      message: issue.message,
+    }));
+    throw ApiHttpError.validation(fields);
+  }
+
+  const dayNoteId = await requireDayNoteIdByDate(date);
+  const updated = await noteEntryRepository.update(dayNoteId, parsed.data);
+  if (!updated) throw ApiHttpError.notFound('指定された日付のノート本文が見つかりません。');
   return c.json(updated);
 });

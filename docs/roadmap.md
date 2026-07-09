@@ -430,54 +430,54 @@
 
 ### タスク
 
-- [ ] **T-4-01** [repo/api] NoteEntry 本文更新
+- [x] **T-4-01** [repo/api] NoteEntry 本文更新
   - 依存: T-1-06
   - 対象AC: AC-04
   - 出力: `packages/repository/src/noteEntryRepository.ts` に `updateBody`、`apps/api/src/routes/dayNotes.ts` に `PATCH /api/day-notes/:date/note-entry`（全文一括、[api_contract.md §7](api_contract.md)）
   - 完了条件: CodeMirror全文を送って保存できる（上限50000文字で `VALIDATION_ERROR`）
-- [ ] **T-4-02** [test] NoteEntry Integration テスト
+- [x] **T-4-02** [test] NoteEntry Integration テスト
   - 依存: T-4-01
   - 対象AC: AC-04
   - 出力: `apps/api/test/noteEntry.integration.test.ts`（[test_strategy.md §4.2](test_strategy.md): 本文更新、上限超過）
   - 完了条件: 本文UPSERTと上限検証が動作する
-- [ ] **T-4-03** [ui] CodeMirror 統合
+- [x] **T-4-03** [ui] CodeMirror 統合
   - 依存: T-0-09
   - 対象AC: AC-03
   - 出力: `apps/desktop/renderer/src/components/NoteEditor.tsx`（CodeMirror 6、Tailwindで広いテキストエリア、[要件 6.3](dayborad_requirements.md)）
   - 完了条件: 数万文字でも実用上軽快（[edge_cases.md §6.1](edge_cases.md)）
-- [ ] **T-4-04** [ui] ノート本文の自動保存接続
+- [x] **T-4-04** [ui] ノート本文の自動保存接続
   - 依存: T-4-01, T-4-03, T-2-07
   - 対象AC: AC-04
   - 対象US: US-MVP-007
   - 出力: CodeMirror入力 → デバウンス800ms → `PATCH /note-entry`（[autosave_spec.md §3.4](autosave_spec.md)）
   - 完了条件: 入力停止800ms後に全文保存、状態表示が追従する
-- [ ] **T-4-05** [ui] 表示モード（viewMode）state と切替
+- [x] **T-4-05** [ui] 表示モード（viewMode）state と切替
   - 依存: T-4-03
   - 対象AC: AC-03, AC-04
   - 対象US: US-MVP-008
   - 出力: `apps/desktop/renderer/src/state/viewMode.ts`（[ui_interaction_spec.md §2.1](ui_interaction_spec.md)）、`WorkMode`/`NoteMode` の切替ラッパー、`⌘/Ctrl+J` と（標準キーバインド時の）`Esc` の基本ハンドリング
   - 完了条件: `work ⇄ note` が体感即時に切り替わる
-- [ ] **T-4-06** [ui] IME 保護（キーハンドラ先頭ガード）
+- [x] **T-4-06** [ui] IME 保護（キーハンドラ先頭ガード）
   - 依存: T-4-05
   - 対象AC: AC-03, AC-19
   - 出力: `apps/desktop/renderer/src/keybindings/guardIme.ts`（`isComposing === true` / `keyCode === 229` でショートカット判定スキップ、[ui_interaction_spec.md §9.1](ui_interaction_spec.md)）
   - 完了条件: 日本語変換中のショートカット誤動作を防ぐ（Vim詳細は Phase 7）
-- [ ] **T-4-07** [ui] Esc 優先順位（基本: IME→モーダル→モード戻り）
+- [x] **T-4-07** [ui] Esc 優先順位（基本: IME→モーダル→モード戻り）
   - 依存: T-4-06
   - 対象AC: AC-04
   - 出力: `apps/desktop/renderer/src/keybindings/escPriority.ts`（[ui_interaction_spec.md §9.2](ui_interaction_spec.md) の優先順位。Vim Insert→Normal は Phase 7 で差し込み）
   - 完了条件: 標準キーバインドで `Esc` がノートモードから仕事整理へ戻す
-- [ ] **T-4-08** [ui] モード切替前 flush 接続
+- [x] **T-4-08** [ui] モード切替前 flush 接続
   - 依存: T-4-05, T-2-10
   - 対象AC: AC-04
   - 出力: `viewMode` 切替の直前に `flush()` を呼び、localStorage同期書込成功で切替（[autosave_spec.md §9.1](autosave_spec.md)）
   - 完了条件: 切替直前の編集が失われない
-- [ ] **T-4-09** [ui] ノートモード ヘッダー（戻る案内）
+- [x] **T-4-09** [ui] ノートモード ヘッダー（戻る案内）
   - 依存: T-4-05, T-1-13
   - 対象AC: AC-03
   - 出力: `NoteMode.tsx` のヘッダー（[要件 6.3](dayborad_requirements.md): 日付、曜日、モード名、「Esc 戻る」）
   - 完了条件: 戻る操作の案内が表示される
-- [ ] **T-4-10** [test] モード切替 E2E
+- [x] **T-4-10** [test] モード切替 E2E
   - 依存: T-4-05, T-4-08
   - 対象AC: AC-03, AC-04
   - 出力: `apps/desktop/e2e/modeSwitch.spec.ts`（[test_strategy.md §5.2 4.2](test_strategy.md)）
@@ -485,9 +485,9 @@
 
 ### Phase 4 のチェック基準
 
-- [ ] `⌘/Ctrl+J` でノートモードへ（AC-03）
-- [ ] `Esc`/`⌘J` で戻り、本文が失われない（AC-04）
-- [ ] ノート本文がデバウンス保存される
+- [x] `⌘/Ctrl+J` でノートモードへ（AC-03）
+- [x] `Esc`/`⌘J` で戻り、本文が失われない（AC-04）
+- [x] ノート本文がデバウンス保存される
 
 ---
 
@@ -873,12 +873,12 @@ T-0-01 → T-0-05 → T-1-04 → T-1-07 → T-1-08 → T-2-07 → T-3-10 → T-4
 | Phase 1 | 14 | 14 | 完了 |
 | Phase 2 | 15 | 15 | 完了 |
 | Phase 3 | 14 | 14 | 完了 |
-| Phase 4 | 10 | 0 | 未着手 |
+| Phase 4 | 10 | 10 | 完了 |
 | Phase 5 | 14 | 0 | 未着手 |
 | Phase 6 | 6 | 0 | 未着手 |
 | Phase 7 | 11 | 0 | 未着手 |
 | Phase 8 | 7 | 0 | 未着手 |
-| **合計** | **103** | **55** | — |
+| **合計** | **103** | **65** | — |
 
 ---
 

@@ -13,6 +13,7 @@ import type {
   BlockerItem,
   DayNote,
   DayNoteFull,
+  NoteEntry,
   Reflection,
   TodoItem,
   ViewMode,
@@ -156,11 +157,14 @@ export async function patchTodo(
 
 /** POST /api/day-notes/:date/todos/reorder — TODO 並替（[api_contract.md §5]）。 */
 export async function reorderTodos(date: string, orderedIds: string[]): Promise<TodoItem[]> {
-  const res = await fetch(`${getApiBaseUrl()}/day-notes/${encodeURIComponent(date)}/todos/reorder`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ orderedIds }),
-  });
+  const res = await fetch(
+    `${getApiBaseUrl()}/day-notes/${encodeURIComponent(date)}/todos/reorder`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ orderedIds }),
+    },
+  );
   await assertOk(res);
   return (await res.json()) as TodoItem[];
 }
@@ -237,4 +241,15 @@ export async function patchReflection(
   });
   await assertOk(res);
   return (await res.json()) as Reflection;
+}
+
+/** PATCH /api/day-notes/:date/note-entry — ノート本文の全文一括更新（[api_contract.md §7]）。 */
+export async function patchNoteEntry(date: string, patch: { body?: string }): Promise<NoteEntry> {
+  const res = await fetch(`${getApiBaseUrl()}/day-notes/${encodeURIComponent(date)}/note-entry`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(patch),
+  });
+  await assertOk(res);
+  return (await res.json()) as NoteEntry;
 }

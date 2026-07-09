@@ -1,5 +1,5 @@
 /**
- * アプリケーションルート（[roadmap.md T-1-12/13/14, T-2-07〜11, T-3-09/14]）
+ * アプリケーションルート（[roadmap.md T-1-12/13/14, T-2-07〜11, T-3-09/14, T-4-04〜09]）
  *
  * 起動時に今日の DayNote を取得し（AC-01）、Header に日付・曜日・テーマ入力欄・
  * 日付移動ボタンを表示する（[要件 6.2]）。日付移動で currentDate が変わると
@@ -15,17 +15,27 @@
  * - 仕事整理モードの3カラム（TODO/障害/振り返り）を統合（T-3-09）
  * - TODO/Blocker/Reflection の自動保存・即時保存エントリを動的生成
  * - carried/done 表示（T-3-14）
+ *
+ * Phase 4 で追加:
+ * - viewMode（work/note）の切替。`⌘/Ctrl+J` でノートモード、`Esc`/`⌘J` で戻る（AC-03/04）
+ * - NoteMode + NoteEditor（CodeMirror 6）で会議メモ本文を編集（T-4-03/05/09）
+ * - ノート本文を800msデバウンスで PATCH /note-entry へ自動保存（T-4-04）
+ * - モード切替前に flush、localStorage 書込成功で切替（T-4-08）
+ * - IME 変換中はショートカット判定をスキップ（T-4-06、AC-19 基盤）
+ * - Esc の優先順位（T-4-07）。Phase 4 は「ノートモード → work 戻り」のみ
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { addDays, todayLocal, toggleDone, type SaveTarget } from '@dayboard/domain';
 import { FlushFailDialog } from './components/FlushFailDialog.js';
 import { Header } from './components/Header.js';
+import { NoteMode } from './components/NoteMode.js';
 import { SaveStatus } from './components/SaveStatus.js';
 import { WorkMode } from './components/WorkMode.js';
 import {
   createBlockerOrderSaver,
   createBlockerSaver,
+  createNoteEntrySaver,
   createReflectionSaver,
   createThemeSaver,
   createTodoOrderSaver,
@@ -44,6 +54,9 @@ import { useAutosave } from './hooks/useAutosave.js';
 import { useDayNote } from './hooks/useDayNote.js';
 import { useFlushOnQuit } from './hooks/useFlushOnQuit.js';
 import { useWorkData } from './hooks/useWorkData.js';
+import { useViewMode } from './state/viewMode.js';
+import { isComposing } from './keybindings/guardIme.js';
+import { handleEsc } from './keybindings/escPriority.js';
 import type { Reflection } from 'shared-types';
 
 /** テーマ保存対象の識別子（T-2-09） */
@@ -54,16 +67,22 @@ const TODO_ORDER_TARGET: SaveTarget = { type: 'todoOrder' };
 const BLOCKER_ORDER_TARGET: SaveTarget = { type: 'blockerOrder' };
 /** 振り返りの保存対象識別子 */
 const REFLECTION_TARGET: SaveTarget = { type: 'reflection' };
+/** ノート本文の保存対象識別子（T-4-04） */
+const NOTE_ENTRY_TARGET: SaveTarget = { type: 'noteEntry' };
 
 export default function App() {
   const { currentDate, goTo, isToday } = useDateNavigation();
   const { data, loading, error } = useDayNote(currentDate);
   const { workData, dispatch } = useWorkData(data, currentDate);
+  const { viewMode, setMode } = useViewMode();
 
-  // 保存エントリを data から動的生成（theme + 全 todo + todoOrder + 全 blocker + blockerOrder + reflection）
+  // 保存エントリを data から動的生成（theme + 全 todo + todoOrder + 全 blocker + blockerOrder + reflection + noteEntry）
   // 日付ごと、各対象ごとに Saver を生成する（[autosave_spec.md §2.1]）
   const entries = useMemo<AutosaveEntry[]>(() => {
     const list: AutosaveEntry[] = [{ target: THEME_TARGET, saver: createThemeSaver(currentDate) }];
+    if (data) {
+      list.push({ target: NOTE_ENTRY_TARGET, saver: createNoteEntrySaver(currentDate) });
+    }
     if (workData) {
       for (const todo of workData.todos) {
         list.push({ target: { type: 'todo', id: todo.id }, saver: createTodoSaver(todo.id) });
@@ -79,7 +98,7 @@ export default function App() {
       list.push({ target: REFLECTION_TARGET, saver: createReflectionSaver(currentDate) });
     }
     return list;
-  }, [currentDate, workData]);
+  }, [currentDate, data, workData]);
 
   const { saveStatus, flush, retryAll, edit, saveNow } = useAutosave(currentDate, entries);
 
@@ -94,6 +113,9 @@ export default function App() {
     void recoverOnStartup((date, target) => {
       if (target.type === 'dayNote' && target.field === 'theme') {
         return createThemeSaver(date);
+      }
+      if (target.type === 'noteEntry') {
+        return createNoteEntrySaver(date);
       }
       if (target.type === 'reflection') {
         return createReflectionSaver(date);
@@ -114,8 +136,23 @@ export default function App() {
     });
   }, []);
 
-  // localStorage 書込失敗時の保留中遷移先（§9.3）。null=ダイアログ非表示。
-  const [pendingNav, setPendingNav] = useState<string | null>(null);
+  // localStorage 書込失敗時の保留中操作（§9.3）。null=ダイアログ非表示。
+  // 日付移動とモード切替の両方で共通利用する（FlushFailDialog は汎用「移動する/キャンセル」）。
+  type PendingAction =
+    { kind: 'navigate'; targetDate: string } | { kind: 'setMode'; mode: 'work' | 'note' };
+  const [pendingAction, setPendingAction] = useState<PendingAction | null>(null);
+
+  /** 保留中操作を実行する（FlushFailDialog の「移動する」で呼ばれる、§9.3） */
+  const runPendingAction = useCallback(
+    (action: PendingAction) => {
+      if (action.kind === 'navigate') {
+        goTo(action.targetDate);
+      } else {
+        setMode(action.mode);
+      }
+    },
+    [goTo, setMode],
+  );
 
   /**
    * 日付移動のラッパー: flush → localStorage 成功で遷移、失敗で確認ダイアログ（T-2-10/11）。
@@ -134,10 +171,32 @@ export default function App() {
         goTo(targetDate);
       } else {
         // localStorage 書込失敗: 遷移を保留して確認（§9.3）
-        setPendingNav(targetDate);
+        setPendingAction({ kind: 'navigate', targetDate });
       }
     },
     [flush, goTo],
+  );
+
+  /**
+   * モード切替のラッパー: flush → localStorage 成功で切替、失敗で確認ダイアログ（T-4-08）。
+   *
+   * [autosave_spec.md §9.1/§9.3]:
+   * - 切替直前に全保留デバウンスを flush し localStorage へ同期書込
+   * - localStorage 書込成功後、viewMode を即時切替（サーバー保存はバックグラウンド継続）
+   * - localStorage 書込自体の失敗時のみ切替を止めてユーザーへ確認
+   *
+   * @param mode 切替先の表示モード
+   */
+  const setModeWithFlush = useCallback(
+    async (mode: 'work' | 'note') => {
+      const { localStorageOk } = await flush();
+      if (localStorageOk) {
+        setMode(mode);
+      } else {
+        setPendingAction({ kind: 'setMode', mode });
+      }
+    },
+    [flush, setMode],
   );
 
   const goPrevDay = useCallback(() => {
@@ -295,6 +354,105 @@ export default function App() {
     [dispatch, edit],
   );
 
+  // --- NoteEntry（Phase 4） ---
+
+  /**
+   * ノート本文編集: デバウンス保存（edit）のみ（T-4-04）。
+   *
+   * CodeMirror の本文全文を useAutosave.edit へ流す。800ms後に PATCH /note-entry が送信される。
+   * 楽観的 state は CodeMirror がローカルで保持し、data.noteEntry.body は
+   * 日付切替時の取り込みのみで更新されるため dispatch 不要。
+   */
+  const handleEditNoteBody = useCallback(
+    (body: string) => {
+      edit(NOTE_ENTRY_TARGET, { body });
+    },
+    [edit],
+  );
+
+  // ============================================================================
+  // Phase 4: モード切替のグローバルキーハンドラ（T-4-05/06/07/08）
+  // ============================================================================
+
+  /**
+   * `⌘/Ctrl+J` と `Esc` のグローバルキーハンドラ（T-4-05）。
+   *
+   * [ui_interaction_spec.md §4.1/§9.1/§9.2]:
+   * - IME 変換中（isComposing）は全ショートカット判定をスキップ（T-4-06、AC-19 基盤）
+   * - `⌘/Ctrl+J`: work ⇄ note を切替。切替前に flush（T-4-08、AC-03/04）
+   * - `Esc`: [§9.2] の優先順位で処理（T-4-07）。Phase 4 では「ノートモード → work 戻り」のみ
+   *
+   * Phase 7 で Vim Insert→Normal（段2）とモーダル（段3）を escPriority へ差し込む。
+   */
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      // IME 変換中はショートカット判定をスキップ（T-4-06、[§9.1]）
+      if (isComposing(e)) return;
+
+      // ⌘/Ctrl+J でモード切替（Mac: metaKey、Win/Linux: ctrlKey）
+      if ((e.metaKey || e.ctrlKey) && (e.key === 'j' || e.key === 'J')) {
+        e.preventDefault();
+        const nextMode = viewMode === 'work' ? 'note' : 'work';
+        void setModeWithFlush(nextMode);
+        return;
+      }
+
+      // Esc: 優先順位に従い処理（T-4-07、[§9.2]）
+      if (e.key === 'Escape') {
+        const consumed = handleEsc({
+          viewMode,
+          goToWork: () => {
+            void setModeWithFlush('work');
+          },
+        });
+        if (consumed) e.preventDefault();
+      }
+    };
+
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [viewMode, setModeWithFlush]);
+
+  // ============================================================================
+  // レンダリング（Phase 4: viewMode で work/note を切替、[要件 7.7]）
+  // ============================================================================
+
+  // ノートモード: CodeMirror 本文を画面いっぱいに表示（[要件 6.3]、[§9.1 ④非同時表示]）
+  if (viewMode === 'note') {
+    return (
+      <div className="min-h-screen bg-stone-50 text-stone-800">
+        {data && (
+          <NoteMode
+            currentDate={currentDate}
+            body={data.noteEntry.body}
+            onBodyChange={handleEditNoteBody}
+          />
+        )}
+
+        {/* 保存状態表示（右上、ノートモードでも共通） */}
+        <div className="pointer-events-none fixed right-4 top-3 z-40">
+          <div className="pointer-events-auto">
+            <SaveStatus status={saveStatus} onRetry={retryAll} />
+          </div>
+        </div>
+
+        {/* localStorage 書込失敗時の確認ダイアログ（§9.3、モード切替兼用） */}
+        <FlushFailDialog
+          open={pendingAction !== null}
+          onProceed={() => {
+            if (pendingAction) {
+              // ユーザー明示で操作を実行（localStorage 保護なし、§9.3「移動する」）
+              runPendingAction(pendingAction);
+            }
+            setPendingAction(null);
+          }}
+          onCancel={() => setPendingAction(null)}
+        />
+      </div>
+    );
+  }
+
+  // 仕事整理モード（デフォルト）
   return (
     <div className="min-h-screen bg-stone-50 text-stone-800">
       <Header
@@ -352,17 +510,17 @@ export default function App() {
         )}
       </main>
 
-      {/* localStorage 書込失敗時の確認ダイアログ（§9.3） */}
+      {/* localStorage 書込失敗時の確認ダイアログ（§9.3、モード切替兼用） */}
       <FlushFailDialog
-        open={pendingNav !== null}
+        open={pendingAction !== null}
         onProceed={() => {
-          if (pendingNav) {
-            // ユーザー明示で遷移（localStorage 保護なし、§9.3「移動する」）
-            goTo(pendingNav);
+          if (pendingAction) {
+            // ユーザー明示で操作を実行（localStorage 保護なし、§9.3「移動する」）
+            runPendingAction(pendingAction);
           }
-          setPendingNav(null);
+          setPendingAction(null);
         }}
-        onCancel={() => setPendingNav(null)}
+        onCancel={() => setPendingAction(null)}
       />
     </div>
   );
