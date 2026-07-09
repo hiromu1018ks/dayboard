@@ -23,6 +23,20 @@ import { closeApp, launchApp } from './helpers.js';
 const THEME_INPUT = '#theme-input';
 /** NoteEditor のホスト要素（ノートモードの識別子） */
 const NOTE_EDITOR = '[data-testid="note-editor"]';
+/** CodeMirror の本文コンテンツ領域 */
+const CM_CONTENT = `${NOTE_EDITOR} .cm-content`;
+
+/**
+ * CodeMirror の本文全文を取得する。
+ *
+ * CodeMirror 6 は行ごとに `.cm-line` div を生成するため、`.cm-content` の textContent を
+ * そのまま取ると行区切りやカーソルマーカー（ゼロ幅スペース等）が混入し、環境によって
+ * 不安定になる。`.cm-line` 行を集計し改行で結合することで、実際の編集内容に近い値を得る。
+ */
+async function getNoteBody(window: import('@playwright/test').Page): Promise<string> {
+  const lines = await window.locator(`${CM_CONTENT} .cm-line`).allTextContents();
+  return lines.join('\n');
+}
 
 /**
  * `⌘/Ctrl+J` を押下する。プラットフォームに応じて修飾キーを選択。
@@ -93,13 +107,13 @@ test.describe('モード切替（AC-03/AC-04）', () => {
     ({ app, window } = await launchApp());
     await expect(window.locator(THEME_INPUT)).toBeVisible({ timeout: 15_000 });
 
-    // ノートモードへ
+    // ノートモードへ（切替直後に CodeMirror へフォーカスされる、[§4.1]）
     await pressModeToggle(window);
     await expect(window.locator(NOTE_EDITOR)).toBeVisible({ timeout: 10_000 });
 
-    // CodeMirror の contenteditable に本文を入力
-    const editor = window.locator(`${NOTE_EDITOR} .cm-content`);
-    await editor.click();
+    // フォーカスが当たっていることを確認してから入力（修正3 の検証）
+    await expect(window.locator(CM_CONTENT)).toBeFocused({ timeout: 5_000 });
+
     const noteText = `E2Eノート ${Date.now()}`;
     await window.keyboard.type(noteText);
 
@@ -114,8 +128,8 @@ test.describe('モード切替（AC-03/AC-04）', () => {
     await pressModeToggle(window);
     await expect(window.locator(NOTE_EDITOR)).toBeVisible({ timeout: 10_000 });
 
-    // CodeMirror の本文に入力内容が含まれるか検証
-    const bodyAfter = await window.locator(`${NOTE_EDITOR} .cm-content`).textContent();
+    // CodeMirror の本文（.cm-line 行を集計）に入力内容が含まれるか検証
+    const bodyAfter = await getNoteBody(window);
     expect(bodyAfter).toContain(noteText);
   });
 });

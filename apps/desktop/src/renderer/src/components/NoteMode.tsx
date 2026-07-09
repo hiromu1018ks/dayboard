@@ -8,10 +8,13 @@
  * - NoteEditor（CodeMirror 6）で本文編集（T-4-03）
  * - 本文変更は親（App）の `onBodyChange` へ通知 → 800ms デバウンス保存（T-4-04）
  * - `⌘/Ctrl+J` と `Esc` による work 戻りは App のグローバルキーハンドラで処理（T-4-05/07/08）
+ * - editorRef を公開し、モード切替直後に App からフォーカスを当てる（[§4.1]）
+ * - loading 中は本文の代わりに「読み込み中…」を表示（日付移動直後の空白画面防止）
  */
 
+import { forwardRef } from 'react';
 import { getWeekdayLabel } from '@dayboard/domain';
-import { NoteEditor } from './NoteEditor.js';
+import { NoteEditor, type NoteEditorHandle } from './NoteEditor.js';
 
 /** YYYY-MM-DD を「2026/07/08」形式に整形（Header.tsx と共通の表示形式） */
 function formatDisplayDate(dateStr: string): string {
@@ -26,9 +29,14 @@ export type NoteModeProps = {
   body: string;
   /** 本文変更時に呼ばれる（親で useAutosave.edit へ接続） */
   onBodyChange: (body: string) => void;
+  /** データロード中か（true のとき本文の代わりに読み込み中表示） */
+  loading?: boolean;
 };
 
-export function NoteMode({ currentDate, body, onBodyChange }: NoteModeProps) {
+export const NoteMode = forwardRef<NoteEditorHandle, NoteModeProps>(function NoteMode(
+  { currentDate, body, onBodyChange, loading = false },
+  ref,
+) {
   const displayDate = formatDisplayDate(currentDate);
   const weekday = getWeekdayLabel(currentDate);
 
@@ -66,12 +74,16 @@ export function NoteMode({ currentDate, body, onBodyChange }: NoteModeProps) {
 
       {/* CodeMirror 本文エリア（[要件 6.3]: 広いテキストエリアを主役に） */}
       <main className="mx-auto flex w-full max-w-5xl flex-1 flex-col px-8 py-4">
-        <div className="flex-1 overflow-hidden rounded-lg border border-stone-200 bg-white shadow-sm">
-          <NoteEditor value={body} onChange={onBodyChange} />
-        </div>
+        {loading ? (
+          <p className="text-sm text-stone-500">読み込み中…</p>
+        ) : (
+          <div className="flex-1 overflow-hidden rounded-lg border border-stone-200 bg-white shadow-sm">
+            <NoteEditor ref={ref} value={body} onChange={onBodyChange} />
+          </div>
+        )}
       </main>
     </div>
   );
-}
+});
 
 export default NoteMode;

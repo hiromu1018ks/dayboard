@@ -30,6 +30,7 @@ import { addDays, todayLocal, toggleDone, type SaveTarget } from '@dayboard/doma
 import { FlushFailDialog } from './components/FlushFailDialog.js';
 import { Header } from './components/Header.js';
 import { NoteMode } from './components/NoteMode.js';
+import type { NoteEditorHandle } from './components/NoteEditor.js';
 import { SaveStatus } from './components/SaveStatus.js';
 import { WorkMode } from './components/WorkMode.js';
 import {
@@ -75,6 +76,28 @@ export default function App() {
   const { data, loading, error } = useDayNote(currentDate);
   const { workData, dispatch } = useWorkData(data, currentDate);
   const { viewMode, setMode } = useViewMode();
+
+  // --- NoteEntry の楽観的 state（Phase 4） ---
+  // CodeMirror の本文全文を data.noteEntry.body とは別にローカルで保持する。
+  // 理由: handleEditNoteBody で edit() を呼ぶだけだと data state が更新されず、
+  // 将来の refetch（Phase 5 の行変換後等）でサーバーの古い値へ巻き戻る不具合が起きる。
+  // ローカル state を更新しておけば、refetch で data が新しくなっても、
+  // 同一日付内の編集は NoteEditor の shouldApplyExternalValue で保護される。
+  // 日付が変わったら新 DayNote の本文で初期化する（他カラムと同じ prevDateRef イディオム）。
+  const [noteBody, setNoteBody] = useState('');
+  const notePrevDateRef = useRef<string | null>(null);
+  const noteEditorRef = useRef<NoteEditorHandle>(null);
+
+  useEffect(() => {
+    if (!data) return;
+    if (notePrevDateRef.current !== currentDate) {
+      setNoteBody(data.noteEntry.body);
+      notePrevDateRef.current = currentDate;
+    }
+    // 同一日付内の data 変化（サーバー保存結果の反映等）ではユーザー編集を保持するため
+    // 上書きしない。NoteEditor の shouldApplyExternalValue が CodeMirror と異なる場合のみ
+    // 取り込むため、編集中でも安全。
+  }, [data, currentDate]);
 
   // 保存エントリを data から動的生成（theme + 全 todo + todoOrder + 全 blocker + blockerOrder + reflection + noteEntry）
   // 日付ごと、各対象ごとに Saver を生成する（[autosave_spec.md §2.1]）
@@ -357,14 +380,15 @@ export default function App() {
   // --- NoteEntry（Phase 4） ---
 
   /**
-   * ノート本文編集: デバウンス保存（edit）のみ（T-4-04）。
+   * ノート本文編集: 楽観的 state 更新 + デバウンス保存（edit）（T-4-04）。
    *
-   * CodeMirror の本文全文を useAutosave.edit へ流す。800ms後に PATCH /note-entry が送信される。
-   * 楽観的 state は CodeMirror がローカルで保持し、data.noteEntry.body は
-   * 日付切替時の取り込みのみで更新されるため dispatch 不要。
+   * CodeMirror の本文全文を:
+   * 1. noteBody state へ反映（楽観的。refetch でサーバー値へ巻き戻るのを防ぐ）
+   * 2. useAutosave.edit へ流す（800ms後に PATCH /note-entry が送信される）
    */
   const handleEditNoteBody = useCallback(
     (body: string) => {
+      setNoteBody(body);
       edit(NOTE_ENTRY_TARGET, { body });
     },
     [edit],
@@ -379,8 +403,13 @@ export default function App() {
    *
    * [ui_interaction_spec.md §4.1/§9.1/§9.2]:
    * - IME 変換中（isComposing）は全ショートカット判定をスキップ（T-4-06、AC-19 基盤）
-   * - `⌘/Ctrl+J`: work ⇄ note を切替。切替前に flush（T-4-08、AC-03/04）
+   * - `⌘/Ctrl+J`: work ⇄ note を切替。切替前に flush（T-4-08、AC-03/04）。
+   *   work→note の切替直後に CodeMirror へフォーカスし、即入力できる（[§4.1]、AC-03）
    * - `Esc`: [§9.2] の優先順位で処理（T-4-07）。Phase 4 では「ノートモード → work 戻り」のみ
+   *
+   * Phase 4 の `basicSetup` 構成では CodeMirror 側が Esc を消費する拡張（補完等）はないため、
+   * ノートモード中の Esc は work 戻りとして扱って安全（AC-04）。
+   * Phase 7 以降で Esc を使う拡張を入れる場合は escPriority.ts へ段を差し込むこと。
    *
    * Phase 7 で Vim Insert→Normal（段2）とモーダル（段3）を escPriority へ差し込む。
    */
@@ -389,11 +418,18 @@ export default function App() {
       // IME 変換中はショートカット判定をスキップ（T-4-06、[§9.1]）
       if (isComposing(e)) return;
 
-      // ⌘/Ctrl+J でモード切替（Mac: metaKey、Win/Linux: ctrlKey）
-      if ((e.metaKey || e.ctrlKey) && (e.key === 'j' || e.key === 'J')) {
+      // ⌘/Ctrl+J でモード切替（Mac: metaKey、Win/Linux: ctrlKey）。
+      // toLowerCase で CapsLock や Shift の有無を吸収（要件8.1 は ⌘+J のみ規定）。
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'j') {
         e.preventDefault();
         const nextMode = viewMode === 'work' ? 'note' : 'work';
-        void setModeWithFlush(nextMode);
+        void setModeWithFlush(nextMode).then(() => {
+          // work→note 切替直後に CodeMirror へフォーカス（[§4.1]、即入力可能にする）
+          if (nextMode === 'note') {
+            // フォーカスは描画後に行う必要があるため次フレームへ遅延
+            requestAnimationFrame(() => noteEditorRef.current?.focus());
+          }
+        });
         return;
       }
 
@@ -421,13 +457,13 @@ export default function App() {
   if (viewMode === 'note') {
     return (
       <div className="min-h-screen bg-stone-50 text-stone-800">
-        {data && (
-          <NoteMode
-            currentDate={currentDate}
-            body={data.noteEntry.body}
-            onBodyChange={handleEditNoteBody}
-          />
-        )}
+        <NoteMode
+          ref={noteEditorRef}
+          currentDate={currentDate}
+          body={noteBody}
+          onBodyChange={handleEditNoteBody}
+          loading={loading || !data}
+        />
 
         {/* 保存状態表示（右上、ノートモードでも共通） */}
         <div className="pointer-events-none fixed right-4 top-3 z-40">
