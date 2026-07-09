@@ -27,6 +27,7 @@ export type SaveTarget =
   | { type: 'todo'; id: string }
   | { type: 'todoOrder' }
   | { type: 'blocker'; id: string }
+  | { type: 'blockerOrder' }
   | { type: 'reflection' }
   | { type: 'noteEntry' };
 
@@ -75,6 +76,8 @@ export function targetKey(target: SaveTarget): string {
       return 'todoOrder';
     case 'blocker':
       return `blocker:${target.id}`;
+    case 'blockerOrder':
+      return 'blockerOrder';
     case 'reflection':
       return 'reflection';
     case 'noteEntry':
@@ -217,6 +220,7 @@ export type TargetPayload = {
   todo: { title: string; status?: import('shared-types').TodoStatus };
   todoOrder: string[]; // todoId の順序配列
   blocker: { text: string; resolved?: boolean; linkedTodoId?: string | null };
+  blockerOrder: string[]; // blockerId の順序配列
   reflection: { doneText?: string; stuckText?: string; tomorrowActionText?: string };
   noteEntry: { body: string };
 };
@@ -235,8 +239,10 @@ export type PayloadFor<T extends SaveTarget> = T extends { type: 'dayNote'; fiel
         ? TargetPayload['todoOrder']
         : T extends { type: 'blocker' }
           ? TargetPayload['blocker']
-          : T extends { type: 'reflection' }
-            ? TargetPayload['reflection']
-            : T extends { type: 'noteEntry' }
-              ? TargetPayload['noteEntry']
-              : unknown;
+          : T extends { type: 'blockerOrder' }
+            ? TargetPayload['blockerOrder']
+            : T extends { type: 'reflection' }
+              ? TargetPayload['reflection']
+              : T extends { type: 'noteEntry' }
+                ? TargetPayload['noteEntry']
+                : unknown;

@@ -10,8 +10,10 @@
 import { Hono } from 'hono';
 import { corsMiddleware } from './middleware/cors.js';
 import { errorHandler } from './middleware/errorHandler.js';
+import { blockerRoutes } from './routes/blockers.js';
 import { dayNoteRoutes } from './routes/dayNotes.js';
 import { healthRoutes } from './routes/health.js';
+import { todoRoutes } from './routes/todos.js';
 
 export function createApp(): Hono {
   const app = new Hono();
@@ -23,6 +25,8 @@ export function createApp(): Hono {
   // ルートマウント（`/api` プレフィックス）
   app.route('/api', healthRoutes);
   app.route('/api/day-notes', dayNoteRoutes);
+  app.route('/api/todos', todoRoutes);
+  app.route('/api/blockers', blockerRoutes);
 
   return app;
 }

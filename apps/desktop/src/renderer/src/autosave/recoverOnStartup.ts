@@ -29,6 +29,7 @@ export function parseTargetKey(key: string): SaveTarget | null {
   if (key === 'noteEntry') return { type: 'noteEntry' };
   if (key === 'reflection') return { type: 'reflection' };
   if (key === 'todoOrder') return { type: 'todoOrder' };
+  if (key === 'blockerOrder') return { type: 'blockerOrder' };
   if (key.startsWith('dayNote:')) {
     const field = key.slice('dayNote:'.length);
     if (field === 'theme') return { type: 'dayNote', field: 'theme' };

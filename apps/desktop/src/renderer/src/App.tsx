@@ -1,5 +1,5 @@
 /**
- * アプリケーションルート（[roadmap.md T-1-12/13/14, T-2-07〜11]）
+ * アプリケーションルート（[roadmap.md T-1-12/13/14, T-2-07〜11, T-3-09/14]）
  *
  * 起動時に今日の DayNote を取得し（AC-01）、Header に日付・曜日・テーマ入力欄・
  * 日付移動ボタンを表示する（[要件 6.2]）。日付移動で currentDate が変わると
@@ -10,35 +10,78 @@
  * - 日付移動の直前に flush を呼び、localStorage 同期書込成功で遷移（T-2-10）
  * - localStorage 書込失敗時は FlushFailDialog で確認（T-2-11）
  * - 右上に SaveStatus を表示（T-2-08）
- * - 仕事整理モードの3カラム（TODO/障害/振り返り）本体は Phase 3
+ *
+ * Phase 3 で追加:
+ * - 仕事整理モードの3カラム（TODO/障害/振り返り）を統合（T-3-09）
+ * - TODO/Blocker/Reflection の自動保存・即時保存エントリを動的生成
+ * - carried/done 表示（T-3-14）
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { addDays, todayLocal, type SaveTarget } from '@dayboard/domain';
+import { addDays, todayLocal, toggleDone, type SaveTarget } from '@dayboard/domain';
 import { FlushFailDialog } from './components/FlushFailDialog.js';
 import { Header } from './components/Header.js';
 import { SaveStatus } from './components/SaveStatus.js';
-import { createThemeSaver } from './autosave/savers.js';
+import { WorkMode } from './components/WorkMode.js';
+import {
+  createBlockerOrderSaver,
+  createBlockerSaver,
+  createReflectionSaver,
+  createThemeSaver,
+  createTodoOrderSaver,
+  createTodoSaver,
+} from './autosave/savers.js';
 import { recoverOnStartup } from './autosave/recoverOnStartup.js';
 import type { AutosaveEntry } from './autosave/types.js';
+import {
+  deleteBlocker as apiDeleteBlocker,
+  deleteTodo as apiDeleteTodo,
+  postBlocker as apiPostBlocker,
+  postTodo as apiPostTodo,
+} from './api/client.js';
 import { useDateNavigation } from './hooks/useDateNavigation.js';
 import { useAutosave } from './hooks/useAutosave.js';
 import { useDayNote } from './hooks/useDayNote.js';
 import { useFlushOnQuit } from './hooks/useFlushOnQuit.js';
+import { useWorkData } from './hooks/useWorkData.js';
+import type { Reflection } from 'shared-types';
 
 /** テーマ保存対象の識別子（T-2-09） */
 const THEME_TARGET: SaveTarget = { type: 'dayNote', field: 'theme' };
+/** TODO 並替の保存対象識別子 */
+const TODO_ORDER_TARGET: SaveTarget = { type: 'todoOrder' };
+/** Blocker 並替の保存対象識別子 */
+const BLOCKER_ORDER_TARGET: SaveTarget = { type: 'blockerOrder' };
+/** 振り返りの保存対象識別子 */
+const REFLECTION_TARGET: SaveTarget = { type: 'reflection' };
 
 export default function App() {
   const { currentDate, goTo, isToday } = useDateNavigation();
   const { data, loading, error } = useDayNote(currentDate);
+  const { workData, dispatch } = useWorkData(data, currentDate);
 
-  // テーマ保存エントリ（日付ごとに Saver を生成、T-2-09）
-  const entries = useMemo<AutosaveEntry[]>(
-    () => [{ target: THEME_TARGET, saver: createThemeSaver(currentDate) }],
-    [currentDate],
-  );
-  const { saveStatus, flush, retryAll, edit } = useAutosave(currentDate, entries);
+  // 保存エントリを data から動的生成（theme + 全 todo + todoOrder + 全 blocker + blockerOrder + reflection）
+  // 日付ごと、各対象ごとに Saver を生成する（[autosave_spec.md §2.1]）
+  const entries = useMemo<AutosaveEntry[]>(() => {
+    const list: AutosaveEntry[] = [{ target: THEME_TARGET, saver: createThemeSaver(currentDate) }];
+    if (workData) {
+      for (const todo of workData.todos) {
+        list.push({ target: { type: 'todo', id: todo.id }, saver: createTodoSaver(todo.id) });
+      }
+      list.push({ target: TODO_ORDER_TARGET, saver: createTodoOrderSaver(currentDate) });
+      for (const blocker of workData.blockers) {
+        list.push({
+          target: { type: 'blocker', id: blocker.id },
+          saver: createBlockerSaver(blocker.id),
+        });
+      }
+      list.push({ target: BLOCKER_ORDER_TARGET, saver: createBlockerOrderSaver(currentDate) });
+      list.push({ target: REFLECTION_TARGET, saver: createReflectionSaver(currentDate) });
+    }
+    return list;
+  }, [currentDate, workData]);
+
+  const { saveStatus, flush, retryAll, edit, saveNow } = useAutosave(currentDate, entries);
 
   // flush の最新参照を保持（終了時 IPC / beforeunload から呼ぶため、T-2-13）
   const flushRef = useRef(flush);
@@ -49,9 +92,23 @@ export default function App() {
   // アプリマウント時に1回だけ実行（日付移動ごとに再実行しない）。
   useEffect(() => {
     void recoverOnStartup((date, target) => {
-      // 現在はテーマのみ。他対象は Phase 3/4 で追加。
       if (target.type === 'dayNote' && target.field === 'theme') {
         return createThemeSaver(date);
+      }
+      if (target.type === 'reflection') {
+        return createReflectionSaver(date);
+      }
+      if (target.type === 'todoOrder') {
+        return createTodoOrderSaver(date);
+      }
+      if (target.type === 'blockerOrder') {
+        return createBlockerOrderSaver(date);
+      }
+      if (target.type === 'todo') {
+        return createTodoSaver(target.id);
+      }
+      if (target.type === 'blocker') {
+        return createBlockerSaver(target.id);
       }
       return null;
     });
@@ -95,6 +152,149 @@ export default function App() {
     void navigateWithFlush(todayLocal());
   }, [navigateWithFlush]);
 
+  // ============================================================================
+  // Phase 3: 仕事整理モードのハンドラ群
+  // ============================================================================
+
+  // --- TODO ---
+
+  /** TODO 追加: 即時 API 呼出 + 楽観的 state 更新 */
+  const handleAddTodo = useCallback(
+    async (title: string) => {
+      try {
+        const created = await apiPostTodo(currentDate, title);
+        dispatch({ type: 'ADD_TODO', todo: created });
+      } catch (err) {
+        // エラー時は再フェッチで同期（楽観的更新の巻き戻し）
+        console.error('TODO追加に失敗:', err);
+      }
+    },
+    [currentDate, dispatch],
+  );
+
+  /** TODO 完了切替: 即時保存（saveNow）+ 楽観的 state 更新（AC-09） */
+  const handleToggleTodo = useCallback(
+    (id: string) => {
+      if (!workData) return;
+      const todo = workData.todos.find((t) => t.id === id);
+      if (!todo) return;
+      const nextStatus = toggleDone(todo.status);
+      dispatch({ type: 'UPDATE_TODO', id, patch: { status: nextStatus } });
+      saveNow({ type: 'todo', id }, { status: nextStatus });
+    },
+    [workData, dispatch, saveNow],
+  );
+
+  /** TODO 本文編集: デバウンス保存（edit）+ 楽観的 state 更新 */
+  const handleEditTodoTitle = useCallback(
+    (id: string, title: string) => {
+      dispatch({ type: 'UPDATE_TODO', id, patch: { title } });
+      edit({ type: 'todo', id }, { title });
+    },
+    [dispatch, edit],
+  );
+
+  /** TODO 削除: 即時 API 呼出 + 楽観的 state 更新 */
+  const handleDeleteTodo = useCallback(
+    async (id: string) => {
+      dispatch({ type: 'DELETE_TODO', id });
+      try {
+        await apiDeleteTodo(id);
+      } catch (err) {
+        console.error('TODO削除に失敗:', err);
+      }
+    },
+    [dispatch],
+  );
+
+  /** TODO 並替: 即時保存（saveNow）+ 楽観的 state 更新 */
+  const handleReorderTodos = useCallback(
+    (orderedIds: string[]) => {
+      dispatch({ type: 'REORDER_TODOS', orderedIds });
+      saveNow(TODO_ORDER_TARGET, orderedIds);
+    },
+    [dispatch, saveNow],
+  );
+
+  // --- Blocker ---
+
+  /** 障害追加: 即時 API 呼出 + 楽観的 state 更新 */
+  const handleAddBlocker = useCallback(
+    async (text: string, linkedTodoId: string | null) => {
+      try {
+        const created = await apiPostBlocker(currentDate, text, linkedTodoId);
+        dispatch({ type: 'ADD_BLOCKER', blocker: created });
+      } catch (err) {
+        console.error('障害追加に失敗:', err);
+      }
+    },
+    [currentDate, dispatch],
+  );
+
+  /** 障害解消切替: 即時保存（saveNow）+ 楽観的 state 更新 */
+  const handleToggleBlockerResolved = useCallback(
+    (id: string) => {
+      if (!workData) return;
+      const blocker = workData.blockers.find((b) => b.id === id);
+      if (!blocker) return;
+      const nextResolved = !blocker.resolved;
+      dispatch({ type: 'UPDATE_BLOCKER', id, patch: { resolved: nextResolved } });
+      saveNow({ type: 'blocker', id }, { resolved: nextResolved });
+    },
+    [workData, dispatch, saveNow],
+  );
+
+  /** 障害本文編集: デバウンス保存（edit）+ 楽観的 state 更新 */
+  const handleEditBlockerText = useCallback(
+    (id: string, text: string) => {
+      dispatch({ type: 'UPDATE_BLOCKER', id, patch: { text } });
+      edit({ type: 'blocker', id }, { text });
+    },
+    [dispatch, edit],
+  );
+
+  /** 障害のTODO紐付け変更: 即時保存（saveNow）+ 楽観的 state 更新 */
+  const handleChangeBlockerLinkedTodo = useCallback(
+    (id: string, linkedTodoId: string | null) => {
+      dispatch({ type: 'UPDATE_BLOCKER', id, patch: { linkedTodoId } });
+      saveNow({ type: 'blocker', id }, { linkedTodoId });
+    },
+    [dispatch, saveNow],
+  );
+
+  /** 障害削除: 即時 API 呼出 + 楽観的 state 更新 */
+  const handleDeleteBlocker = useCallback(
+    async (id: string) => {
+      dispatch({ type: 'DELETE_BLOCKER', id });
+      try {
+        await apiDeleteBlocker(id);
+      } catch (err) {
+        console.error('障害削除に失敗:', err);
+      }
+    },
+    [dispatch],
+  );
+
+  /** 障害並替: 即時保存（saveNow）+ 楽観的 state 更新 */
+  const handleReorderBlockers = useCallback(
+    (orderedIds: string[]) => {
+      dispatch({ type: 'REORDER_BLOCKERS', orderedIds });
+      saveNow(BLOCKER_ORDER_TARGET, orderedIds);
+    },
+    [dispatch, saveNow],
+  );
+
+  // --- Reflection ---
+
+  /** 振り返り編集: デバウンス保存（edit）+ 楽観的 state 更新 */
+  const handleEditReflection = useCallback(
+    (patch: Partial<Reflection>) => {
+      dispatch({ type: 'UPDATE_REFLECTION', patch });
+      edit(REFLECTION_TARGET, patch);
+    },
+    [dispatch, edit],
+  );
+
   return (
     <div className="min-h-screen bg-stone-50 text-stone-800">
       <Header
@@ -127,33 +327,28 @@ export default function App() {
           </div>
         )}
 
-        {data && !loading && (
-          // TODO(Phase 3): この「DayNote 取得確認」デバッグ表示を仕事整理モードの
-          // 3カラム（TODO/障害/振り返り）に置き換える。Phase 1 は動作確認用の仮実装。
-          <section className="rounded-lg border border-stone-200 bg-white p-6">
-            <h2 className="mb-2 text-sm font-medium text-stone-600">DayNote 取得確認</h2>
-            <dl className="space-y-1 text-sm">
-              <div className="flex gap-2">
-                <dt className="w-32 text-stone-500">id:</dt>
-                <dd className="font-mono text-stone-700">{data.dayNote.id}</dd>
-              </div>
-              <div className="flex gap-2">
-                <dt className="w-32 text-stone-500">date:</dt>
-                <dd className="font-mono text-stone-700">{data.dayNote.date}</dd>
-              </div>
-              <div className="flex gap-2">
-                <dt className="w-32 text-stone-500">theme:</dt>
-                <dd className="font-mono text-stone-700">{data.dayNote.theme ?? '(未入力)'}</dd>
-              </div>
-              <div className="flex gap-2">
-                <dt className="w-32 text-stone-500">lastOpenedMode:</dt>
-                <dd className="font-mono text-stone-700">{data.dayNote.lastOpenedMode}</dd>
-              </div>
-            </dl>
-            <p className="mt-4 text-xs text-stone-400">
-              ※ TODO・障害・振り返りの3カラムは Phase 3 で実装されます。
-            </p>
-          </section>
+        {workData && !loading && (
+          <WorkMode
+            date={currentDate}
+            todos={workData.todos}
+            blockers={workData.blockers}
+            reflection={workData.reflection}
+            dispatch={dispatch}
+            handlers={{
+              onAddTodo: handleAddTodo,
+              onToggleTodo: handleToggleTodo,
+              onEditTodoTitle: handleEditTodoTitle,
+              onDeleteTodo: handleDeleteTodo,
+              onReorderTodos: handleReorderTodos,
+              onAddBlocker: handleAddBlocker,
+              onToggleBlockerResolved: handleToggleBlockerResolved,
+              onEditBlockerText: handleEditBlockerText,
+              onChangeBlockerLinkedTodo: handleChangeBlockerLinkedTodo,
+              onDeleteBlocker: handleDeleteBlocker,
+              onReorderBlockers: handleReorderBlockers,
+              onEditReflection: handleEditReflection,
+            }}
+          />
         )}
       </main>
 

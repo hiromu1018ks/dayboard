@@ -16,9 +16,14 @@ export * as schema from './schema/index.js';
 // リポジトリIF型（[database_schema.md §11] / [test_strategy.md §1.2]）
 export type {
   DayNoteRepository,
+  TodoRepository,
+  BlockerRepository,
   ReflectionRepository,
   NoteEntryRepository,
   DayNoteUpdateInput,
+  TodoUpdateInput,
+  BlockerUpdateInput,
+  ReflectionUpdateInput,
   Tx,
 } from './types.js';
 
@@ -26,6 +31,10 @@ export type {
 export * as dayNoteRepository from './dayNoteRepository.js';
 export * as reflectionRepository from './reflectionRepository.js';
 export * as noteEntryRepository from './noteEntryRepository.js';
+
+// リポジトリ実装（Phase 3: 仕事整理モード）
+export * as todoRepository from './todoRepository.js';
+export * as blockerRepository from './blockerRepository.js';
 
 // DayNote aggregator（AC-01: 自動生成 + DayNoteFull 編成）
 export { getOrCreateFull, patchDayNote, dayNoteExists } from './dayNoteAggregator.js';
