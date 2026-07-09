@@ -1,13 +1,12 @@
 /**
- * ヘッダーコンポーネント（[roadmap.md T-1-13]）
+ * ヘッダーコンポーネント（[roadmap.md T-1-13, T-2-09]）
  *
  * [要件 6.2]: 日付・曜日・今日のテーマ入力欄・日付移動ボタン（‹ / › / 今日）。
  * [ui_interaction_spec.md §7]: ボタンから前日/翌日/今日へ移動。
  *
- * Phase 1 のスコープ:
- * - ヘッダーに日付・曜日を表示（曜日計算は `@dayboard/domain` の `getWeekdayLabel`）
- * - テーマ入力欄を配置（ローカルstateのみ。自動保存接続は Phase 2 の T-2-09）
- * - 日付移動ボタン（Phase 1 では currentDate 更新のみ。flush は Phase 2 の T-2-10）
+ * Phase 1: 日付・曜日表示、テーマ入力欄配置、日付移動ボタン
+ * Phase 2（T-2-09）: テーマ入力を useAutosave のデバウンス保存へ接続。
+ *   入力変更ごとに onThemeEdit を呼び、800ms後に PATCH /api/day-notes/:date の theme 送信。
  */
 
 import { useEffect, useRef, useState } from 'react';
@@ -32,6 +31,8 @@ export type HeaderProps = {
   onToday: () => void;
   /** 今日の日付と一致するか（「今日」ボタンの無効化用） */
   isToday: boolean;
+  /** テーマ編集時に呼ばれる（Phase 2: useAutosave の edit へ接続） */
+  onThemeEdit: (theme: string | null) => void;
 };
 
 export function Header({
@@ -41,24 +42,36 @@ export function Header({
   onNextDay,
   onToday,
   isToday,
+  onThemeEdit,
 }: HeaderProps) {
   const displayDate = formatDisplayDate(currentDate);
   const weekday = getWeekdayLabel(currentDate);
 
-  // テーマ入力のローカルstate。
-  // - 日付（currentDate）が変わったら新たな DayNote のテーマで初期化
-  // - 同一日付内で theme prop が変わった場合（Phase 2 の自動保存反映）は更新しない
-  //   （ユーザー入力をサーバー保存結果で上書きしないため）。
-  // 前回日付を追跡し、日付切替時のみリセットすることで両者を実現する。
+  // テーマ入力のローカルstate（楽観的更新、[autosave_spec.md §8.1]）。
+  // 日付（currentDate）が変わったら新たな DayNote のテーマで初期化する。
+  // 同一日付内の theme prop 変化（サーバー正規化の反映等）では上書きしない
+  // （ユーザー入力がサーバー保存結果で巻き戻るのを避けるため）。
   const [themeInput, setThemeInput] = useState(theme ?? '');
   const prevDateRef = useRef(currentDate);
+
+  // 日付切替時は新 DayNote のテーマで初期化
   useEffect(() => {
     if (prevDateRef.current !== currentDate) {
-      // 日付が変わった: 新 DayNote のテーマで初期化
       setThemeInput(theme ?? '');
       prevDateRef.current = currentDate;
     }
   }, [currentDate, theme]);
+
+  /**
+   * テーマ入力変更ハンドラ（T-2-09）。
+   * 入力ごとにローカルstateを更新（楽観的）し、useAutosave.edit へ通知。
+   * 800ms後に PATCH /api/day-notes/:date の theme が送信される。
+   */
+  const handleThemeChange = (value: string) => {
+    setThemeInput(value);
+    // 空文字は null として扱う（API 側でも正規化されるが、クライアント側でも明示）
+    onThemeEdit(value === '' ? null : value);
+  };
 
   return (
     <header className="border-b border-stone-200 bg-white px-8 py-4">
@@ -101,7 +114,7 @@ export function Header({
         </nav>
       </div>
 
-      {/* テーマ入力欄（[要件 7.2]: 未入力可。自動保存は Phase 2） */}
+      {/* テーマ入力欄（[要件 7.2]: 未入力可。Phase 2 で自動保存接続、T-2-09） */}
       <div className="mt-3 flex items-center gap-2">
         <label htmlFor="theme-input" className="text-sm text-stone-500">
           今日のテーマ：
@@ -110,7 +123,7 @@ export function Header({
           id="theme-input"
           type="text"
           value={themeInput}
-          onChange={(e) => setThemeInput(e.target.value)}
+          onChange={(e) => handleThemeChange(e.target.value)}
           placeholder="今日のテーマを入力"
           maxLength={200}
           className="flex-1 border-b border-stone-200 bg-transparent px-1 py-0.5 text-stone-700 outline-none placeholder:text-stone-300 focus:border-stone-400"
