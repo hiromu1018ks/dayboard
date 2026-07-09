@@ -139,74 +139,74 @@
 
 ### タスク
 
-- [ ] **T-1-01** [domain] 日付ユーティリティ
+- [x] **T-1-01** [domain] 日付ユーティリティ
   - 依存: T-0-03
   - 対象AC: AC-10
   - 出力: `packages/domain/src/date.ts`（`toLocalDateString(date): string`（YYYY-MM-DD）、`addDays(dateStr, n): string`、`todayLocal(): string`）
   - 完了条件: [database_schema.md §8](database_schema.md) のローカル日付運用に従い、サーバー `now()` を使わない
-- [ ] **T-1-02** [test] 日付ユーティリティ Unit テスト
+- [x] **T-1-02** [test] 日付ユーティリティ Unit テスト
   - 依存: T-1-01
   - 対象AC: AC-10
   - 出力: `packages/domain/test/date.test.ts`（[test_strategy.md §3.2](test_strategy.md): 月境界、うるう年、年末、時刻注入）
   - 完了条件: [edge_cases.md §8.1](edge_cases.md) の境界ケースを全て網羅
-- [ ] **T-1-03** [domain] DayNote エンティティ・ID生成
+- [x] **T-1-03** [domain] DayNote エンティティ・ID生成
   - 依存: T-0-03
   - 対象AC: -
   - 出力: `packages/domain/src/entities/dayNote.ts`（`DayNote` 型）、`packages/domain/src/id.ts`（UUID/ULID生成、テストで固定化可能）
   - 完了条件: [api_contract.md §2](api_contract.md) の型と整合
-- [ ] **T-1-04** [repo] DayNoteRepository IF + 実装
+- [x] **T-1-04** [repo] DayNoteRepository IF + 実装
   - 依存: T-1-03
   - 対象AC: AC-01
   - 出力: `packages/repository/src/dayNoteRepository.ts`（[database_schema.md §11](database_schema.md): `findByDate`, `findById`, `create`, `update`、snake_case↔camelCase 変換）
   - 完了条件: テスト用DBで各メソッドが動作する
-- [ ] **T-1-05** [repo] ReflectionRepository（最小 create/upsert）
+- [x] **T-1-05** [repo] ReflectionRepository（最小 create/upsert）
   - 依存: T-1-04
   - 対象AC: AC-01
   - 出力: `packages/repository/src/reflectionRepository.ts`（`create(dayNoteId)`、空文字3セクション）
   - 完了条件: DayNote生成時に空の Reflection が作られる（[database_schema.md §3.5](database_schema.md)）
-- [ ] **T-1-06** [repo] NoteEntryRepository（最小 create）
+- [x] **T-1-06** [repo] NoteEntryRepository（最小 create）
   - 依存: T-1-04
   - 対象AC: AC-01
   - 出力: `packages/repository/src/noteEntryRepository.ts`（`create(dayNoteId)`、body空文字）
   - 完了条件: DayNote生成時に空の NoteEntry が作られる（[database_schema.md §3.6](database_schema.md)）
-- [ ] **T-1-07** [domain] DayNote 取得ユースケース（自動生成付き）
+- [x] **T-1-07** [domain] DayNote 取得ユースケース（自動生成付き）
   - 依存: T-1-04, T-1-05, T-1-06
   - 対象AC: AC-01
   - 出力: `packages/domain/src/usecases/getOrCreateDayNote.ts`（存在しない日付→DayNote+Reflection+NoteEntryをトランザクション生成→`/full` 応答データ編成）
   - 完了条件: 存在しない日付呼び出しで3リソースが1トランザクションで作られる
-- [ ] **T-1-08** [api] `GET /api/day-notes/:date/full` エンドポイント
+- [x] **T-1-08** [api] `GET /api/day-notes/:date/full` エンドポイント
   - 依存: T-1-07
   - 対象AC: AC-01
   - 対象US: US-MVP-001
   - 出力: `apps/api/src/routes/dayNotes.ts`（`GET /:date/full`、[api_contract.md §3](api_contract.md) のレスポンス形状）
   - 完了条件: 存在しない日付を自動生成して200を返す
-- [ ] **T-1-09** [api] `GET /api/day-notes/today/full` エンドポイント
+- [x] **T-1-09** [api] `GET /api/day-notes/today/full` エンドポイント
   - 依存: T-1-08
   - 対象AC: AC-10
   - 出力: `apps/api/src/routes/dayNotes.ts` に追加（[api_contract.md §3](api_contract.md): サーバー側ローカル日付で計算、307リダイレクトまたは直接応答）
   - 完了条件: 常に「今日」の `/full` を返す
-- [ ] **T-1-10** [api] `PATCH /api/day-notes/:date` エンドポイント
+- [x] **T-1-10** [api] `PATCH /api/day-notes/:date` エンドポイント
   - 依存: T-1-04
   - 対象AC: AC-02（間接、テーマ）
   - 出力: `apps/api/src/routes/dayNotes.ts` に追加（`theme` は空文字→`null` 正規化、`lastOpenedMode` は `'work' | 'note'` のみ許可、[api_contract.md §4](api_contract.md)）
   - 完了条件: theme/lastOpenedMode の部分更新が動作し、`lastOpenedMode` の不正値や空文字は保存前に `VALIDATION_ERROR` になる
-- [ ] **T-1-11** [test] DayNote系 Integration テスト
+- [x] **T-1-11** [test] DayNote系 Integration テスト
   - 依存: T-1-08, T-1-09, T-1-10
   - 対象AC: AC-01, AC-10
   - 出力: `apps/api/test/dayNotes.integration.test.ts`（[test_strategy.md §4.2](test_strategy.md): 自動生成、一意制約違反、存在しない日付の404、today リダイレクト）
   - 完了条件: [edge_cases.md §10.5](edge_cases.md) を含む主要ケースが通る
-- [ ] **T-1-12** [ui] APIクライアント + useDayNote フック
+- [x] **T-1-12** [ui] APIクライアント + useDayNote フック
   - 依存: T-0-09, T-0-02
   - 対象AC: AC-01
   - 出力: `apps/desktop/renderer/src/api/client.ts`（`window.__API_BASE_URL__` 取得）、`apps/desktop/renderer/src/hooks/useDayNote.ts`（`GET /full` を呼びUI状態へ反映）
   - 完了条件: 起動時に当日データを取得し、React stateへ格納する
-- [ ] **T-1-13** [ui] ヘッダー（日付・曜日・テーマ入力・日付移動ボタン）
+- [x] **T-1-13** [ui] ヘッダー（日付・曜日・テーマ入力・日付移動ボタン）
   - 依存: T-1-12
   - 対象AC: AC-01
   - 対象US: US-MVP-001, US-MVP-003
   - 出力: `apps/desktop/renderer/src/components/Header.tsx`（[要件 6.2](dayborad_requirements.md): 日付・曜日、テーマ入力欄、`‹` / `›` / 「今日」ボタン）
   - 完了条件: ヘッダーに日付・曜日が表示され、テーマ入力欄が配置される（テーマ永続化は Phase 2）
-- [ ] **T-1-14** [ui] 日付移動ロジック
+- [x] **T-1-14** [ui] 日付移動ロジック
   - 依存: T-1-13
   - 対象AC: AC-10
   - 対象US: US-MVP-002
@@ -215,9 +215,9 @@
 
 ### Phase 1 のチェック基準
 
-- [ ] 起動で当日 DayNote が表示される（AC-01）
-- [ ] 前日/翌日/今日移動と自動生成が動く（AC-10）
-- [ ] DayNote系 Integration テストが通る
+- [x] 起動で当日 DayNote が表示される（AC-01）
+- [x] 前日/翌日/今日移動と自動生成が動く（AC-10）
+- [x] DayNote系 Integration テストが通る
 
 ---
 
@@ -870,7 +870,7 @@ T-0-01 → T-0-05 → T-1-04 → T-1-07 → T-1-08 → T-2-07 → T-3-10 → T-4
 | フェーズ | タスク総数 | 完了 | 状態 |
 |----------|------------|------|------|
 | Phase 0 | 12 | 12 | 完了 |
-| Phase 1 | 14 | 0 | 未着手 |
+| Phase 1 | 14 | 14 | 完了 |
 | Phase 2 | 15 | 0 | 未着手 |
 | Phase 3 | 14 | 0 | 未着手 |
 | Phase 4 | 10 | 0 | 未着手 |
@@ -878,7 +878,7 @@ T-0-01 → T-0-05 → T-1-04 → T-1-07 → T-1-08 → T-2-07 → T-3-10 → T-4
 | Phase 6 | 6 | 0 | 未着手 |
 | Phase 7 | 11 | 0 | 未着手 |
 | Phase 8 | 7 | 0 | 未着手 |
-| **合計** | **103** | **12** | — |
+| **合計** | **103** | **26** | — |
 
 ---
 

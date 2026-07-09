@@ -1,82 +1,78 @@
-import { useEffect, useState } from 'react';
-
 /**
- * APIベースURLを取得する。
+ * アプリケーションルート（[roadmap.md T-1-12/13/14]）
  *
- * パッケージ版では Electron main が preload 経由で `window.__API_BASE_URL__` を注入する
- * （[architecture.md §6.1]）。
- * 開発時の分離起動（ブラウザ表示）では未注入のため、`import.meta.env.VITE_API_BASE_URL` にフォールバックする。
+ * 起動時に今日の DayNote を取得し（AC-01）、Header に日付・曜日・テーマ入力欄・
+ * 日付移動ボタンを表示する（[要件 6.2]）。日付移動で currentDate が変わると
+ * 再フェッチする（AC-10）。
+ *
+ * Phase 1 のスコープ:
+ * - useDayNote で当日/指定日の DayNoteFull を取得・表示
+ * - useDateNavigation + Header で前日/翌日/今日移動
+ * - テーマの自動保存接続は Phase 2（T-2-09）
+ * - 仕事整理モードの3カラム（TODO/障害/振り返り）本体は Phase 3
  */
-function getApiBaseUrl(): string {
-  if (typeof window !== 'undefined' && window.__API_BASE_URL__) {
-    return window.__API_BASE_URL__;
-  }
-  const fallback = import.meta.env.VITE_API_BASE_URL;
-  if (fallback) return fallback;
-  // 最終フォールバック（開発時の electron-vite dev）
-  return 'http://127.0.0.1:8787/api';
-}
 
-type HealthState = { status: 'loading' } | { status: 'ok' } | { status: 'error'; message: string };
+import { Header } from './components/Header.js';
+import { useDateNavigation } from './hooks/useDateNavigation.js';
+import { useDayNote } from './hooks/useDayNote.js';
 
 export default function App() {
-  const [health, setHealth] = useState<HealthState>({ status: 'loading' });
-  const [apiBaseUrl] = useState(() => getApiBaseUrl());
-
-  useEffect(() => {
-    let cancelled = false;
-    fetch(`${apiBaseUrl}/health`)
-      .then(async (res) => {
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        const data = (await res.json()) as { status?: string };
-        if (!cancelled) {
-          setHealth(
-            data.status === 'ok'
-              ? { status: 'ok' }
-              : { status: 'error', message: 'unexpected response' },
-          );
-        }
-      })
-      .catch((err: unknown) => {
-        if (!cancelled) {
-          setHealth({ status: 'error', message: err instanceof Error ? err.message : String(err) });
-        }
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [apiBaseUrl]);
+  const { currentDate, goPrevDay, goNextDay, goToday, isToday } = useDateNavigation();
+  const { data, loading, error } = useDayNote(currentDate);
 
   return (
     <div className="min-h-screen bg-stone-50 text-stone-800">
-      <div className="mx-auto max-w-3xl px-8 py-16">
-        <header className="mb-8">
-          <h1 className="text-3xl font-semibold tracking-tight">dayborad</h1>
-          <p className="mt-2 text-sm text-stone-500">その日の仕事ノート1枚</p>
-        </header>
+      <Header
+        currentDate={currentDate}
+        theme={data?.dayNote.theme ?? null}
+        onPrevDay={goPrevDay}
+        onNextDay={goNextDay}
+        onToday={goToday}
+        isToday={isToday}
+      />
 
-        <section className="rounded-lg border border-stone-200 bg-white p-6">
-          <h2 className="mb-3 text-sm font-medium text-stone-600">API 接続確認</h2>
-          <dl className="space-y-2 text-sm">
-            <div className="flex gap-2">
-              <dt className="w-24 text-stone-500">エンドポイント:</dt>
-              <dd className="font-mono text-stone-700">{apiBaseUrl}/health</dd>
-            </div>
-            <div className="flex gap-2">
-              <dt className="w-24 text-stone-500">状態:</dt>
-              <dd>
-                {health.status === 'loading' && <span className="text-stone-500">確認中…</span>}
-                {health.status === 'ok' && (
-                  <span className="font-semibold text-emerald-600">ok</span>
-                )}
-                {health.status === 'error' && (
-                  <span className="font-semibold text-red-600">エラー: {health.message}</span>
-                )}
-              </dd>
-            </div>
-          </dl>
-        </section>
-      </div>
+      <main className="mx-auto max-w-6xl px-8 py-6">
+        {loading && <p className="text-sm text-stone-500">読み込み中…</p>}
+
+        {error && (
+          <div className="rounded border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+            <p className="font-semibold">データの取得に失敗しました。</p>
+            <p className="mt-1 text-red-600">{error.message}</p>
+            <p className="mt-2 text-xs text-red-400">
+              dayborad_dev への PostgreSQL 接続とマイグレーションを確認してください。
+            </p>
+          </div>
+        )}
+
+        {data && !loading && (
+          // TODO(Phase 3): この「DayNote 取得確認」デバッグ表示を仕事整理モードの
+          // 3カラム（TODO/障害/振り返り）に置き換える。Phase 1 は動作確認用の仮実装。
+          <section className="rounded-lg border border-stone-200 bg-white p-6">
+            <h2 className="mb-2 text-sm font-medium text-stone-600">DayNote 取得確認</h2>
+            <dl className="space-y-1 text-sm">
+              <div className="flex gap-2">
+                <dt className="w-32 text-stone-500">id:</dt>
+                <dd className="font-mono text-stone-700">{data.dayNote.id}</dd>
+              </div>
+              <div className="flex gap-2">
+                <dt className="w-32 text-stone-500">date:</dt>
+                <dd className="font-mono text-stone-700">{data.dayNote.date}</dd>
+              </div>
+              <div className="flex gap-2">
+                <dt className="w-32 text-stone-500">theme:</dt>
+                <dd className="font-mono text-stone-700">{data.dayNote.theme ?? '(未入力)'}</dd>
+              </div>
+              <div className="flex gap-2">
+                <dt className="w-32 text-stone-500">lastOpenedMode:</dt>
+                <dd className="font-mono text-stone-700">{data.dayNote.lastOpenedMode}</dd>
+              </div>
+            </dl>
+            <p className="mt-4 text-xs text-stone-400">
+              ※ TODO・障害・振り返りの3カラムは Phase 3 で実装されます。
+            </p>
+          </section>
+        )}
+      </main>
     </div>
   );
 }
