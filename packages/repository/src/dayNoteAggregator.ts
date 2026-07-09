@@ -23,9 +23,11 @@ import {
   createId,
 } from '@dayboard/domain';
 import { getDb } from './db.js';
+import * as blockerRepository from './blockerRepository.js';
 import * as dayNoteRepository from './dayNoteRepository.js';
 import * as noteEntryRepository from './noteEntryRepository.js';
 import * as reflectionRepository from './reflectionRepository.js';
+import * as todoRepository from './todoRepository.js';
 import type { Tx } from './types.js';
 
 /**
@@ -135,17 +137,20 @@ async function findFullByDate(date: string): Promise<DayNoteFull | null> {
   const dayNote = await dayNoteRepository.findByDate(date);
   if (!dayNote) return null;
 
-  // dayNoteId で Reflection/NoteEntry を並行取得（Pool から別クライアントを使うため安全）
-  const [reflection, noteEntry] = await Promise.all([
+  // dayNoteId で Reflection/NoteEntry/Todos/Blockers を並行取得
+  // （Pool から別クライアントを使うため安全）
+  const [reflection, noteEntry, todos, blockers] = await Promise.all([
     reflectionRepository.findByDayNote(dayNote.id),
     noteEntryRepository.findByDayNote(dayNote.id),
+    todoRepository.listByDayNote(dayNote.id),
+    blockerRepository.listByDayNote(dayNote.id),
   ]);
   if (!reflection || !noteEntry) return null;
 
   return {
     dayNote,
-    todos: [],
-    blockers: [],
+    todos,
+    blockers,
     reflection,
     noteEntry,
     noteLineMetas: [],

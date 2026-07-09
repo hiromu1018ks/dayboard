@@ -78,6 +78,14 @@ export type UseAutosaveResult = {
   retryAll: () => void;
   /** error 状態の対象が存在するか（SaveStatus の再試行ボタン表示用） */
   hasError: boolean;
+  /**
+   * 即時保存（[autosave_spec.md §2.2]）。
+   *
+   * 追加/削除/完了切替/並替など「操作の確定」が自明な対象をデバウンスせず即座に保存する。
+   * 既存の FSM/saveStatus/localStorage フェイルセーフ/リトライ機構をそのまま経由する。
+   * POST の二重作成防止は Idempotency-Key（[autosave_spec.md §8.2]）で担保する。
+   */
+  saveNow: <P>(target: SaveTarget, payload: P) => void;
 };
 
 /**
@@ -261,6 +269,32 @@ export function useAutosave(
   );
 
   /**
+   * 即時保存（[autosave_spec.md §2.2]）: デバウンスタイマーを飛ばし即座に保存を発火。
+   *
+   * 追加/削除/完了切替/並替など「操作の確定」が自明な対象に用いる。
+   * edit と同じく localStorage へ即時書込し、FSM（idle→saving→saved/error）と
+   * リトライ機構を経由する。POST の二重作成防止は Idempotency-Key（§8.2）で担保。
+   */
+  const saveNow = useCallback(
+    <P>(target: SaveTarget, payload: P) => {
+      const key = targetKey(target);
+      const rt = runtimesRef.current.get(key);
+      if (!rt) return;
+      rt.pendingPayload = payload;
+      applyTransition(key, { type: 'EDIT' });
+      // デバウンスタイマーをクリアし、即座に保存発火
+      if (rt.debounceTimer) {
+        clearTimeout(rt.debounceTimer);
+        rt.debounceTimer = null;
+      }
+      // localStorage へ即時書込（サーバー保存失敗の保険、§6.2）
+      persistTarget(date, target, payload);
+      void executeSaveRef.current(key, false);
+    },
+    [applyTransition, date],
+  );
+
+  /**
    * flush: 全保留対象を即時保存し localStorage へ同期書込（§4）。
    * 日付移動/モード切替の直前に呼ぶ。
    * 戻り値の localStorageOk が false の場合のみ遷移を止める（§9.3）。
@@ -307,5 +341,5 @@ export function useAutosave(
 
   const hasError = useMemo(() => saveStatus === 'error', [saveStatus]);
 
-  return { saveStatus, flush, retryAll, hasError, edit, getStatus };
+  return { saveStatus, flush, retryAll, hasError, edit, saveNow, getStatus };
 }

@@ -7,8 +7,8 @@
  * 返すため、ドメイン型（ISO 8601 文字列）へ変換する。
  */
 
-import type { DayNote, NoteEntry, Reflection } from 'shared-types';
-import type { dayNotes, noteEntries, reflections } from './schema/index.js';
+import type { BlockerItem, DayNote, NoteEntry, Reflection, TodoItem } from 'shared-types';
+import type { blockerItems, dayNotes, noteEntries, reflections, todoItems } from './schema/index.js';
 
 /** Drizzle の timestamp `Date` を ISO 8601 文字列へ。NULL はそのまま。 */
 function toIso(date: Date | null | undefined): string | null {
@@ -47,6 +47,39 @@ export function mapNoteEntry(row: typeof noteEntries.$inferSelect): NoteEntry {
     dayNoteId: row.dayNoteId,
     body: row.body,
     createdAt: toIso(row.createdAt) as string,
+    updatedAt: toIso(row.updatedAt) as string,
+  };
+}
+
+/** todo_items row → TodoItem ドメイン型 */
+export function mapTodoItem(row: typeof todoItems.$inferSelect): TodoItem {
+  return {
+    id: row.id,
+    dayNoteId: row.dayNoteId,
+    title: row.title,
+    status: row.status as TodoItem['status'],
+    order: row.order,
+    sourceNoteLineMetaId: row.sourceNoteLineMetaId,
+    carriedFromTodoId: row.carriedFromTodoId,
+    carriedFromDate: row.carriedFromDate,
+    createdAt: toIso(row.createdAt) as string,
+    completedAt: toIso(row.completedAt),
+    updatedAt: toIso(row.updatedAt) as string,
+  };
+}
+
+/** blocker_items row → BlockerItem ドメイン型 */
+export function mapBlockerItem(row: typeof blockerItems.$inferSelect): BlockerItem {
+  return {
+    id: row.id,
+    dayNoteId: row.dayNoteId,
+    text: row.text,
+    linkedTodoId: row.linkedTodoId,
+    sourceNoteLineMetaId: row.sourceNoteLineMetaId,
+    resolved: row.resolved,
+    order: row.order,
+    createdAt: toIso(row.createdAt) as string,
+    resolvedAt: toIso(row.resolvedAt),
     updatedAt: toIso(row.updatedAt) as string,
   };
 }

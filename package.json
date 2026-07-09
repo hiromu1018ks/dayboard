@@ -25,7 +25,7 @@
     "typecheck": "pnpm -r typecheck",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:integration": "vitest run --workspace vitest.integration.config.ts --project integration",
+    "test:integration": "vitest run --workspace vitest.integration.config.ts --project integration --no-file-parallelism",
     "test:e2e": "pnpm --filter desktop build && playwright test",
     "test:e2e:headed": "pnpm --filter desktop build && playwright test --headed",
     "format": "prettier --write .",

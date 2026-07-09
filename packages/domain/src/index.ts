@@ -77,3 +77,6 @@ export {
   pendingKey,
   parsePendingKey,
 } from './autosave/pendingSnapshot.js';
+
+// TODO状態遷移（ピュア関数、[roadmap.md Phase 3]）
+export { canTransition, toggleDone, shouldSetCompletedAt } from './todo/transitions.js';

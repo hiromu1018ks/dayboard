@@ -333,78 +333,78 @@
 
 ### タスク
 
-- [ ] **T-3-01** [domain] TODO状態遷移ドメイン関数
+- [x] **T-3-01** [domain] TODO状態遷移ドメイン関数
   - 依存: T-1-03
   - 対象AC: AC-09
   - 出力: `packages/domain/src/todo/transitions.ts`（[database_schema.md §3.3](database_schema.md): `todo↔done`, `todo→carried`、`carried→*`/`done→carried` は `INVALID_TRANSITION`）
   - 完了条件: 全遷移と違反遷移の判定ができる
-- [ ] **T-3-02** [test] TODO状態遷移 Unit テスト
+- [x] **T-3-02** [test] TODO状態遷移 Unit テスト
   - 依存: T-3-01
   - 対象AC: AC-09
   - 出力: `packages/domain/test/todo/transitions.test.ts`（[test_strategy.md §3.4](test_strategy.md)）
   - 完了条件: [edge_cases.md §3.1](edge_cases.md) の `carried` 操作違反を含む全パスが通る
-- [ ] **T-3-03** [repo] TodoRepository
+- [x] **T-3-03** [repo] TodoRepository
   - 依存: T-1-04
   - 対象AC: AC-02, AC-09
   - 出力: `packages/repository/src/todoRepository.ts`（[database_schema.md §11](database_schema.md): `listByDayNote`(order順), `create`, `update`, `reorder`(再採番), `delete`, `findByCarriedFrom`）
   - 完了条件: `order` の0,1,2...再採番が正しく動作する
-- [ ] **T-3-04** [api] TODO系エンドポイント
+- [x] **T-3-04** [api] TODO系エンドポイント
   - 依存: T-3-01, T-3-03
   - 対象AC: AC-02, AC-09
   - 対象US: US-MVP-004
   - 出力: `apps/api/src/routes/todos.ts`（`POST /api/day-notes/:date/todos`, `PATCH /api/todos/:id`(title/status), `POST /api/day-notes/:date/todos/reorder`, `DELETE /api/todos/:id`、[api_contract.md §5](api_contract.md)）
   - 完了条件: title検証（trim/1-200文字）、`INVALID_TRANSITION` の400、reorder過不足チェックが動作
-- [ ] **T-3-05** [repo] BlockerRepository
+- [x] **T-3-05** [repo] BlockerRepository
   - 依存: T-1-04, T-3-03
   - 対象AC: AC-02
   - 出力: `packages/repository/src/blockerRepository.ts`（`listByDayNote`, `create`, `update`, `reorder`, `delete`）
   - 完了条件: `linkedTodoId`（任意）を扱える
-- [ ] **T-3-06** [api] Blocker系エンドポイント
+- [x] **T-3-06** [api] Blocker系エンドポイント
   - 依存: T-3-05
   - 対象AC: AC-02
   - 対象US: US-MVP-005
   - 出力: `apps/api/src/routes/blockers.ts`（`POST`, `PATCH`(text/resolved/linkedTodoId), `POST /reorder`, `DELETE`、[api_contract.md §6](api_contract.md)）
   - 完了条件: `linkedTodoId` が別日付のTODOなら `VALIDATION_ERROR`（[edge_cases.md §10.2](edge_cases.md)）
-- [ ] **T-3-07** [repo/api] Reflection UPSERT
+- [x] **T-3-07** [repo/api] Reflection UPSERT
   - 依存: T-1-05
   - 対象AC: AC-02
   - 出力: `packages/repository/src/reflectionRepository.ts` に `upsert` 追加、`apps/api/src/routes/dayNotes.ts` に `PATCH /api/day-notes/:date/reflection`（[api_contract.md §7](api_contract.md)）
   - 完了条件: 3セクションの部分更新が動作する
-- [ ] **T-3-08** [test] TODO/Blocker/Reflection Integration テスト
+- [x] **T-3-08** [test] TODO/Blocker/Reflection Integration テスト
   - 依存: T-3-04, T-3-06, T-3-07
   - 対象AC: AC-02, AC-09
   - 出力: `apps/api/test/{todos,blockers,reflection}.integration.test.ts`（[test_strategy.md §4.2](test_strategy.md): CRUD, reorder, `INVALID_TRANSITION`, VALIDATION_ERROR, ON DELETE SET NULL/cascade）
   - 完了条件: [edge_cases.md §1.1/§1.2/§2.2/§2.3/§10.4](edge_cases.md) を含む
-- [ ] **T-3-09** [ui] 3カラムレイアウト（仕事整理モード）
+- [x] **T-3-09** [ui] 3カラムレイアウト（仕事整理モード）
   - 依存: T-1-12
   - 対象AC: AC-02
   - 対象US: US-MVP-004/005/006
   - 出力: `apps/desktop/renderer/src/components/WorkMode.tsx`（[要件 6.2/14](dayborad_requirements.md): TODO/障害/振り返りの3カラム、Tailwindでノート風UI、紙ノート余白）
   - 完了条件: 3カラムが画面いっぱいに配置される
-- [ ] **T-3-10** [ui] TODO リスト（追加・完了・編集・削除・並替）
+- [x] **T-3-10** [ui] TODO リスト（追加・完了・編集・削除・並替）
   - 依存: T-3-04, T-3-09, T-2-07
   - 対象AC: AC-02, AC-09
   - 対象US: US-MVP-004
   - 出力: `apps/desktop/renderer/src/components/TodoColumn.tsx`、`TodoItem.tsx`（[ui_interaction_spec.md §5](ui_interaction_spec.md): 追加入力欄、`Enter`確定、完了切替、楽観的更新、並替）
   - 完了条件: 追加/完了/編集/削除/並替が動作し、即時保存・デバウンス保存を使い分ける
-- [ ] **T-3-11** [ui] TODO 本文編集の確定・空時削除確認
+- [x] **T-3-11** [ui] TODO 本文編集の確定・空時削除確認
   - 依存: T-3-10
   - 対象AC: AC-02
   - 出力: `TodoItem.tsx` の編集モード、空にして確定で [edge_cases.md §2.1](edge_cases.md) の削除確認ダイアログ
   - 完了条件: 空確定で削除確認、キャンセルで元に戻す
-- [ ] **T-3-12** [ui] 障害リスト（追加・編集・解消・TODO紐付け）
+- [x] **T-3-12** [ui] 障害リスト（追加・編集・解消・TODO紐付け）
   - 依存: T-3-06, T-3-09
   - 対象AC: AC-02
   - 対象US: US-MVP-005
   - 出力: `apps/desktop/renderer/src/components/BlockerColumn.tsx`、`BlockerItem.tsx`（[要件 7.4](dayborad_requirements.md): 編集、解消切替、`linkedTodoId` 任意）
   - 完了条件: 解消状態の視覚的区別、TODO紐付けが任意で動作
-- [ ] **T-3-13** [ui] 振り返り（3セクション自由入力）
+- [x] **T-3-13** [ui] 振り返り（3セクション自由入力）
   - 依存: T-3-07, T-3-09
   - 対象AC: AC-02
   - 対象US: US-MVP-006
   - 出力: `apps/desktop/renderer/src/components/ReflectionColumn.tsx`（できたこと/止まったこと/明日の一手、[要件 7.5](dayborad_requirements.md)）
   - 完了条件: 3セクションがデバウンス保存される
-- [ ] **T-3-14** [ui] `carried` / `done` 表示スタイル
+- [x] **T-3-14** [ui] `carried` / `done` 表示スタイル
   - 依存: T-3-10
   - 対象AC: AC-09
   - 出力: `TodoItem.tsx` の `done`（取り消し線+薄色）、`carried`（「→ 翌日へ持ち越し済み」ラベル、[要件 7.10 表示例](dayborad_requirements.md)）
@@ -412,10 +412,10 @@
 
 ### Phase 3 のチェック基準
 
-- [ ] TODO/障害/振り返りの入力が永続化され再起動後も同じ（AC-02）
-- [ ] TODO完了切替が動作（AC-09）
-- [ ] 並替・削除が動作する
-- [ ] TODO/Blocker Integration テストが通る
+- [x] TODO/障害/振り返りの入力が永続化され再起動後も同じ（AC-02）
+- [x] TODO完了切替が動作（AC-09）
+- [x] 並替・削除が動作する
+- [x] TODO/Blocker Integration テストが通る
 
 ---
 
@@ -872,13 +872,13 @@ T-0-01 → T-0-05 → T-1-04 → T-1-07 → T-1-08 → T-2-07 → T-3-10 → T-4
 | Phase 0 | 12 | 12 | 完了 |
 | Phase 1 | 14 | 14 | 完了 |
 | Phase 2 | 15 | 15 | 完了 |
-| Phase 3 | 14 | 0 | 未着手 |
+| Phase 3 | 14 | 14 | 完了 |
 | Phase 4 | 10 | 0 | 未着手 |
 | Phase 5 | 14 | 0 | 未着手 |
 | Phase 6 | 6 | 0 | 未着手 |
 | Phase 7 | 11 | 0 | 未着手 |
 | Phase 8 | 7 | 0 | 未着手 |
-| **合計** | **103** | **41** | — |
+| **合計** | **103** | **55** | — |
 
 ---
 

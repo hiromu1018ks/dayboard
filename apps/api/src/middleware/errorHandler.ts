@@ -41,6 +41,11 @@ export class ApiHttpError extends Error {
   static notFound(message = '指定されたノートが見つかりません。'): ApiHttpError {
     return new ApiHttpError('NOT_FOUND', 404, message);
   }
+
+  /** INVALID_TRANSITION を生成するヘルパー（[api_contract.md §5/§8]、Phase 3） */
+  static invalidTransition(message = 'この操作は現在の状態では実行できません。'): ApiHttpError {
+    return new ApiHttpError('INVALID_TRANSITION', 400, message);
+  }
 }
 
 /**
