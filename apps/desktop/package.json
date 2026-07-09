@@ -15,10 +15,12 @@
     "typecheck": "pnpm run typecheck:node && pnpm run typecheck:web"
   },
   "dependencies": {
+    "@dayboard/domain": "workspace:*",
     "@hono/node-server": "^1.13.0",
     "api": "workspace:*",
     "hono": "^4.6.0",
-    "pg": "^8.12.0"
+    "pg": "^8.12.0",
+    "shared-types": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "^20.14.0",

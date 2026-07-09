@@ -7,7 +7,13 @@
     "moduleResolution": "Bundler",
     "jsx": "react-jsx",
     "lib": ["ES2022", "DOM", "DOM.Iterable"],
-    "types": ["vite/client"]
+    "types": ["vite/client"],
+    "baseUrl": ".",
+    "paths": {
+      "shared-types": ["../../packages/shared-types/src/index.ts"],
+      "@dayboard/domain": ["../../packages/domain/src/index.ts"],
+      "@renderer/*": ["src/renderer/src/*"]
+    }
   },
   "include": ["src/renderer/src/**/*"]
 }

@@ -19,6 +19,7 @@
     "db:reset": "tsx src/scripts/reset.ts"
   },
   "dependencies": {
+    "@dayboard/domain": "workspace:*",
     "drizzle-orm": "^0.33.0",
     "pg": "^8.12.0",
     "shared-types": "workspace:*"

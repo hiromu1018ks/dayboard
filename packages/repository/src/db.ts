@@ -8,6 +8,9 @@
  */
 
 import pg from 'pg';
+import { drizzle } from 'drizzle-orm/node-postgres';
+import type { NodePgDatabase } from 'drizzle-orm/node-postgres';
+import * as schema from './schema/index.js';
 
 const { Pool } = pg;
 
@@ -47,6 +50,22 @@ export function getPool(): pg.Pool {
 }
 
 /**
+ * Drizzle ORM インスタンス（シングルトン）。
+ *
+ * 既存の [schema/index.ts] 定義を活かし、型安全なクエリビルダを提供する。
+ * リポジトリ実装は `pg.Pool` の生クエリではなくこちらを用いる。
+ */
+let dbInstance: NodePgDatabase<typeof schema> | null = null;
+
+export type Db = NodePgDatabase<typeof schema>;
+
+export function getDb(): Db {
+  if (dbInstance) return dbInstance;
+  dbInstance = drizzle(getPool(), { schema });
+  return dbInstance;
+}
+
+/**
  * 接続健全性確認。`SELECT 1` が通るか検証する。
  *
  * アプリ起動フロー（[architecture.md §6.1]）でPostgreSQLの起動確認に用いる。
@@ -70,4 +89,5 @@ export async function closePool(): Promise<void> {
     await pool.end();
     pool = null;
   }
+  dbInstance = null;
 }

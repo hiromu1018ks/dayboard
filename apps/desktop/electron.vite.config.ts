@@ -20,7 +20,7 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
  * `externalizeDepsPlugin` は dependencies を全て外部化してしまうため、ここでは使わず、
  * 外部化対象を明示的に列挙する（ワークスペースパッケージは含めない）。
  */
-const WORKSPACE_PACKAGES = ['shared-types', 'domain', 'repository', 'api'];
+const WORKSPACE_PACKAGES = ['shared-types', '@dayboard/domain', 'repository', 'api'];
 
 /** main/preload で外部化するモジュール（実行時に Node/Electron が解決） */
 const externalized = [
@@ -33,7 +33,7 @@ const externalized = [
 
 const workspaceAlias = {
   'shared-types': resolve(__dirname, '../../packages/shared-types/src/index.ts'),
-  domain: resolve(__dirname, '../../packages/domain/src/index.ts'),
+  '@dayboard/domain': resolve(__dirname, '../../packages/domain/src/index.ts'),
   repository: resolve(__dirname, '../../packages/repository/src/index.ts'),
   api: resolve(__dirname, '../../apps/api/src/index.ts'),
 };

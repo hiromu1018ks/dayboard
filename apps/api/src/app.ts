@@ -10,6 +10,7 @@
 import { Hono } from 'hono';
 import { corsMiddleware } from './middleware/cors.js';
 import { errorHandler } from './middleware/errorHandler.js';
+import { dayNoteRoutes } from './routes/dayNotes.js';
 import { healthRoutes } from './routes/health.js';
 
 export function createApp(): Hono {
@@ -21,6 +22,7 @@ export function createApp(): Hono {
 
   // ルートマウント（`/api` プレフィックス）
   app.route('/api', healthRoutes);
+  app.route('/api/day-notes', dayNoteRoutes);
 
   return app;
 }

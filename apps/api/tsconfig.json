@@ -7,7 +7,8 @@
     "baseUrl": ".",
     "paths": {
       "shared-types": ["../../packages/shared-types/src/index.ts"],
-      "repository": ["../../packages/repository/src/index.ts"]
+      "repository": ["../../packages/repository/src/index.ts"],
+      "@dayboard/domain": ["../../packages/domain/src/index.ts"]
     }
   },
   "include": ["src/**/*"]
