@@ -9,11 +9,11 @@ import { configDefaults, defineWorkspace } from 'vitest/config';
  */
 export default defineWorkspace([
   {
-    // Unit テスト: ピュアTS層（domain, shared-types）
+    // Unit テスト: ピュアTS層（domain, shared-types）+ API ミドルウェア等の DB 不要テスト
     test: {
       name: 'unit',
       environment: 'node',
-      include: ['packages/*/test/**/*.test.ts'],
+      include: ['packages/*/test/**/*.test.ts', 'apps/api/test/**/*.test.ts'],
       exclude: [...configDefaults.exclude, '**/*.integration.test.ts'],
       coverage: {
         provider: 'v8',

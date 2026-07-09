@@ -41,3 +41,39 @@ export {
   buildNewNoteEntryInput,
   normalizeTheme,
 } from './usecases/dayNoteFactory.js';
+
+// 自動保存（ピュア関数、[roadmap.md Phase 2]）
+export {
+  type SaveStatus,
+  type SaveEvent,
+  transition,
+  aggregateStatus,
+} from './autosave/saveStateMachine.js';
+export { DEBOUNCE_MS, isTimerActive, isSameTarget, shouldFire } from './autosave/debounce.js';
+export {
+  MAX_RETRIES,
+  RETRY_DELAYS_MS,
+  RETRIABLE_STATUS,
+  type SaveErrorKind,
+  isRetriable,
+  shouldRetry,
+  nextDelayMs,
+  isRetryExhausted,
+} from './autosave/retry.js';
+export {
+  type SaveTarget,
+  type PendingTarget,
+  type PendingSnapshot,
+  type TargetPayload,
+  type PayloadFor,
+  targetKey,
+  createEmptySnapshot,
+  isSnapshotEmpty,
+  upsertTarget,
+  removeTarget,
+  removeTargets,
+  listTargetKeys,
+  getTarget,
+  pendingKey,
+  parsePendingKey,
+} from './autosave/pendingSnapshot.js';

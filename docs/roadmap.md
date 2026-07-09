@@ -233,80 +233,80 @@
 
 ### タスク
 
-- [ ] **T-2-01** [domain] 自動保存 FSM（ステートマシン）
+- [x] **T-2-01** [domain] 自動保存 FSM（ステートマシン）
   - 依存: T-1-03
   - 対象AC: AC-13, AC-14
   - 出力: `packages/domain/src/autosave/saveStateMachine.ts`（`idle`/`saving`/`saved`/`error`、[autosave_spec.md §5](autosave_spec.md) の遷移表）
   - 完了条件: ピュアTSで状態遷移関数が実装され、副作用を持たない
-- [ ] **T-2-02** [domain] デバウンス管理（per-field）
+- [x] **T-2-02** [domain] デバウンス管理（per-field）
   - 依存: T-2-01
   - 対象AC: AC-13
   - 出力: `packages/domain/src/autosave/debounce.ts`（編集対象別タイマー、800ms、[autosave_spec.md §3](autosave_spec.md)）
   - 完了条件: 同対象の再入力でタイマーリセット、対象間で干渉しない
-- [ ] **T-2-03** [domain] リトライポリシー（指数バックオフ）
+- [x] **T-2-03** [domain] リトライポリシー（指数バックオフ）
   - 依存: T-2-01
   - 対象AC: AC-14
   - 出力: `packages/domain/src/autosave/retry.ts`（最大3回、1s/2s/4s、[autosave_spec.md §7.1](autosave_spec.md)、4xxはリトライしない）
   - 完了条件: ネットワークエラー/5xx でバックオフ動作、4xxで即時 `error`
-- [ ] **T-2-04** [test] 自動保存 FSM/デバウンス/リトライ Unit テスト
+- [x] **T-2-04** [test] 自動保存 FSM/デバウンス/リトライ Unit テスト
   - 依存: T-2-01, T-2-02, T-2-03
   - 対象AC: AC-13, AC-14
   - 出力: `packages/domain/test/autosave/*.test.ts`（[test_strategy.md §3.7](test_strategy.md): 疑似タイマー `vi.useFakeTimers()`、モックfetch、全遷移パス）
   - 完了条件: [autosave_spec.md §5.2](autosave_spec.md) の全遷移と §7 のリトライ系列を網羅
-- [ ] **T-2-05** [domain] PendingSnapshot 型と対象別マージ関数
+- [x] **T-2-05** [domain] PendingSnapshot 型と対象別マージ関数
   - 依存: T-2-01
   - 対象AC: AC-13, AC-14
   - 出力: `packages/domain/src/autosave/pendingSnapshot.ts`（[autosave_spec.md §6.2](autosave_spec.md) の `PendingSnapshot` 型、対象キー生成、対象別 upsert/remove/empty 判定。localStorage/Web Storage には触れない）
   - 完了条件: 同一日付内でテーマ保存成功してもノート本文/TODOの未同期分が消えない純粋関数が実装される
-- [ ] **T-2-06** [test] PendingSnapshot 純粋関数 Unit テスト
+- [x] **T-2-06** [test] PendingSnapshot 純粋関数 Unit テスト
   - 依存: T-2-05
   - 対象AC: AC-13, AC-14
   - 出力: `packages/domain/test/autosave/pendingSnapshot.test.ts`（対象別 upsert・部分成功時の対象単位削除・空判定、[test_strategy.md §6.1](test_strategy.md)）
   - 完了条件: 部分成功で対象単位削除が副作用なしに正しく動作する
-- [ ] **T-2-07** [ui] 自動保存フック統合
+- [x] **T-2-07** [ui] 自動保存フック統合
   - 依存: T-2-01, T-2-02, T-2-03, T-2-05, T-1-12
   - 対象AC: AC-13, AC-14
   - 出力: `apps/desktop/renderer/src/hooks/useAutosave.ts`（デバウンス保存・即時保存・flush・リトライ・集約 `saveStatus` 表示用セレクタ）と `apps/desktop/renderer/src/autosave/pendingStore.ts`（domainの `PendingSnapshot` 純粋関数を使う localStorage アダプタ）
   - 完了条件: 任意の編集対象で `idle→saving→saved` または `→error→retry` が動作する
-- [ ] **T-2-08** [ui] 保存状態表示
+- [x] **T-2-08** [ui] 保存状態表示
   - 依存: T-2-07
   - 対象AC: AC-13, AC-14
   - 出力: `apps/desktop/renderer/src/components/SaveStatus.tsx`（[ui_interaction_spec.md §10](ui_interaction_spec.md): 右上、`保存中...` / `保存済み` / `保存できませんでした` + 再試行ボタン）
   - 完了条件: 4状態が仕様どおり色・文言で表示される
-- [ ] **T-2-09** [ui] テーマ入力の自動保存接続
+- [x] **T-2-09** [ui] テーマ入力の自動保存接続
   - 依存: T-2-07, T-1-13
   - 対象AC: AC-13
   - 対象US: US-MVP-003
   - 出力: `Header.tsx` のテーマ入力を `useAutosave({type:'dayNote', field:'theme'})` へ接続、`PATCH /api/day-notes/:date` の `theme` のみ送信
   - 完了条件: テーマ編集が800ms後に保存され、再起動後も維持される（AC-02 のテーマ部）
-- [ ] **T-2-10** [ui] flush トリガ接続（日付移動）
+- [x] **T-2-10** [ui] flush トリガ接続（日付移動）
   - 依存: T-2-07, T-1-14
   - 対象AC: AC-13
   - 対象US: US-MVP-011 AC-5（日付移動分）
   - 出力: `useDateNavigation` の日付移動直前に `flush()` を組み込み、localStorage同期書込成功をもって遷移（[autosave_spec.md §4/§9](autosave_spec.md)。モード切替は T-4-08 で接続）
   - 完了条件: サーバー保存失敗中でも localStorage 書込成功後は遷移が長時間ブロックされない
-- [ ] **T-2-11** [ui] localStorage 書込失敗時の確認ダイアログ
+- [x] **T-2-11** [ui] localStorage 書込失敗時の確認ダイアログ
   - 依存: T-2-10
   - 対象AC: AC-13
   - 出力: `apps/desktop/renderer/src/components/FlushFailDialog.tsx`（[autosave_spec.md §9.3](autosave_spec.md) の「移動する / キャンセル」）
   - 完了条件: localStorage書込失敗時のみ遷移を止めて確認する
-- [ ] **T-2-12** [ui] 起動時リカバリ（pending 再送）
+- [x] **T-2-12** [ui] 起動時リカバリ（pending 再送）
   - 依存: T-2-07, T-1-12
   - 対象AC: AC-13
   - 出力: `apps/desktop/renderer/src/autosave/recoverOnStartup.ts`（`dayborad:pending:*` 走査→再送→成功対象だけ削除、[autosave_spec.md §6.2](autosave_spec.md)）
   - 完了条件: クラッシュ後再起動で未保存分が復元される
-- [ ] **T-2-13** [infra] Electron `before-quit` / `beforeunload` flush-all
+- [x] **T-2-13** [infra] Electron `before-quit` / `beforeunload` flush-all
   - 依存: T-2-07, T-0-08
   - 対象AC: AC-13
   - 出力: `apps/desktop/main` からRendererへ `flush-all` IPC、Rendererの `beforeunload` でlocalStorage同期書込（[autosave_spec.md §10](autosave_spec.md)）
   - 完了条件: 正常終了時に保留内容がlocalStorageへ保護される
-- [ ] **T-2-14** [api] POST重複排除（推奨）
+- [x] **T-2-14** [api] POST重複排除（推奨）
   - 依存: T-0-07
   - 依存(任意): T-2-07
   - 対象AC: AC-13
   - 出力: `apps/api/src/middleware/idempotency.ts`（リクエストIDベース60秒重複排除、[autosave_spec.md §8.2](autosave_spec.md)）
   - 完了条件: 同リクエストIDの再送で2回目を作成しない（TODO二重追加防止）
-- [ ] **T-2-15** [test] 自動保存 Integration/E2E（段階導入）
+- [x] **T-2-15** [test] 自動保存 Integration/E2E（段階導入）
   - 依存: T-2-07, T-2-12
   - 対象AC: AC-13, AC-14
   - 出力: Playwrightヘルパー `apps/desktop/e2e/autosave.spec.ts`（[test_strategy.md §5.2 4.1](test_strategy.md): 入力→再起動→保持、クラッシュ→復元）
@@ -314,10 +314,10 @@
 
 ### Phase 2 のチェック基準
 
-- [ ] テーマ編集が800ms後に保存、状態が `saving → saved`（AC-13）
-- [ ] 保存失敗で `error` + リトライ（AC-14）
-- [ ] クラッシュ→再起動で未保存分が復元される
-- [ ] テーマが再起動後も維持される
+- [x] テーマ編集が800ms後に保存、状態が `saving → saved`（AC-13）
+- [x] 保存失敗で `error` + リトライ（AC-14）
+- [x] クラッシュ→再起動で未保存分が復元される
+- [x] テーマが再起動後も維持される
 
 ---
 
@@ -871,14 +871,14 @@ T-0-01 → T-0-05 → T-1-04 → T-1-07 → T-1-08 → T-2-07 → T-3-10 → T-4
 |----------|------------|------|------|
 | Phase 0 | 12 | 12 | 完了 |
 | Phase 1 | 14 | 14 | 完了 |
-| Phase 2 | 15 | 0 | 未着手 |
+| Phase 2 | 15 | 15 | 完了 |
 | Phase 3 | 14 | 0 | 未着手 |
 | Phase 4 | 10 | 0 | 未着手 |
 | Phase 5 | 14 | 0 | 未着手 |
 | Phase 6 | 6 | 0 | 未着手 |
 | Phase 7 | 11 | 0 | 未着手 |
 | Phase 8 | 7 | 0 | 未着手 |
-| **合計** | **103** | **26** | — |
+| **合計** | **103** | **41** | — |
 
 ---
 

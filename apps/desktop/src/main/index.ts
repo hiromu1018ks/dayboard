@@ -10,7 +10,7 @@
  * main はドメインロジックを持たず（[architecture.md §3.1]）、起動・ライフサイクル管理のみを行う。
  */
 
-import { app, BrowserWindow, dialog, shell } from 'electron';
+import { app, BrowserWindow, dialog, ipcMain, shell } from 'electron';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { ping, closePool, runMigrations } from 'repository';
@@ -19,6 +19,49 @@ import { startServer, type StartedServer } from 'api';
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
 let apiServer: StartedServer | null = null;
+
+/**
+ * 全 BrowserWindow へ flush-all を要求し、flush-done を待つ（[roadmap.md T-2-13]）。
+ *
+ * [autosave_spec.md §10.1]: before-quit で Renderer へ flush-all を要求し、
+ * Renderer が全保留対象を localStorage へ同期書き込みするまで待機する。
+ *
+ * タイムアウト（2s）を設け、Renderer が応答しない場合は待たずに終了へ進む。
+ * localStorage バッファ（§6.2）が真の保険になるため、flush 未完了でも入力喪失は
+ * 起きない（編集ごとに localStorage へ書き込んでいるため）。
+ */
+function requestFlushAll(): Promise<void> {
+  const windows = BrowserWindow.getAllWindows();
+  if (windows.length === 0) return Promise.resolve();
+
+  return new Promise<void>((resolve) => {
+    let remaining = windows.length;
+    let settled = false;
+
+    const onDone = () => {
+      if (settled) return;
+      remaining -= 1;
+      if (remaining <= 0) {
+        settled = true;
+        ipcMain.removeListener('flush-done', onDone);
+        resolve();
+      }
+    };
+    ipcMain.on('flush-done', onDone);
+
+    for (const win of windows) {
+      win.webContents.send('flush-all');
+    }
+
+    // タイムアウト: Renderer が応答しない場合でも終了へ進む（§10.1 の待ち時間上限）
+    setTimeout(() => {
+      if (settled) return;
+      settled = true;
+      ipcMain.removeListener('flush-done', onDone);
+      resolve();
+    }, 2000);
+  });
+}
 
 /**
  * マイグレーションフォルダを解決する。
@@ -138,6 +181,8 @@ app.on('before-quit', async (event) => {
   if (apiServer) {
     event.preventDefault();
     try {
+      // Renderer の保留中編集を localStorage へ保護（[autosave_spec.md §10.1]、T-2-13）
+      await requestFlushAll();
       await apiServer.close();
       await closePool();
       console.log('[main] resources released');
