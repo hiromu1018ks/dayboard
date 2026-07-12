@@ -60,7 +60,9 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
           cache: 'pnpm'
       - run: pnpm install --frozen-lockfile
-      - run: pnpm test
+        # カバレッジ閾値（domain 90%, renderer keybindings 60%）を含む品質ゲート
+        # [test_strategy.md §8.2]
+      - run: pnpm test -- --coverage
 
   integration-test:
     name: Integration Test

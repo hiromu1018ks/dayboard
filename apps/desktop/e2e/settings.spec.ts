@@ -13,7 +13,7 @@
  */
 
 import { expect, test, type ElectronApplication, type Page } from '@playwright/test';
-import { closeApp, launchApp } from './helpers.js';
+import { closeApp, launchApp, resetE2eDatabase } from './helpers.js';
 
 const THEME_INPUT = '#theme-input';
 /** 設定（歯車）ボタン */
@@ -22,6 +22,10 @@ const SETTINGS_BUTTON = 'button[aria-label="設定を開く"]';
 test.describe('設定モーダル（AC-15）', () => {
   let app: ElectronApplication;
   let window: Page;
+
+  test.beforeEach(async () => {
+    await resetE2eDatabase();
+  });
 
   test.afterEach(async () => {
     if (app) await closeApp(app);

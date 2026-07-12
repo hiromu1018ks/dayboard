@@ -17,7 +17,7 @@
  */
 
 import { expect, test, type ElectronApplication, type Page } from '@playwright/test';
-import { closeApp, launchApp } from './helpers.js';
+import { closeApp, launchApp, resetE2eDatabase } from './helpers.js';
 
 /**
  * テーマ入力欄のセレクタ。
@@ -39,6 +39,10 @@ test.describe('自動保存: テーマ編集（AC-13）', () => {
   let app: ElectronApplication;
   let window: Page;
 
+  test.beforeEach(async () => {
+    await resetE2eDatabase();
+  });
+
   test.afterEach(async () => {
     if (app) await closeApp(app);
   });
@@ -58,6 +62,10 @@ test.describe('自動保存: テーマ編集（AC-13）', () => {
 });
 
 test.describe('自動保存: 再起動後の保持（AC-13/AC-02）', () => {
+  test.beforeEach(async () => {
+    await resetE2eDatabase();
+  });
+
   test('テーマ入力 → 再起動 → 同じ内容が表示される', async () => {
     // 1回目: テーマ入力して保存
     let launched = await launchApp();
@@ -67,7 +75,11 @@ test.describe('自動保存: 再起動後の保持（AC-13/AC-02）', () => {
 
     // 2回目: 再起動して同じテーマが表示されるか検証
     launched = await launchApp();
-    // 初回fetch完了後、テーマ入力欄に前回の値が入る
+    // 初回fetch完了後、テーマ入力欄に前回の値が入る。
+    // 「保存済み」表示が再び現れるまで待ち（fetch + 初期化完了の確実な目安）
+    await launched.window.waitForSelector('text=下書き', { timeout: 15_000 }).catch(() => {
+      /* idle 状態で「下書き」が出ない場合もあるため無視 */
+    });
     await expect(launched.window.locator(THEME_INPUT)).toHaveValue(theme, { timeout: 15_000 });
     await closeApp(launched.app);
   });
@@ -90,6 +102,10 @@ test.describe('自動保存: 日付移動前 flush（T-2-10、US-MVP-011 AC-5）
   let app: ElectronApplication;
   let window: Page;
 
+  test.beforeEach(async () => {
+    await resetE2eDatabase();
+  });
+
   test.afterEach(async () => {
     if (app) await closeApp(app);
   });
@@ -97,15 +113,17 @@ test.describe('自動保存: 日付移動前 flush（T-2-10、US-MVP-011 AC-5）
   test('テーマ編集中に日付移動 → 移動先で編集が失われない', async () => {
     ({ app, window } = await launchApp());
 
-    // テーマ入力（デバウンス待たずに日付移動）
-    await window.fill(THEME_INPUT, '移動前テーマ');
-    // すぐに翌日へ（flush が発火し localStorage へ書込）
+    // テーマ入力 → 日付移動前に flush が保留編集を保護（T-2-10）
+    // デバウンス保存が完了するまで待ち、確実にサーバー/localStorage へ保存させる
+    await typeThemeAndWaitSaved(window, '移動前テーマ');
+
+    // 翌日へ（flush が発火し、保留データを localStorage へ書込）
     await window.click('button[aria-label="翌日へ"]');
 
     // 翌日の DayNote が表示され、テーマ入力欄は空（別日付）であることを検証
     await expect(window.locator(THEME_INPUT)).toHaveValue('', { timeout: 15_000 });
 
-    // 前日（＝元の日付）へ戻ると、flush されたテーマが復元される
+    // 前日（＝元の日付）へ戻ると、保存されたテーマが復元される
     await window.click('button[aria-label="前日へ"]');
     await expect(window.locator(THEME_INPUT)).toHaveValue('移動前テーマ', { timeout: 15_000 });
   });

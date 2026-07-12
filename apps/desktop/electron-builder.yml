@@ -1,0 +1,73 @@
+# electron-builder 設定（[roadmap.md T-8-05] / [dev_setup.md §4.2]）
+#
+# 配布用バイナリ（macOS dmg / Windows nsis / Linux AppImage）を生成する。
+#
+# PostgreSQL 同梱の方針（[architecture.md §2.2]）:
+#   バイナリには PostgreSQL サーバープロセスを同梱しない。
+#   ユーザー環境の PostgreSQL への接続を前提とし、DATABASE_URL で接続先を指定する
+#   （設定手順は docs/release_checklist.md 参照）。
+#
+# マイグレーションファイルは extraResources で resources/migrations へ同梱。
+# main/index.ts の resolveMigrationsFolder() が app.isPackaged 時にこのパスを参照する。
+
+appId: dev.dayborad.app
+productName: dayborad
+copyright: Copyright © 2026 dayborad
+
+# ビルド成果物の出力先（apps/desktop/dist-electron）
+directories:
+  output: dist-electron
+  buildResources: build
+
+# electron-vite のビルド成果物と package.json を同梱
+# node_modules は production 依存のみ（pg 関連を含む）が electron-builder により解決される
+files:
+  - out/**/*
+  - package.json
+  - '!**/.DS_Store'
+
+# asar アーカイブ化。pg は pure-JS（pg-native 未導入）のため unpack 不要
+asar: true
+
+# ネイティブモジュールの再ビルドは不要（pg-native 未導入）
+nodeGypRebuild: false
+
+# マイグレーションファイルを resources/migrations へ同梱
+# main/index.ts の app.isPackaged 分岐（process.resourcesPath/migrations）と対応
+extraResources:
+  - from: ../../packages/repository/migrations
+    to: migrations
+    filter: ['**/*.sql', '**/meta/**']
+
+# macOS 向け（arm64: Apple Silicon, x64: Intel）
+mac:
+  category: public.app-category.productivity
+  target:
+    - target: dmg
+      arch:
+        - arm64
+        - x64
+  # コード署名・公証は未対応（ローカル検証用）。配布時は別途設定が必要。
+  identity: null
+  gatekeeperAssess: false
+
+# Windows 向け（NSIS インストーラ）
+win:
+  target:
+    - target: nsis
+      arch:
+        - x64
+
+# Linux 向け（AppImage）
+linux:
+  category: Office
+  target:
+    - target: AppImage
+      arch:
+        - x64
+
+# NSIS インストーラの設定（Windows）
+nsis:
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: true

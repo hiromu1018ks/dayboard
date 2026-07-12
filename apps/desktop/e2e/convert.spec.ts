@@ -16,7 +16,7 @@
  */
 
 import { expect, test, type ElectronApplication, type Page } from '@playwright/test';
-import { closeApp, launchApp } from './helpers.js';
+import { closeApp, launchApp, resetE2eDatabase } from './helpers.js';
 
 /** NoteEditor のホスト要素（ノートモードの識別子） */
 const NOTE_EDITOR = '[data-testid="note-editor"]';
@@ -40,6 +40,10 @@ async function pressModeToggle(window: Page): Promise<void> {
 test.describe('ノート行変換（AC-05/AC-06/AC-07/AC-08）', () => {
   let app: ElectronApplication;
   let window: Page;
+
+  test.beforeEach(async () => {
+    await resetE2eDatabase();
+  });
 
   test.afterEach(async () => {
     if (app) await closeApp(app);

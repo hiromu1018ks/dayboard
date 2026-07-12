@@ -26,8 +26,9 @@ export type SaveStatusProps = {
 export function SaveStatus({ status, onRetry }: SaveStatusProps) {
   if (status === 'idle') {
     // idle は「下書き」を小さくグレー表示（入力中だが未保存を示唆）
+    // pointer-events-none: テキストのみで操作要素がないため、下にあるボタン等のクリックを透過する
     return (
-      <span className="text-xs text-stone-400" role="status" aria-live="polite">
+      <span className="pointer-events-none text-xs text-stone-400" role="status" aria-live="polite">
         下書き
       </span>
     );
@@ -35,7 +36,7 @@ export function SaveStatus({ status, onRetry }: SaveStatusProps) {
 
   if (status === 'saving') {
     return (
-      <span className="text-xs text-stone-400" role="status" aria-live="polite">
+      <span className="pointer-events-none text-xs text-stone-400" role="status" aria-live="polite">
         保存中...
       </span>
     );
@@ -44,21 +45,26 @@ export function SaveStatus({ status, onRetry }: SaveStatusProps) {
   if (status === 'saved') {
     // 控えめな緑（ui_interaction_spec §10「緑（控えめ）」）
     return (
-      <span className="text-xs text-emerald-600" role="status" aria-live="polite">
+      <span
+        className="pointer-events-none text-xs text-emerald-600"
+        role="status"
+        aria-live="polite"
+      >
         保存済み
       </span>
     );
   }
 
   // error: 「保存できませんでした」+ 再試行ボタン（§5.1/§7.2）
+  // ラッパが pointer-events-none のため、再試行ボタンに pointer-events-auto を付与して操作可能にする
   return (
     <span className="flex items-center gap-1" role="status" aria-live="assertive">
-      <span className="text-xs text-red-600">保存できませんでした</span>
+      <span className="pointer-events-none text-xs text-red-600">保存できませんでした</span>
       {onRetry && (
         <button
           type="button"
           onClick={onRetry}
-          className="rounded border border-red-300 px-1.5 py-0.5 text-xs text-red-700 hover:bg-red-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-400"
+          className="pointer-events-auto rounded border border-red-300 px-1.5 py-0.5 text-xs text-red-700 hover:bg-red-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-400"
         >
           再試行
         </button>

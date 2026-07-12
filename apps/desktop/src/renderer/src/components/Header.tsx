@@ -81,7 +81,10 @@ export function Header({
       <div className="flex items-center justify-between">
         {/* 日付・曜日 */}
         <div className="flex items-baseline gap-3">
-          <h1 className="text-2xl font-semibold tracking-tight text-stone-800">
+          <h1
+            className="text-2xl font-semibold tracking-tight text-stone-800"
+            data-testid="date-display"
+          >
             <span className="font-mono">{displayDate}</span>
             <span className="ml-2 text-stone-500">{weekday}</span>
           </h1>

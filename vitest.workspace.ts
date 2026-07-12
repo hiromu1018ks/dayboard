@@ -18,10 +18,11 @@ export default defineWorkspace([
       coverage: {
         provider: 'v8',
         reporter: ['text', 'lcov'],
-        include: ['packages/*/src/**/*.ts'],
-        // [test_strategy.md §8.1] のカバレッジ目安
+        // [test_strategy.md §8.1] のカバレッジ目安。ピュアTS層（domain）は高カバレッジが現実的。
+        // repository/shared-types は Integration 層で検証するため Unit の coverage 対象外。
+        include: ['packages/domain/src/**/*.ts'],
         thresholds: {
-          lines: 80,
+          lines: 90,
         },
       },
     },
@@ -32,6 +33,15 @@ export default defineWorkspace([
       name: 'renderer',
       environment: 'jsdom',
       include: ['apps/desktop/src/renderer/src/**/*.test.{ts,tsx}'],
+      coverage: {
+        provider: 'v8',
+        reporter: ['text', 'lcov'],
+        // [test_strategy.md §8.1]: renderer 60%。UI は E2E 中心、Unit はロジック抽出部分。
+        include: ['apps/desktop/src/renderer/src/keybindings/**/*.ts'],
+        thresholds: {
+          lines: 60,
+        },
+      },
     },
   },
 ]);

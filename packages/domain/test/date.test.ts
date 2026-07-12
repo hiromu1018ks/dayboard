@@ -8,6 +8,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   addDays,
+  formatMonthDay,
   getWeekdayLabel,
   isValidDateString,
   toLocalDateString,
@@ -175,5 +176,26 @@ describe('getWeekdayLabel', () => {
     // 2026-12-31 は木曜日、2027-01-01 は金曜日
     expect(getWeekdayLabel('2026-12-31')).toBe('木');
     expect(getWeekdayLabel('2027-01-01')).toBe('金');
+  });
+});
+
+describe('formatMonthDay', () => {
+  it('YYYY-MM-DD を M/D（ゼロ埋めなし）で返す', () => {
+    expect(formatMonthDay('2026-07-08')).toBe('7/8');
+    expect(formatMonthDay('2026-01-05')).toBe('1/5');
+    expect(formatMonthDay('2026-12-31')).toBe('12/31');
+    expect(formatMonthDay('2026-10-20')).toBe('10/20');
+  });
+
+  it('持ち越しラベルの表示例（[要件 7.10]）に一致する', () => {
+    // 要件例: 「7/8から持ち越し」「7/9へ持ち越し済み」
+    expect(formatMonthDay('2026-07-08')).toBe('7/8');
+    expect(formatMonthDay('2026-07-09')).toBe('7/9');
+  });
+
+  it('形式不正の文字列では RangeError を投げる', () => {
+    expect(() => formatMonthDay('invalid')).toThrow(RangeError);
+    expect(() => formatMonthDay('2026/07/08')).toThrow(RangeError);
+    expect(() => formatMonthDay('')).toThrow(RangeError);
   });
 });

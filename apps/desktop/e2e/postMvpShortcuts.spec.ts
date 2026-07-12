@@ -14,13 +14,17 @@
  */
 
 import { expect, test, type ElectronApplication, type Page } from '@playwright/test';
-import { closeApp, launchApp } from './helpers.js';
+import { closeApp, launchApp, resetE2eDatabase } from './helpers.js';
 
 const THEME_INPUT = '#theme-input';
 
 test.describe('Post-MVP ショートカットの無効化（AC-22）', () => {
   let app: ElectronApplication;
   let window: Page;
+
+  test.beforeEach(async () => {
+    await resetE2eDatabase();
+  });
 
   test.afterEach(async () => {
     if (app) await closeApp(app);

@@ -859,11 +859,11 @@ export default function App() {
         {/* 変換成功・エラーのトースト通知（Phase 5、[§6.2]） */}
         <Toast message={toast} onClose={() => setToast(null)} />
 
-        {/* 保存状態表示（右上、ノートモードでも共通） */}
+        {/* 保存状態表示（右上、ノートモードでも共通）。
+            ラッパは pointer-events-none で下の UI（日付移動ボタン等）のクリックを透過し、
+            error 時の再試行ボタンのみ SaveStatus 側で pointer-events-auto を持つ。 */}
         <div className="pointer-events-none fixed right-4 top-3 z-40">
-          <div className="pointer-events-auto">
-            <SaveStatus status={saveStatus} onRetry={retryAll} />
-          </div>
+          <SaveStatus status={saveStatus} onRetry={retryAll} />
         </div>
 
         {/* Vim操作状態表示（右下、Phase 7 T-7-08、[要件 9.4]） */}
@@ -925,11 +925,11 @@ export default function App() {
         onOpenSettings={() => setSettingsOpen(true)}
       />
 
-      {/* 保存状態表示（右上、[ui_interaction_spec.md §10]） */}
+      {/* 保存状態表示（右上、[ui_interaction_spec.md §10]）。
+          ラッパは pointer-events-none で下の UI のクリックを透過し、
+          error 時の再試行ボタンのみ SaveStatus 側で pointer-events-auto を持つ。 */}
       <div className="pointer-events-none fixed right-4 top-3 z-40">
-        <div className="pointer-events-auto">
-          <SaveStatus status={saveStatus} onRetry={retryAll} />
-        </div>
+        <SaveStatus status={saveStatus} onRetry={retryAll} />
       </div>
 
       {/* Vim操作状態表示（右下、Phase 7 T-7-08、[要件 9.4]） */}

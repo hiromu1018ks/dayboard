@@ -14,7 +14,7 @@
  */
 
 import { expect, test, type ElectronApplication, type Page } from '@playwright/test';
-import { closeApp, launchApp } from './helpers.js';
+import { closeApp, launchApp, resetE2eDatabase } from './helpers.js';
 
 const THEME_INPUT = '#theme-input';
 
@@ -43,6 +43,10 @@ async function dispatchComposition(window: Page, selector: string, reading: stri
 test.describe('IME 変換中の Esc 優先順位（AC-19）', () => {
   let app: ElectronApplication;
   let window: Page;
+
+  test.beforeEach(async () => {
+    await resetE2eDatabase();
+  });
 
   test.afterEach(async () => {
     if (app) await closeApp(app);

@@ -1,5 +1,6 @@
 node_modules
 dist
+dist-electron
 out
 coverage
 **/*.sql
@@ -9,3 +10,4 @@ docs
 .agents
 .zcode
 skills-lock.json
+test-results

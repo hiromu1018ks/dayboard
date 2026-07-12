@@ -15,7 +15,7 @@
  */
 
 import { expect, test, type ElectronApplication, type Page } from '@playwright/test';
-import { closeApp, launchApp } from './helpers.js';
+import { closeApp, launchApp, resetE2eDatabase } from './helpers.js';
 
 const THEME_INPUT = '#theme-input';
 const SETTINGS_BUTTON = 'button[aria-label="設定を開く"]';
@@ -43,6 +43,10 @@ async function restoreStandard(window: Page): Promise<void> {
 test.describe('Vim キーバインド（AC-16〜AC-20）', () => {
   let app: ElectronApplication;
   let window: Page;
+
+  test.beforeEach(async () => {
+    await resetE2eDatabase();
+  });
 
   test.afterEach(async () => {
     if (app) {

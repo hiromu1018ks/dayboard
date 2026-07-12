@@ -156,8 +156,13 @@ app.whenReady().then(async () => {
     createWindow(server.baseUrl);
   } catch (err) {
     console.error('[main] bootstrap failed:', err);
-    // ユーザーへエラー表示して終了
-    dialog.showErrorBox('起動エラー', `アプリを起動できませんでした:\n${err}`);
+    // ユーザーへエラー表示して終了。
+    // パッケージ版では PostgreSQL が未起動・DATABASE_URL 未設定が主な原因のため、
+    // 設定手順を併記する（[release_checklist.md] 参照）。
+    const dbHint = process.env.DATABASE_URL
+      ? ''
+      : '\n\nDATABASE_URL 環境変数が設定されていません。\nPostgreSQL を起動し、DATABASE_URL を設定してから起動してください。\n（例: postgres://localhost:5432/dayborad）';
+    dialog.showErrorBox('起動エラー', `アプリを起動できませんでした:\n${err}${dbHint}`);
     app.quit();
   }
 
