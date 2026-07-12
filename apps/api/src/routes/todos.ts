@@ -84,14 +84,10 @@ todoRoutes.patch('/:id', async (c) => {
 
     // `todo → carried` の直接API指定は禁止（持ち越しAPI経由のみ、[api_contract.md §5]）
     if (current.status === 'todo' && patch.status === 'carried') {
-      throw ApiHttpError.invalidTransition(
-        '持ち越しは専用の操作から行ってください。',
-      );
+      throw ApiHttpError.invalidTransition('持ち越しは専用の操作から行ってください。');
     }
     if (!canTransition(current.status, patch.status)) {
-      throw ApiHttpError.invalidTransition(
-        'このTODOは現在の状態ではこの操作を実行できません。',
-      );
+      throw ApiHttpError.invalidTransition('このTODOは現在の状態ではこの操作を実行できません。');
     }
   }
 

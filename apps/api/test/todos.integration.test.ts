@@ -278,9 +278,10 @@ describe('TODO API (Integration)', () => {
 
       // 削除済み
       const pool = getPool();
-      const result = await pool.query('SELECT COUNT(*)::int AS count FROM todo_items WHERE id = $1', [
-        todo.id,
-      ]);
+      const result = await pool.query(
+        'SELECT COUNT(*)::int AS count FROM todo_items WHERE id = $1',
+        [todo.id],
+      );
       expect(result.rows[0].count).toBe(0);
     });
 

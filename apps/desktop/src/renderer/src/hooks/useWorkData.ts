@@ -78,9 +78,7 @@ function reducer(state: WorkData | null, action: WorkAction): WorkData | null {
     case 'UPDATE_BLOCKER':
       return {
         ...state,
-        blockers: state.blockers.map((b) =>
-          b.id === action.id ? { ...b, ...action.patch } : b,
-        ),
+        blockers: state.blockers.map((b) => (b.id === action.id ? { ...b, ...action.patch } : b)),
       };
 
     case 'DELETE_BLOCKER':
@@ -122,7 +120,10 @@ function toWorkData(full: DayNoteFull): WorkData {
  * @param data useDayNote が取得した DayNoteFull（null 时は何もしない）
  * @param date 現在日付（YYYY-MM-DD）。日付変更検知に用いる。
  */
-export function useWorkData(data: DayNoteFull | null, date: string): {
+export function useWorkData(
+  data: DayNoteFull | null,
+  date: string,
+): {
   workData: WorkData | null;
   dispatch: Dispatch<WorkAction>;
 } {

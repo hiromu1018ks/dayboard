@@ -66,9 +66,7 @@ export function ReflectionColumn({ reflection, onEdit }: ReflectionColumnProps) 
       <div className="flex-1 space-y-4">
         {SECTIONS.map((section) => (
           <div key={section.key}>
-            <label className="mb-1 block text-xs font-medium text-stone-500">
-              {section.label}
-            </label>
+            <label className="mb-1 block text-xs font-medium text-stone-500">{section.label}</label>
             <textarea
               value={drafts[section.key]}
               onChange={handleChange(section.key)}

@@ -162,6 +162,36 @@ export type DayNoteFull = {
   noteLineMetas: NoteLineMeta[];
 };
 
+// ----- 持ち越しAPI（[api_contract.md §10]） -----
+
+/** 持ち越し成功行（[api_contract.md §10]） */
+export type CarryOverCarriedItem = {
+  /** 持ち越し元TODOのid */
+  sourceTodoId: string;
+  /** 翌日に新規作成されたTODOのid */
+  newTodoId: string;
+  /** 翌日の日付（YYYY-MM-DD） */
+  nextDayDate: string;
+};
+
+/** 持ち越しスキップ行（[api_contract.md §10]）。重複持ち越し時 */
+export type CarryOverSkippedItem = {
+  /** スキップされた元TODOのid */
+  sourceTodoId: string;
+  reason: 'DUPLICATE_CARRYOVER';
+  /** ユーザー表示用メッセージ */
+  message: string;
+};
+
+/**
+ * POST /api/day-notes/:date/carry-over のレスポンス（[api_contract.md §10]）。
+ * 常に HTTP 200（部分成功）。`skipped` は通知表示に使う。
+ */
+export type CarryOverResult = {
+  carried: CarryOverCarriedItem[];
+  skipped: CarryOverSkippedItem[];
+};
+
 // ----- APIエラー形式（[api_contract.md §1.4/§8]） -----
 
 /** マシン可読エラーコード（SCREAMING_SNAKE_CASE） */

@@ -90,6 +90,19 @@ export function isValidDateString(dateStr: string): boolean {
 }
 
 /**
+ * YYYY-MM-DD 文字列を「M/D」形式（例: `7/8`）で返す。
+ *
+ * 持ち越しラベル「7/8 から持ち越し」（[要件 7.10 表示例]）の表示用。
+ * ゼロ埋めなし（月・日とも1桁なら1桁のまま）。
+ *
+ * 事前条件: `dateStr` は YYYY-MM-DD 形式の実在日付であること。
+ */
+export function formatMonthDay(dateStr: string): string {
+  const { month, day } = parseYyyyMmDd(dateStr);
+  return `${month}/${day}`;
+}
+
+/**
  * 日本語曜日の並び（0=日 〜 6=土）。`getWeekdayLabel` で用いる。
  */
 export const WEEKDAY_LABELS_JA = ['日', '月', '火', '水', '木', '金', '土'] as const;
