@@ -14,11 +14,14 @@ import type {
   CarryOverResult,
   DayNote,
   DayNoteFull,
+  KeybindingMode,
   NoteEntry,
   NoteLineMeta,
   Reflection,
   TodoItem,
+  UserSettings,
   ViewMode,
+  VimDefaultState,
 } from 'shared-types';
 
 /**
@@ -335,10 +338,7 @@ export async function postConvertBlocker(
  * @param date     持ち越し元日付（YYYY-MM-DD）
  * @param todoIds  持ち越し対象のTODO id 群（未完了のみ推奨。carried は skipped、done はエラー）
  */
-export async function postCarryOver(
-  date: string,
-  todoIds: string[],
-): Promise<CarryOverResult> {
+export async function postCarryOver(date: string, todoIds: string[]): Promise<CarryOverResult> {
   const res = await fetch(`${getApiBaseUrl()}/day-notes/${encodeURIComponent(date)}/carry-over`, {
     method: 'POST',
     headers: postHeaders(),
@@ -346,4 +346,36 @@ export async function postCarryOver(
   });
   await assertOk(res);
   return (await res.json()) as CarryOverResult;
+}
+
+// ============================================================================
+// Phase 7: ユーザー設定（キーバインドモード）
+// ============================================================================
+
+/**
+ * GET /api/settings — ユーザー設定を取得（[api_contract.md §11]）。
+ * 未作成の場合はサーバー側で初期値が作成されて返る。
+ */
+export async function fetchSettings(): Promise<UserSettings> {
+  const res = await fetch(`${getApiBaseUrl()}/settings`);
+  await assertOk(res);
+  return (await res.json()) as UserSettings;
+}
+
+/**
+ * PATCH /api/settings — ユーザー設定を部分更新（[api_contract.md §11]）。
+ * keybindingMode / vimDefaultState のいずれか（または両方）。
+ * レスポンスは更新後の UserSettings 全体。
+ */
+export async function patchSettings(patch: {
+  keybindingMode?: KeybindingMode;
+  vimDefaultState?: VimDefaultState;
+}): Promise<UserSettings> {
+  const res = await fetch(`${getApiBaseUrl()}/settings`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(patch),
+  });
+  await assertOk(res);
+  return (await res.json()) as UserSettings;
 }

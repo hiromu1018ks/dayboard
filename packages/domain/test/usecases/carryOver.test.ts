@@ -67,9 +67,7 @@ describe('planCarryOver', () => {
 
     it('carriedFromDate に sourceDate を設定する', () => {
       const todo = makeTodo({ id: 'todo_1' });
-      const result = planCarryOver(
-        makeInput({ sourceTodos: [todo], sourceDate: '2026-12-31' }),
-      );
+      const result = planCarryOver(makeInput({ sourceTodos: [todo], sourceDate: '2026-12-31' }));
 
       expect(result[0]?.kind).toBe('carry');
       if (result[0]?.kind === 'carry') {
@@ -78,10 +76,7 @@ describe('planCarryOver', () => {
     });
 
     it('新規TODO id を idGenerator から順に採番する', () => {
-      const todos = [
-        makeTodo({ id: 'a', title: 'A' }),
-        makeTodo({ id: 'b', title: 'B' }),
-      ];
+      const todos = [makeTodo({ id: 'a', title: 'A' }), makeTodo({ id: 'b', title: 'B' })];
       const result = planCarryOver(makeInput({ sourceTodos: todos }));
 
       expect(result.map((r) => (r.kind === 'carry' ? r.newTodoId : null))).toEqual([
@@ -216,9 +211,9 @@ describe('planCarryOver', () => {
       const t1 = makeTodo({ id: 't1', status: 'todo' });
       const t2 = makeTodo({ id: 't2', status: 'done' });
 
-      expect(() =>
-        planCarryOver(makeInput({ sourceTodos: [t1, t2] })),
-      ).toThrow(CarryOverValidationError);
+      expect(() => planCarryOver(makeInput({ sourceTodos: [t1, t2] }))).toThrow(
+        CarryOverValidationError,
+      );
     });
   });
 

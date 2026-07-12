@@ -33,7 +33,9 @@ import { Header } from './components/Header.js';
 import { NoteMode } from './components/NoteMode.js';
 import type { NoteEditorHandle } from './components/NoteEditor.js';
 import { SaveStatus } from './components/SaveStatus.js';
+import { SettingsModal } from './components/SettingsModal.js';
 import { Toast, type ToastMessage } from './components/Toast.js';
+import { VimStateBadge, type VimState } from './components/VimStateBadge.js';
 import { WorkMode } from './components/WorkMode.js';
 import {
   createBlockerOrderSaver,
@@ -60,10 +62,22 @@ import { useDateNavigation } from './hooks/useDateNavigation.js';
 import { useAutosave } from './hooks/useAutosave.js';
 import { useDayNote } from './hooks/useDayNote.js';
 import { useFlushOnQuit } from './hooks/useFlushOnQuit.js';
+import { useSettings } from './hooks/useSettings.js';
 import { useWorkData } from './hooks/useWorkData.js';
 import { useViewMode } from './state/viewMode.js';
 import { isComposing } from './keybindings/guardIme.js';
 import { handleEsc } from './keybindings/escPriority.js';
+import {
+  isAddTodoShortcut,
+  isGoNextDayShortcut,
+  isGoPrevDayShortcut,
+  isGoTodayShortcut,
+  isToggleModeShortcut,
+  matchColumnFocusShortcut,
+} from './keybindings/standard.js';
+import { handlePostMvpShortcut } from './keybindings/postMvp.js';
+import { handleSpaceLeader, handleVimWorkKey, SPACE_LEADER_TIMEOUT_MS } from './keybindings/vim.js';
+import { focusSection, getFocusedItemId } from './keybindings/focus.js';
 import type { Reflection } from 'shared-types';
 
 /** テーマ保存対象の識別子（T-2-09） */
@@ -82,6 +96,29 @@ export default function App() {
   const { data, loading, error, refetch } = useDayNote(currentDate);
   const { workData, dispatch } = useWorkData(data, currentDate);
   const { viewMode, setMode } = useViewMode();
+
+  // --- Phase 7: ユーザー設定・キーバインド ---
+  const { settings, updateKeybindingMode, updateVimDefaultState } = useSettings();
+  // Vim操作状態（仕事整理モード用。ノートモードは CodeMirror 内部状態が権威）
+  const [vimState, setVimState] = useState<VimState>('normal');
+  // 設定モーダル（[ui_interaction_spec.md §8]）
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  // 設定ロード完了後、vimDefaultState に従い初期化（normal/insert）
+  const settingsInitializedRef = useRef(false);
+  useEffect(() => {
+    if (!settingsInitializedRef.current) {
+      setVimState(settings.vimDefaultState);
+      settingsInitializedRef.current = true;
+    }
+  }, [settings.vimDefaultState]);
+  // keybindingMode が standard に切替わったら vimState を強制的に normal に戻す
+  // （標準キーバインドでは Normal/Insert の概念を使わないため。後述のキーハンドラでも
+  // keybindingMode !== 'vim' のときは vimState を見ないが、表示バッジを消すため）
+  useEffect(() => {
+    if (settings.keybindingMode === 'standard') {
+      setVimState('normal');
+    }
+  }, [settings.keybindingMode]);
 
   // --- Phase 5: 変換（TODO化 / 障害化） ---
   // トースト通知（[§6.2] 2s）
@@ -117,6 +154,12 @@ export default function App() {
   const [noteBody, setNoteBody] = useState('');
   const notePrevDateRef = useRef<string | null>(null);
   const noteEditorRef = useRef<NoteEditorHandle>(null);
+
+  // --- Phase 7: Vim Space リーダー状態管理（[ui_interaction_spec.md §3.5]、200ms） ---
+  // Space を押した時点でリーダー待ち状態に入り、200ms以内に次キーが来なければキャンセル。
+  // Vimキーバインド時のみ使用。標準キーバインド時は Space は入力欄の標準挙動に任せる。
+  const spaceLeaderTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [spaceLeaderPending, setSpaceLeaderPending] = useState(false);
 
   useEffect(() => {
     if (!data) return;
@@ -566,59 +609,216 @@ export default function App() {
   );
 
   // ============================================================================
-  // Phase 4: モード切替のグローバルキーハンドラ（T-4-05/06/07/08）
+  // Phase 7: グローバルキーハンドラ（T-4-05/06/07/08 + T-7-03/04/06/07/09/10）
   // ============================================================================
 
   /**
-   * `⌘/Ctrl+J` と `Esc` のグローバルキーハンドラ（T-4-05）。
+   * Vim の `x`（TODO完了切替、AC-09）用: 現在フォーカス中のTODOを切替。
+   * フォーカスがTODO項目上に無い場合は何もしない。
+   */
+  const toggleCurrentTodo = useCallback(() => {
+    const id = getFocusedItemId();
+    if (!id) return;
+    if (!workData) return;
+    const todo = workData.todos.find((t) => t.id === id);
+    if (!todo) return;
+    // carried は操作不可、done/todo を切替（[edge_cases.md §3.1]）
+    if (todo.status === 'carried') return;
+    handleToggleTodo(id);
+  }, [workData, handleToggleTodo]);
+
+  // アンマウント時に Space リーダーのタイマーを確実にクリア（タイマー漏れ防止）
+  useEffect(() => {
+    return () => {
+      if (spaceLeaderTimerRef.current !== null) {
+        clearTimeout(spaceLeaderTimerRef.current);
+        spaceLeaderTimerRef.current = null;
+      }
+    };
+  }, []);
+
+  /**
+   * 全グローバルショートカットのキーハンドラ。
    *
-   * [ui_interaction_spec.md §4.1/§9.1/§9.2]:
-   * - IME 変換中（isComposing）は全ショートカット判定をスキップ（T-4-06、AC-19 基盤）
-   * - `⌘/Ctrl+J`: work ⇄ note を切替。切替前に flush（T-4-08、AC-03/04）。
-   *   work→note の切替直後に CodeMirror へフォーカスし、即入力できる（[§4.1]、AC-03）
-   * - `Esc`: [§9.2] の優先順位で処理（T-4-07）。Phase 4 では「ノートモード → work 戻り」のみ
+   * [ui_interaction_spec.md §4.1/§9.1/§9.2/§11]:
+   * - IME 変換中は全ショートカット判定をスキップ（T-4-06、AC-19 基盤）
+   * - 共通（標準/Vim両方）: `⌘J`（モード切替）、`⌘T`（今日）、`Option←/→`（前日翌日）、
+   *   `⌘K`/`⌘Shift+R`/`⌘Shift+M`（Post-MVP無効化、AC-22）
+   * - 標準キーバインド（仕事整理モードのみ）: `⌘1/2/3`（列フォーカス）、`⌘Enter`（TODO追加）
+   * - Vimキーバインド: h/j/k/l（列/項目移動）、i（Insert）、x（TODO切替）、Space 系（リーダー）
+   * - Esc: escPriority で4段優先順位処理（T-4-07/T-7-09、AC-17/18/19）
    *
-   * Phase 4 の `basicSetup` 構成では CodeMirror 側が Esc を消費する拡張（補完等）はないため、
-   * ノートモード中の Esc は work 戻りとして扱って安全（AC-04）。
-   * Phase 7 以降で Esc を使う拡張を入れる場合は escPriority.ts へ段を差し込むこと。
-   *
-   * Phase 7 で Vim Insert→Normal（段2）とモーダル（段3）を escPriority へ差し込む。
+   * ノートモードでの Vim 操作（h/j/k/l/i/Esc）は CodeMirror の Vim 拡張が処理するため、
+   * 本ハンドラではノートモード時の Vim キーは処理しない（共通系ショートカットのみ）。
    */
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
-      // IME 変換中はショートカット判定をスキップ（T-4-06、[§9.1]）
+      // IME 変換中はショートカット判定をスキップ（T-4-06、[§9.1]、AC-19）
       if (isComposing(e)) return;
 
-      // ⌘/Ctrl+J でモード切替（Mac: metaKey、Win/Linux: ctrlKey）。
-      // toLowerCase で CapsLock や Shift の有無を吸収（要件8.1 は ⌘+J のみ規定）。
-      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'j') {
+      // ----- Post-MVP ショートカットの握り潰し（T-7-10、AC-22） -----
+      // 標準/Vim両方で無効化。入力内容は破壊しない。
+      if (handlePostMvpShortcut(e)) return;
+
+      // ----- 共通ショートカット（標準/Vim両方で有効、[要件 8.6]） -----
+
+      // ⌘/Ctrl+J: モード切替（AC-03/04）
+      if (isToggleModeShortcut(e)) {
         e.preventDefault();
         const nextMode = viewMode === 'work' ? 'note' : 'work';
+        // Vim の場合、note→work に戻る際は vimState を normal へ（AC-18）
+        if (viewMode === 'note' && settings.keybindingMode === 'vim') {
+          setVimState('normal');
+        }
         void setModeWithFlush(nextMode).then(() => {
-          // work→note 切替直後に CodeMirror へフォーカス（[§4.1]、即入力可能にする）
           if (nextMode === 'note') {
-            // フォーカスは描画後に行う必要があるため次フレームへ遅延
-            requestAnimationFrame(() => noteEditorRef.current?.focus());
+            requestAnimationFrame(() => {
+              noteEditorRef.current?.focus();
+              // Vim の場合は vimDefaultState を CodeMirror へ反映するためのフック。
+              // NoteEditor 側で Vim 拡張が初期状態を扱う（T-7-05）。
+            });
           }
         });
         return;
       }
 
-      // Esc: 優先順位に従い処理（T-4-07、[§9.2]）
+      // ⌘/Ctrl+T: 今日へ（AC-10）
+      if (isGoTodayShortcut(e)) {
+        e.preventDefault();
+        goToday();
+        return;
+      }
+
+      // Alt/Option+←: 前日へ（AC-10）
+      if (isGoPrevDayShortcut(e)) {
+        e.preventDefault();
+        goPrevDay();
+        return;
+      }
+      // Alt/Option+→: 翌日へ（AC-10）
+      if (isGoNextDayShortcut(e)) {
+        e.preventDefault();
+        goNextDay();
+        return;
+      }
+
+      // ----- Esc: 4段優先順位（T-4-07/T-7-09、[§9.2]） -----
       if (e.key === 'Escape') {
         const consumed = handleEsc({
           viewMode,
+          vimState: settings.keybindingMode === 'vim' ? vimState : 'normal',
+          settingsOpen,
+          setVimState: settings.keybindingMode === 'vim' ? setVimState : undefined,
+          closeSettings: () => setSettingsOpen(false),
           goToWork: () => {
             void setModeWithFlush('work');
           },
         });
         if (consumed) e.preventDefault();
+        return;
+      }
+
+      // 設定モーダルが開いている時は上記以外のショートカットを処理しない
+      // （モーダル内のラジオ操作等を優先）
+      if (settingsOpen) return;
+
+      // ----- 標準キーバインド専用（仕事整理モードのみ、[要件 8.2]） -----
+      if (settings.keybindingMode === 'standard' && viewMode === 'work') {
+        // ⌘/Ctrl+1/2/3: 列フォーカス
+        const section = matchColumnFocusShortcut(e);
+        if (section !== null) {
+          e.preventDefault();
+          focusSection(section);
+          return;
+        }
+        // ⌘/Ctrl+Enter: TODO追加（TODO列の追加入力欄へフォーカス）
+        if (isAddTodoShortcut(e)) {
+          e.preventDefault();
+          focusSection('todo');
+          return;
+        }
+        return;
+      }
+
+      // ----- Vimキーバインド（仕事整理モードのみ、[要件 8.6]） -----
+      // ノートモードでは CodeMirror の Vim 拡張がキーを処理するため、
+      // アプリ層では Vim キーを処理しない（共通系ショートカットのみ上で処理済み）。
+      if (settings.keybindingMode === 'vim' && viewMode === 'work') {
+        // Space リーダー待ち状態の場合（[§3.5]）
+        if (spaceLeaderPending) {
+          // タイマーをクリア
+          if (spaceLeaderTimerRef.current !== null) {
+            clearTimeout(spaceLeaderTimerRef.current);
+            spaceLeaderTimerRef.current = null;
+          }
+          setSpaceLeaderPending(false);
+          const commandKey = e.key.toLowerCase();
+          const result = handleSpaceLeader(commandKey);
+          if (result.status === 'handled') {
+            e.preventDefault();
+            if (result.requestToggleMode) {
+              // Space n: モード切替
+              const nextMode = viewMode === 'work' ? 'note' : 'work';
+              void setModeWithFlush(nextMode).then(() => {
+                if (nextMode === 'note') {
+                  requestAnimationFrame(() => noteEditorRef.current?.focus());
+                }
+              });
+            }
+          }
+          return;
+        }
+
+        // Space: リーダー待ち状態へ（[§3.5]、200ms）
+        if (e.key === ' ' && !e.metaKey && !e.ctrlKey && !e.altKey) {
+          // Normal状態のみリーダーとして扱う（Insert では Space は文字入力）
+          if (vimState === 'normal') {
+            e.preventDefault();
+            setSpaceLeaderPending(true);
+            spaceLeaderTimerRef.current = setTimeout(() => {
+              // 200ms超過でキャンセル（[edge_cases.md §9.4]）
+              spaceLeaderTimerRef.current = null;
+              setSpaceLeaderPending(false);
+            }, SPACE_LEADER_TIMEOUT_MS);
+            return;
+          }
+          return;
+        }
+
+        // i: Insert へ（AC-16）
+        if (e.key === 'i' && !e.metaKey && !e.ctrlKey && !e.altKey && vimState === 'normal') {
+          e.preventDefault();
+          setVimState('insert');
+          return;
+        }
+
+        // その他の Vim キー（h/j/k/l/x、[§3.4]、AC-09/AC-20）
+        const result = handleVimWorkKey(e, {
+          vimState,
+          viewMode,
+          toggleCurrentTodo,
+        });
+        if (result === 'handled') {
+          e.preventDefault();
+        }
+        return;
       }
     };
 
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [viewMode, setModeWithFlush]);
+  }, [
+    viewMode,
+    settings.keybindingMode,
+    vimState,
+    settingsOpen,
+    setModeWithFlush,
+    goToday,
+    goPrevDay,
+    goNextDay,
+    toggleCurrentTodo,
+    spaceLeaderPending,
+  ]);
 
   // ============================================================================
   // レンダリング（Phase 4: viewMode で work/note を切替、[要件 7.7]）
@@ -638,6 +838,7 @@ export default function App() {
           noteLineMetas={data?.noteLineMetas}
           onConvertTodo={handleConvertTodo}
           onConvertBlocker={handleConvertBlocker}
+          keybindingMode={settings.keybindingMode}
         />
 
         {/* 変換成功・エラーのトースト通知（Phase 5、[§6.2]） */}
@@ -649,6 +850,22 @@ export default function App() {
             <SaveStatus status={saveStatus} onRetry={retryAll} />
           </div>
         </div>
+
+        {/* Vim操作状態表示（右下、Phase 7 T-7-08、[要件 9.4]） */}
+        <VimStateBadge keybindingMode={settings.keybindingMode} vimState={vimState} />
+
+        {/* 設定モーダル（Phase 7 T-7-02、[ui_interaction_spec.md §8]） */}
+        <SettingsModal
+          open={settingsOpen}
+          settings={settings}
+          onChangeKeybindingMode={(mode) => {
+            void updateKeybindingMode(mode);
+          }}
+          onChangeVimDefaultState={(state) => {
+            void updateVimDefaultState(state);
+          }}
+          onClose={() => setSettingsOpen(false)}
+        />
 
         {/* 重複変換確認ダイアログ（Phase 5、[§7]） */}
         <DuplicateConversionDialog
@@ -690,6 +907,7 @@ export default function App() {
         onToday={goToday}
         isToday={isToday}
         onThemeEdit={(theme) => edit(THEME_TARGET, theme)}
+        onOpenSettings={() => setSettingsOpen(true)}
       />
 
       {/* 保存状態表示（右上、[ui_interaction_spec.md §10]） */}
@@ -698,6 +916,9 @@ export default function App() {
           <SaveStatus status={saveStatus} onRetry={retryAll} />
         </div>
       </div>
+
+      {/* Vim操作状態表示（右下、Phase 7 T-7-08、[要件 9.4]） */}
+      <VimStateBadge keybindingMode={settings.keybindingMode} vimState={vimState} />
 
       <main className="mx-auto max-w-6xl px-8 py-6">
         {loading && <p className="text-sm text-stone-500">読み込み中…</p>}
@@ -743,6 +964,19 @@ export default function App() {
 
       {/* 変換成功・エラーのトースト通知（Phase 5、[§6.2]） */}
       <Toast message={toast} onClose={() => setToast(null)} />
+
+      {/* 設定モーダル（Phase 7 T-7-02、[ui_interaction_spec.md §8]） */}
+      <SettingsModal
+        open={settingsOpen}
+        settings={settings}
+        onChangeKeybindingMode={(mode) => {
+          void updateKeybindingMode(mode);
+        }}
+        onChangeVimDefaultState={(state) => {
+          void updateVimDefaultState(state);
+        }}
+        onClose={() => setSettingsOpen(false)}
+      />
 
       {/* localStorage 書込失敗時の確認ダイアログ（§9.3、モード切替兼用） */}
       <FlushFailDialog

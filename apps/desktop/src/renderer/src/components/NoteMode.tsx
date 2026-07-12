@@ -18,7 +18,7 @@
 
 import { forwardRef } from 'react';
 import { getWeekdayLabel } from '@dayboard/domain';
-import type { NoteLineMeta } from 'shared-types';
+import type { KeybindingMode, NoteLineMeta } from 'shared-types';
 import { NoteEditor, type NoteEditorHandle } from './NoteEditor.js';
 
 /** YYYY-MM-DD を「2026/07/08」形式に整形（Header.tsx と共通の表示形式） */
@@ -44,6 +44,8 @@ export type NoteModeProps = {
   onConvertTodo?: (lineNumber: number, lineText: string) => void;
   /** 障害化キー（⌘/Ctrl+Shift+B）押下時（Phase 5） */
   onConvertBlocker?: (lineNumber: number, lineText: string) => void;
+  /** キーバインドモード（Phase 7 T-7-05: Vim拡張の有効化に使用） */
+  keybindingMode?: KeybindingMode;
 };
 
 export const NoteMode = forwardRef<NoteEditorHandle, NoteModeProps>(function NoteMode(
@@ -56,6 +58,7 @@ export const NoteMode = forwardRef<NoteEditorHandle, NoteModeProps>(function Not
     noteLineMetas,
     onConvertTodo,
     onConvertBlocker,
+    keybindingMode,
   },
   ref,
 ) {
@@ -108,6 +111,7 @@ export const NoteMode = forwardRef<NoteEditorHandle, NoteModeProps>(function Not
               noteLineMetas={noteLineMetas}
               onConvertTodo={onConvertTodo}
               onConvertBlocker={onConvertBlocker}
+              keybindingMode={keybindingMode}
             />
           </div>
         )}

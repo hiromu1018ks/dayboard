@@ -26,8 +26,9 @@ import type { BlockInfo, ViewUpdate } from '@codemirror/view';
 import { markdown } from '@codemirror/lang-markdown';
 import { StateEffect, StateField } from '@codemirror/state';
 import type { Extension } from '@codemirror/state';
-import type { NoteLineMeta } from 'shared-types';
+import type { KeybindingMode, NoteLineMeta } from 'shared-types';
 import { computeLineHash, normalizeLineText } from '@dayboard/domain';
+import { createVimExtension } from '../keybindings/vim.js';
 
 export type NoteEditorProps = {
   /** NoteEntry.body 全文 */
@@ -42,6 +43,11 @@ export type NoteEditorProps = {
   onConvertTodo?: (lineNumber: number, lineText: string) => void;
   /** 障害化キー（⌘/Ctrl+Shift+B）押下時。行テキストが空の場合は呼ばれない */
   onConvertBlocker?: (lineNumber: number, lineText: string) => void;
+  /**
+   * キーバインドモード（Phase 7 T-7-05）。
+   * 'vim' のとき CodeMirror の Vim 拡張を有効化する。'standard' なら通常エディタ。
+   */
+  keybindingMode?: KeybindingMode;
 };
 
 /**
@@ -164,7 +170,15 @@ function computeConversionMarks(
 }
 
 export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(function NoteEditor(
-  { value, onChange, noteEntryId, noteLineMetas = [], onConvertTodo, onConvertBlocker },
+  {
+    value,
+    onChange,
+    noteEntryId,
+    noteLineMetas = [],
+    onConvertTodo,
+    onConvertBlocker,
+    keybindingMode = 'standard',
+  },
   ref,
 ) {
   const hostRef = useRef<HTMLDivElement | null>(null);
@@ -181,6 +195,9 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(function
   onConvertTodoRef.current = onConvertTodo;
   const onConvertBlockerRef = useRef(onConvertBlocker);
   onConvertBlockerRef.current = onConvertBlocker;
+  // キーバインドモードの最新参照（Vim 拡張の動的切替に使用）
+  const keybindingModeRef = useRef(keybindingMode);
+  keybindingModeRef.current = keybindingMode;
 
   // 命令型APIを公開
   useImperativeHandle(
@@ -205,23 +222,31 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(function
   useEffect(() => {
     if (!hostRef.current) return;
 
+    // Phase 7 T-7-05: Vim 拡張を条件付きで有効化（keybindingMode='vim' のときのみ）
+    const initialExtensions: Extension[] = [
+      basicSetup,
+      markdown(),
+      EditorView.lineWrapping,
+      EditorView.theme({
+        '&': { height: '100%', fontSize: '15px' },
+        '.cm-scroller': {
+          fontFamily:
+            'ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace',
+          lineHeight: '1.7',
+        },
+        '.cm-content': { padding: '16px 20px', maxWidth: '100%' },
+        '&.cm-focused': { outline: 'none' },
+        '.cm-conversion-gutter': { width: '2.5em' },
+      }),
+    ];
+    if (keybindingModeRef.current === 'vim') {
+      initialExtensions.push(createVimExtension());
+    }
+
     const view = new EditorView({
       doc: initialValueRef.current,
       extensions: [
-        basicSetup,
-        markdown(),
-        EditorView.lineWrapping,
-        EditorView.theme({
-          '&': { height: '100%', fontSize: '15px' },
-          '.cm-scroller': {
-            fontFamily:
-              'ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace',
-            lineHeight: '1.7',
-          },
-          '.cm-content': { padding: '16px 20px', maxWidth: '100%' },
-          '&.cm-focused': { outline: 'none' },
-          '.cm-conversion-gutter': { width: '2.5em' },
-        }),
+        ...initialExtensions,
         // 変換済みマーク（ガター + StateField）
         conversionMarksField,
         conversionGutterExtension(),
@@ -259,10 +284,16 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(function
     viewRef.current = view;
 
     return () => {
+      // 再生成（keybindingMode 変更時）に直前の編集内容を引き継ぐため、
+      // 破棄前に現在の doc を initialValueRef へ退避する（T-7-05）。
+      if (viewRef.current) {
+        initialValueRef.current = viewRef.current.state.doc.toString();
+      }
       view.destroy();
       viewRef.current = null;
     };
-  }, []);
+    // keybindingMode が変わったらCodeMirrorを再生成（Vim拡張の切替、T-7-05）。
+  }, [keybindingMode]);
 
   /**
    * 現在カーソル行を取得し、変換コールバックを呼ぶ。

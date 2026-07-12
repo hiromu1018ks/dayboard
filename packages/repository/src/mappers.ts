@@ -14,6 +14,7 @@ import type {
   NoteLineMeta,
   Reflection,
   TodoItem,
+  UserSettings,
 } from 'shared-types';
 import type {
   blockerItems,
@@ -22,6 +23,7 @@ import type {
   noteLineMetas,
   reflections,
   todoItems,
+  userSettings,
 } from './schema/index.js';
 
 /** Drizzle の timestamp `Date` を ISO 8601 文字列へ。NULL はそのまま。 */
@@ -111,6 +113,17 @@ export function mapNoteLineMeta(row: typeof noteLineMetas.$inferSelect): NoteLin
     convertedToBlockerId: row.convertedToBlockerId,
     convertedToReflection: row.convertedToReflection,
     convertedAt: toIso(row.convertedAt) as string,
+    createdAt: toIso(row.createdAt) as string,
+    updatedAt: toIso(row.updatedAt) as string,
+  };
+}
+
+/** user_settings row → UserSettings ドメイン型 */
+export function mapUserSettings(row: typeof userSettings.$inferSelect): UserSettings {
+  return {
+    id: row.id,
+    keybindingMode: row.keybindingMode as UserSettings['keybindingMode'],
+    vimDefaultState: row.vimDefaultState as UserSettings['vimDefaultState'],
     createdAt: toIso(row.createdAt) as string,
     updatedAt: toIso(row.updatedAt) as string,
   };

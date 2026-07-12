@@ -15,6 +15,7 @@ import { carryOverRoutes } from './routes/carryOver.js';
 import { convertRoutes } from './routes/convert.js';
 import { dayNoteRoutes } from './routes/dayNotes.js';
 import { healthRoutes } from './routes/health.js';
+import { settingsRoutes } from './routes/settings.js';
 import { todoRoutes } from './routes/todos.js';
 
 export function createApp(): Hono {
@@ -33,6 +34,7 @@ export function createApp(): Hono {
   app.route('/api/day-notes', carryOverRoutes);
   app.route('/api/todos', todoRoutes);
   app.route('/api/blockers', blockerRoutes);
+  app.route('/api/settings', settingsRoutes);
 
   return app;
 }

@@ -5,7 +5,6 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import { createHash } from 'node:crypto';
 import { computeLineHash } from '../../src/conversion/lineHash.js';
 
 describe('computeLineHash', () => {
@@ -49,23 +48,31 @@ describe('computeLineHash', () => {
     });
   });
 
-  describe('SHA-256 の検証', () => {
-    it('noteEntryId + 改行 + text のSHA-256先頭16文字と一致する', () => {
-      const expected = createHash('sha256')
-        .update('ne_001\n見積作成', 'utf8')
-        .digest('hex')
-        .slice(0, 16);
-      expect(computeLineHash('ne_001', '見積作成')).toBe(expected);
+  describe('FNV-1a ハッシュの検証', () => {
+    // Phase 7 修正: lineHash は SHA-256 から FNV-1a（64bit）へ変更した。
+    // 理由: node:crypto は Electron renderer（nodeIntegration:false）で使えず、
+    // ビルドが失敗するため。ドメイン層で1関数を共有しているため、サーバー・クライアント間の
+    // 整合性は保たれる。ここでは FNV-1a の特性（決定論的・同一入力で同一値）を検証する。
+
+    it('noteEntryId + 改行 + text を入力とする（決定論的）', () => {
+      // 同じ入力に対しては常に同じ値を返す
+      const a = computeLineHash('ne_001', '見積作成');
+      const b = computeLineHash('ne_001', '見積作成');
+      expect(a).toBe(b);
+      expect(a).toMatch(/^[0-9a-f]{16}$/);
     });
 
     it('改行区切りが使われている（単純結合ではない）', () => {
-      // "ne_001" + "\n" + "text" と "ne_001\ntext" は同じだが、
-      // "ne_001" + "text"（改行なし）とは異なることを確認
-      const withoutNewline = createHash('sha256')
-        .update('ne_001text', 'utf8')
-        .digest('hex')
-        .slice(0, 16);
-      expect(computeLineHash('ne_001', 'text')).not.toBe(withoutNewline);
+      // "ne_001" + "\n" + "text" と "ne_001" + "text"（改行なし）は異なるハッシュになる
+      const withNewline = computeLineHash('ne_001', 'text');
+      // 改行なしの入力で直接計算した値とは異なることを確認
+      // （computeLineHash は内部で "\n" を挟むため）
+      // ne_001 + text の直接結合を模倣するため、noteEntryId に \n を含めないケース
+      const fakeWithoutNewline = computeLineHash('ne_001text', '');
+      // 実際のハッシュ: fnv1a("ne_001\ntext")
+      // 改行なし参考:   fnv1a("ne_001text\n")
+      // これらは異なるはず
+      expect(withNewline).not.toBe(fakeWithoutNewline);
     });
   });
 

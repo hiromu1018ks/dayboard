@@ -649,71 +649,71 @@
 
 ### タスク
 
-- [ ] **T-7-01** [repo/api] UserSettings エンドポイント
+- [x] **T-7-01** [repo/api] UserSettings エンドポイント
   - 依存: T-0-05
   - 対象AC: AC-15
   - 出力: `packages/repository/src/userSettingsRepository.ts`（`get`/`update`）、`apps/api/src/routes/settings.ts`（`GET`/`PATCH /api/settings`、[api_contract.md §11](api_contract.md)）
   - 完了条件: 未作成なら初期値で作成して返す
-- [ ] **T-7-02** [ui] 設定モーダル
+- [x] **T-7-02** [ui] 設定モーダル
   - 依存: T-7-01
   - 対象AC: AC-15
   - 対象US: US-MVP-014
   - 出力: `apps/desktop/renderer/src/components/SettingsModal.tsx`（[ui_interaction_spec.md §8](ui_interaction_spec.md): 歯車アイコンから開く、`standard`/`vim` ラジオ、Vim時に `vimDefaultState`、Esc/背景クリックで閉じる）
   - 完了条件: 保存で `PATCH /api/settings`、即座にキーバインド切替
-- [ ] **T-7-03** [ui] 標準キーバインド完成（仕事整理モード）
+- [x] **T-7-03** [ui] 標準キーバインド完成（仕事整理モード）
   - 依存: T-4-06, T-3-09, T-3-10
   - 対象AC: AC-02, AC-09
   - 対象US: US-MVP-013
   - 出力: `apps/desktop/renderer/src/keybindings/standard.ts`（[ui_interaction_spec.md §11.2](ui_interaction_spec.md): `⌘/Ctrl+1/2/3` 列フォーカス、`⌘/Ctrl+Enter` TODO追加、フォーカス制御）
   - 完了条件: 各列の入力可能最初の要素へフォーカス
-- [ ] **T-7-04** [ui] 標準キーバインド（日付移動・基本）
+- [x] **T-7-04** [ui] 標準キーバインド（日付移動・基本）
   - 依存: T-7-03, T-1-14
   - 対象AC: AC-10
   - 出力: `⌘/Ctrl+T`（今日）、`Alt/Option+←/→`（前日/翌日）、`⌘/Ctrl+J`（モード切替）、[ui_interaction_spec.md §11.1](ui_interaction_spec.md)
   - 完了条件: ショートカットから日付移動・モード切替ができる（flush接続済み）
-- [ ] **T-7-05** [ui] Vim 拡張の有効化（CodeMirror）
+- [x] **T-7-05** [ui] Vim 拡張の有効化（CodeMirror）
   - 依存: T-4-03, T-7-02
   - 対象AC: AC-16, AC-17, AC-18
-  - 出力: `apps/desktop/renderer/src/keybindings/vim.ts`（`@codemirror/vim` 拡張の条件付き有効化、`vimState` と CodeMirror Normal/Insert の同期）
+  - 出力: `apps/desktop/renderer/src/keybindings/vim.ts`（`@replit/codemirror-vim` 拡張の条件付き有効化、`vimState` と CodeMirror Normal/Insert の同期）
   - 完了条件: Vim時に CodeMirror が Vimモードで動く
-- [ ] **T-7-06** [ui] Vim `h/j/k/l`（列/項目移動 vs カーソル移動）
+- [x] **T-7-06** [ui] Vim `h/j/k/l`（列/項目移動 vs カーソル移動）
   - 依存: T-7-05
   - 対象AC: AC-20
   - 対象US: US-MVP-015
   - 出力: [ui_interaction_spec.md §3.4](ui_interaction_spec.md) の優先ルール（Normal=列/項目、Insert=テキストカーソル）、仕事整理モードでの `theme↔todo↔blocker↔reflection`
   - 完了条件: ノートモードでは CodeMirror の `h/j/k/l` をそのまま利用
-- [ ] **T-7-07** [ui] Vim `i`/`x`/`Space系`
+- [x] **T-7-07** [ui] Vim `i`/`x`/`Space系`
   - 依存: T-7-05, T-7-06
   - 対象AC: AC-09, AC-16
   - 出力: `i`（Insertへ）、`x`（TODO完了切替、AC-09）、`Space n/1/2/3/t/b`（[ui_interaction_spec.md §3.5](ui_interaction_spec.md)、200msリーダー待ち）
   - 完了条件: Space リーダー後200ms超過でキャンセル（[edge_cases.md §9.4](edge_cases.md)）
-- [ ] **T-7-08** [ui] Vim状態表示
+- [x] **T-7-08** [ui] Vim状態表示
   - 依存: T-7-05
   - 対象AC: AC-16
   - 出力: `apps/desktop/renderer/src/components/VimStateBadge.tsx`（右下に `VIM NORMAL`/`VIM INSERT`、[要件 9.4](dayborad_requirements.md)、控えめ）
   - 完了条件: 状態が分かりやすく、入力の邪魔にならない
-- [ ] **T-7-09** [ui] Esc の4段優先順位（Vim対応）
+- [x] **T-7-09** [ui] Esc の4段優先順位（Vim対応）
   - 依存: T-4-07, T-7-05
   - 対象AC: AC-17, AC-18, AC-19
   - 出力: `escPriority.ts` に Vim Insert→Normal を差し込み（[ui_interaction_spec.md §9.2](ui_interaction_spec.md): IME→Vim Insert→モーダル→モード戻り）
   - 完了条件: Vim Insert中の `Esc` は Normal のみ（ノート離脱しない、AC-17）、Normal 中の `Esc` はモード戻り（AC-18）
-- [ ] **T-7-10** [ui] Post-MVP ショートカットの無効化
+- [x] **T-7-10** [ui] Post-MVP ショートカットの無効化
   - 依存: T-7-03
   - 対象AC: AC-22
   - 出力: `⌘/Ctrl+K`、`⌘/Ctrl+Shift+R`、`⌘/Ctrl+Shift+M`、Vim Normal の `gg`, `G`, `A`, `o`, `O`, `dd`, `u`, `Ctrl+r`, `/`, `n`, `N`, `Space r`, `Space k` をハンドラで握りつぶす（[ui_interaction_spec.md §11.5](ui_interaction_spec.md) / [dayborad_requirements.md §8.6](dayborad_requirements.md)）
   - 完了条件: 押しても何も起きず、入力内容を破壊しない
-- [ ] **T-7-11** [test] Vim/IME/Post-MVP E2E
+- [x] **T-7-11** [test] Vim/IME/Post-MVP E2E
   - 依存: T-7-05, T-7-09, T-7-10
   - 対象AC: AC-16〜AC-20, AC-22
-  - 出力: `apps/desktop/e2e/{vim,ime,postMvpShortcuts}.spec.ts`（[test_strategy.md §5.2 4.4/4.5/4.6](test_strategy.md)、合成CompositionEventでIME擬似）
+  - 出力: `apps/desktop/e2e/{vim,ime,postMvpShortcuts,settings}.spec.ts`（[test_strategy.md §5.2 4.4/4.5/4.6](test_strategy.md)、合成CompositionEventでIME擬似）
   - 完了条件: 各ACのシナリオが通る
 
 ### Phase 7 のチェック基準
 
-- [ ] キーバインド切替が永続化（AC-15）
-- [ ] Vimの基本操作と状態表示（AC-16〜AC-20）
-- [ ] IME中の `Esc` 優先順位（AC-19）
-- [ ] Post-MVPショートカットが不発（AC-22）
+- [x] キーバインド切替が永続化（AC-15）
+- [x] Vimの基本操作と状態表示（AC-16〜AC-20）
+- [x] IME中の `Esc` 優先順位（AC-19）
+- [x] Post-MVPショートカットが不発（AC-22）
 
 ---
 
@@ -876,9 +876,9 @@ T-0-01 → T-0-05 → T-1-04 → T-1-07 → T-1-08 → T-2-07 → T-3-10 → T-4
 | Phase 4 | 10 | 10 | 完了 |
 | Phase 5 | 14 | 14 | 完了 |
 | Phase 6 | 6 | 6 | 完了 |
-| Phase 7 | 11 | 0 | 未着手 |
+| Phase 7 | 11 | 11 | 完了 |
 | Phase 8 | 7 | 0 | 未着手 |
-| **合計** | **103** | **85** | — |
+| **合計** | **103** | **96** | — |
 
 ---
 

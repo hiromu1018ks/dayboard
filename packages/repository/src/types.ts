@@ -13,12 +13,15 @@
 import type {
   BlockerItem,
   DayNote,
+  KeybindingMode,
   NoteEntry,
   NoteLineMeta,
   Reflection,
   TodoItem,
   TodoStatus,
+  UserSettings,
   ViewMode,
+  VimDefaultState,
 } from 'shared-types';
 
 /** DayNote の部分更新入力（[api_contract.md §4]） */
@@ -186,4 +189,18 @@ export interface NoteLineMetaRepository {
   ): Promise<NoteLineMeta[]>;
   /** 新規作成（変換時の1トランザクション内で呼ばれる） */
   create(id: string, input: NoteLineMetaCreateInput, tx?: Tx): Promise<NoteLineMeta>;
+}
+
+/** UserSettings の部分更新入力（[api_contract.md §11]）。両方任意 */
+export type UserSettingsUpdateInput = {
+  keybindingMode?: KeybindingMode;
+  vimDefaultState?: VimDefaultState;
+};
+
+/** UserSettingsRepository IF（[database_schema.md §3.2/§11]）。MVPは単一ユーザーのため常に1行 */
+export interface UserSettingsRepository {
+  /** 常に1行返す。未作成の場合は初期値（standard/normal）で作成して返す（[api_contract.md §11]） */
+  get(): Promise<UserSettings>;
+  /** 部分更新。空 input は現状維持 */
+  update(input: UserSettingsUpdateInput): Promise<UserSettings>;
 }

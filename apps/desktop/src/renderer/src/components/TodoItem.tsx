@@ -92,13 +92,16 @@ export function TodoItem({
     <li
       className={`group flex items-start gap-2 rounded px-1 py-1 transition-colors duration-700 ${highlight ? 'bg-amber-100' : ''}`}
     >
-      {/* 完了チェック（carried は操作不可） */}
+      {/* 完了チェック（carried は操作不可）
+          Phase 7: data-focus-item で Vim j/k（項目移動）・x（完了切替、AC-09）のターゲット */}
       <button
         type="button"
         onClick={onToggle}
         disabled={isCarried}
         aria-label={isDone ? '未完了に戻す' : '完了にする'}
-        className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded border border-stone-300 text-xs disabled:opacity-40"
+        data-focus-item={todo.id}
+        tabIndex={0}
+        className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded border border-stone-300 text-xs disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-stone-400 focus-visible:ring-offset-1"
         aria-pressed={isDone}
       >
         {isDone && <span aria-hidden="true">✓</span>}

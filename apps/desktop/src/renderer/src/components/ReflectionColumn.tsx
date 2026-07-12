@@ -63,8 +63,10 @@ export function ReflectionColumn({ reflection, onEdit }: ReflectionColumnProps) 
         <span className="mr-1 text-stone-400">③</span>振り返り
       </h2>
 
+      {/* Phase 7: 最初のセクション（できたこと）へ data-focus-section="reflection" を付与
+          （⌘3, Vim h/l/Space 3 の列フォーカス対象） */}
       <div className="flex-1 space-y-4">
-        {SECTIONS.map((section) => (
+        {SECTIONS.map((section, i) => (
           <div key={section.key}>
             <label className="mb-1 block text-xs font-medium text-stone-500">{section.label}</label>
             <textarea
@@ -73,6 +75,7 @@ export function ReflectionColumn({ reflection, onEdit }: ReflectionColumnProps) 
               placeholder={section.placeholder}
               maxLength={4000}
               rows={4}
+              {...(i === 0 ? { 'data-focus-section': 'reflection' } : {})}
               className="w-full resize-none rounded border border-stone-200 bg-stone-50/50 px-2 py-1.5 text-sm text-stone-700 outline-none placeholder:text-stone-300 focus:border-stone-400 focus:bg-white"
               aria-label={section.label}
             />

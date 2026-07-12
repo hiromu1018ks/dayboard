@@ -43,10 +43,7 @@ async function addTodo(date: string, title: string): Promise<TodoItem> {
 }
 
 /** 持ち越しリクエストのヘルパー */
-async function carryOver(
-  date: string,
-  body: { todoIds: string[] },
-): Promise<Response> {
+async function carryOver(date: string, body: { todoIds: string[] }): Promise<Response> {
   return app.request(`/api/day-notes/${date}/carry-over`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -324,7 +321,7 @@ describe('持ち越し API (Integration)', () => {
       // DB の翌日TODO数と carried 数が一致
       const pool = getPool();
       const rows = await pool.query(
-        "SELECT COUNT(*)::int AS count FROM todo_items WHERE carried_from_todo_id IS NOT NULL",
+        'SELECT COUNT(*)::int AS count FROM todo_items WHERE carried_from_todo_id IS NOT NULL',
       );
       expect(rows.rows[0].count).toBe(body.carried.length);
     });

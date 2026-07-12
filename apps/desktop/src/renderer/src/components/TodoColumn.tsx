@@ -156,7 +156,8 @@ export function TodoColumn({
         </div>
       )}
 
-      {/* 追加入力欄（[ui_interaction_spec.md §5.1]） */}
+      {/* 追加入力欄（[ui_interaction_spec.md §5.1]）
+          Phase 7: data-focus-section="todo" で列フォーカス（⌘1, Vim h/l/Space 1）対応 */}
       <div className="mt-3 border-t border-stone-100 pt-3">
         <input
           ref={inputRef}
@@ -171,6 +172,7 @@ export function TodoColumn({
           }}
           placeholder="TODOを追加して Enter"
           maxLength={200}
+          data-focus-section="todo"
           className="w-full border-b border-stone-200 bg-transparent px-1 py-0.5 text-sm text-stone-700 outline-none placeholder:text-stone-300 focus:border-stone-400"
           aria-label="新規TODO入力"
         />
