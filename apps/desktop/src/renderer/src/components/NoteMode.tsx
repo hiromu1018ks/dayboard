@@ -46,6 +46,8 @@ export type NoteModeProps = {
   onConvertBlocker?: (lineNumber: number, lineText: string) => void;
   /** キーバインドモード（Phase 7 T-7-05: Vim拡張の有効化に使用） */
   keybindingMode?: KeybindingMode;
+  /** CodeMirror の Vim mode 変化通知（Phase 7 T-7-05） */
+  onVimModeChange?: (mode: 'normal' | 'insert') => void;
 };
 
 export const NoteMode = forwardRef<NoteEditorHandle, NoteModeProps>(function NoteMode(
@@ -59,6 +61,7 @@ export const NoteMode = forwardRef<NoteEditorHandle, NoteModeProps>(function Not
     onConvertTodo,
     onConvertBlocker,
     keybindingMode,
+    onVimModeChange,
   },
   ref,
 ) {
@@ -112,6 +115,7 @@ export const NoteMode = forwardRef<NoteEditorHandle, NoteModeProps>(function Not
               onConvertTodo={onConvertTodo}
               onConvertBlocker={onConvertBlocker}
               keybindingMode={keybindingMode}
+              onVimModeChange={onVimModeChange}
             />
           </div>
         )}

@@ -15,7 +15,7 @@
  * これにより「保存忘れ」を防ぎ、切替後すぐに全ショートカットが新キーバインドで動く。
  */
 
-import { useEffect, useRef } from 'react';
+import { useRef } from 'react';
 import type { KeybindingMode, UserSettings, VimDefaultState } from 'shared-types';
 
 export type SettingsModalProps = {
@@ -197,30 +197,6 @@ export function SettingsModal({
       </div>
     </div>
   );
-}
-
-/**
- * モーダルのキーハンドリングを扱う補助フック。
- * Esc で閉じる処理（[ui_interaction_spec.md §8.1]）。
- *
- * ただし Esc の優先順位は escPriority.ts で段3（モーダル）として統一管理されるため、
- * ここでは escPriority への差し込み用に settingsOpen 状態を親へ渡す設計とする。
- * このフックはモーダル内でのフォーカストラップ等が必要になった際の拡張ポイント。
- */
-export function useSettingsModalEsc(open: boolean, onClose: () => void): void {
-  useEffect(() => {
-    if (!open) return;
-    // escPriority が段3で消費するため、ここではフォールバックとしてのみ動作
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && !e.isComposing && e.keyCode !== 229) {
-        // 親の escPriority が先に処理するはずだが、念のためフォールバック
-        e.preventDefault();
-        onClose();
-      }
-    };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [open, onClose]);
 }
 
 export default SettingsModal;

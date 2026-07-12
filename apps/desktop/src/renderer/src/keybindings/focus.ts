@@ -5,10 +5,11 @@
  * 列内項目移動（Vim `j/k`）を支える。
  *
  * 設計方針:
- * - 各カラムのコンテナ要素（`<section>`）へ `data-focus-section="<section>"` を付与する
+ * - 各カラムの**コンテナ要素**（`<section>`）へ `data-focus-section="<section>"` を付与する
+ * - カラム内の**入力要素**（追加入力欄等）へ `data-focus-input` を付与する
  * - カラム内の各項目（TODO/Blocker）へ `data-focus-item="<id>"` を付与する
- * - `focusSection()` はセクションコンテナ内の最初のフォーカス可能要素（input/textarea/
- *   button[data-focus-item] 等）へフォーカスする
+ * - `focusSectionInput()` はセクション内の**入力要素**（`data-focus-input`）へフォーカスする
+ *   （入力要素が無ければ最初の項目 `data-focus-item` へ）
  *
  * 列の順序（[ui_interaction_spec.md §3.4]）: theme ↔ todo ↔ blocker ↔ reflection
  */
@@ -19,31 +20,44 @@ export type WorkSection = 'theme' | 'todo' | 'blocker' | 'reflection';
 /** 列の左右順序（[ui_interaction_spec.md §3.4]: theme ↔ todo ↔ blocker ↔ reflection） */
 export const SECTION_ORDER: readonly WorkSection[] = ['theme', 'todo', 'blocker', 'reflection'];
 
-/** フォーカス可能要素のセレクタ（input/textarea/button/select、disabled/hidden 除外） */
-const FOCUSABLE_SELECTOR =
-  'input:not([disabled]):not([type="hidden"]), textarea:not([disabled]), button:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])';
+/**
+ * 指定セクションのコンテナを取得する（`data-focus-section` を持つ要素）。
+ * コンテナが見つからない場合は null。
+ */
+function getSectionContainer(section: WorkSection): HTMLElement | null {
+  return document.querySelector<HTMLElement>(`[data-focus-section="${section}"]`);
+}
 
 /**
- * 指定セクションの「入力可能最初の要素」へフォーカスを移す（[§3.2]）。
+ * 指定セクションの**入力要素**（`data-focus-input`）へフォーカスを移す（[§3.2]）。
  *
- * `data-focus-section="<section>"` を持つコンテナを探し、その中の最初のフォーカス可能
- * 要素（input/textarea等）へフォーカスする。
+ * `⌘1/2/3`、Vim `Space 1/2/3`、`⌘Enter`（TODO追加）、Vim `i`（Insert遷移）で使う。
+ * 入力要素が無い場合はセクション内の最初の `data-focus-item` へ、
+ * それも無ければコンテナ内の最初のフォーカス可能要素へ。
+ *
+ * @returns フォーカス移動できた場合 true
  */
-export function focusSection(section: WorkSection): boolean {
-  const container = document.querySelector<HTMLElement>(`[data-focus-section="${section}"]`);
+export function focusSectionInput(section: WorkSection): boolean {
+  const container = getSectionContainer(section);
   if (!container) return false;
-  // コンテナ内の最初のフォーカス可能要素を探す
-  const focusable =
-    container.matches(FOCUSABLE_SELECTOR) && !container.hasAttribute('data-focus-item')
-      ? container
-      : container.querySelector<HTMLElement>(FOCUSABLE_SELECTOR);
-  if (focusable) {
-    focusable.focus();
+  // 優先1: data-focus-input を持つ要素（追加入力欄等）
+  const input = container.querySelector<HTMLElement>('[data-focus-input]');
+  if (input) {
+    input.focus();
     return true;
   }
-  // フォーカス可能要素が無い場合はコンテナ自身へ（tabindex を持つ場合等）
-  if (container.matches(FOCUSABLE_SELECTOR)) {
-    container.focus();
+  // 優先2: data-focus-item の最初の要素
+  const firstItem = container.querySelector<HTMLElement>('[data-focus-item]');
+  if (firstItem) {
+    firstItem.focus();
+    return true;
+  }
+  // 優先3: コンテナ内の最初のフォーカス可能要素（フォールバック）
+  const focusable = container.querySelector<HTMLElement>(
+    'input:not([disabled]), textarea:not([disabled]), button:not([disabled]), [tabindex]:not([tabindex="-1"])',
+  );
+  if (focusable) {
+    focusable.focus();
     return true;
   }
   return false;
@@ -89,6 +103,8 @@ export function getFocusedItemId(): string | null {
 /**
  * 隣接セクションへフォーカスを移す（[ui_interaction_spec.md §3.4] の列移動）。
  *
+ * 移動先は列の入力要素（`focusSectionInput`）へフォーカスする。
+ *
  * @param direction 'left' (h) または 'right' (l)
  * @returns フォーカス移動できた場合 true
  */
@@ -96,14 +112,14 @@ export function focusAdjacentSection(direction: 'left' | 'right'): boolean {
   const current = getFocusedSection();
   if (!current) {
     // フォーカスが無い場合は最初のセクション（theme）へ
-    return focusSection('theme');
+    return focusSectionInput('theme');
   }
   const idx = SECTION_ORDER.indexOf(current);
   if (idx < 0) return false;
   const nextIdx = direction === 'left' ? idx - 1 : idx + 1;
   // 循環しない（[§3.4]: 列の末端で止まる）
   if (nextIdx < 0 || nextIdx >= SECTION_ORDER.length) return false;
-  return focusSection(SECTION_ORDER[nextIdx]!);
+  return focusSectionInput(SECTION_ORDER[nextIdx]!);
 }
 
 /**

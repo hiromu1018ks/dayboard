@@ -24,11 +24,12 @@ import { basicSetup } from 'codemirror';
 import { EditorView, GutterMarker, gutter } from '@codemirror/view';
 import type { BlockInfo, ViewUpdate } from '@codemirror/view';
 import { markdown } from '@codemirror/lang-markdown';
-import { StateEffect, StateField } from '@codemirror/state';
+import { Compartment, StateEffect, StateField } from '@codemirror/state';
 import type { Extension } from '@codemirror/state';
 import type { KeybindingMode, NoteLineMeta } from 'shared-types';
 import { computeLineHash, normalizeLineText } from '@dayboard/domain';
-import { createVimExtension } from '../keybindings/vim.js';
+import { createVimExtension, getCodeMirrorVimMode } from '../keybindings/vim.js';
+import { handlePostMvpShortcut } from '../keybindings/postMvp.js';
 
 export type NoteEditorProps = {
   /** NoteEntry.body 全文 */
@@ -48,6 +49,12 @@ export type NoteEditorProps = {
    * 'vim' のとき CodeMirror の Vim 拡張を有効化する。'standard' なら通常エディタ。
    */
   keybindingMode?: KeybindingMode;
+  /**
+   * CodeMirror の Vim 操作状態（Normal/Insert）が変化したときに呼ばれる（Phase 7 T-7-05）。
+   * ノートモードでは CodeMirror 内部が状態の権威のため、これ経由で App 側の vimState へ反映する。
+   * keybindingMode='vim' のときのみ有意。
+   */
+  onVimModeChange?: (mode: 'normal' | 'insert') => void;
 };
 
 /**
@@ -178,6 +185,7 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(function
     onConvertTodo,
     onConvertBlocker,
     keybindingMode = 'standard',
+    onVimModeChange,
   },
   ref,
 ) {
@@ -195,9 +203,11 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(function
   onConvertTodoRef.current = onConvertTodo;
   const onConvertBlockerRef = useRef(onConvertBlocker);
   onConvertBlockerRef.current = onConvertBlocker;
-  // キーバインドモードの最新参照（Vim 拡張の動的切替に使用）
-  const keybindingModeRef = useRef(keybindingMode);
-  keybindingModeRef.current = keybindingMode;
+  // onVimModeChange の最新参照（updateListener が初回生成で固定されるため）
+  const onVimModeChangeRef = useRef(onVimModeChange);
+  onVimModeChangeRef.current = onVimModeChange;
+  // 直近の Vim mode（変化検知用。updateListener は初回生成で固定されるため ref で持つ）
+  const lastVimModeRef = useRef<'normal' | 'insert' | null>(null);
 
   // 命令型APIを公開
   useImperativeHandle(
@@ -218,50 +228,60 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(function
     [],
   );
 
-  // 初回マウントで CodeMirror を生成
+  // Phase 7 T-7-05: Vim 拡張を Compartment で動的切替するための仕掛け。
+  // keybindingMode が変わっても CodeMirror を再生成せず、reconfigure で差し替える。
+  // これによりカーソル位置・スクロール位置・ガターマークが保持される。
+  const vimCompartmentRef = useRef(new Compartment());
+
+  // 初回マウントで CodeMirror を生成（一度きり。keybindingMode 変更時は reconfigure）
   useEffect(() => {
     if (!hostRef.current) return;
-
-    // Phase 7 T-7-05: Vim 拡張を条件付きで有効化（keybindingMode='vim' のときのみ）
-    const initialExtensions: Extension[] = [
-      basicSetup,
-      markdown(),
-      EditorView.lineWrapping,
-      EditorView.theme({
-        '&': { height: '100%', fontSize: '15px' },
-        '.cm-scroller': {
-          fontFamily:
-            'ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace',
-          lineHeight: '1.7',
-        },
-        '.cm-content': { padding: '16px 20px', maxWidth: '100%' },
-        '&.cm-focused': { outline: 'none' },
-        '.cm-conversion-gutter': { width: '2.5em' },
-      }),
-    ];
-    if (keybindingModeRef.current === 'vim') {
-      initialExtensions.push(createVimExtension());
-    }
 
     const view = new EditorView({
       doc: initialValueRef.current,
       extensions: [
-        ...initialExtensions,
+        basicSetup,
+        markdown(),
+        EditorView.lineWrapping,
+        EditorView.theme({
+          '&': { height: '100%', fontSize: '15px' },
+          '.cm-scroller': {
+            fontFamily:
+              'ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace',
+            lineHeight: '1.7',
+          },
+          '.cm-content': { padding: '16px 20px', maxWidth: '100%' },
+          '&.cm-focused': { outline: 'none' },
+          '.cm-conversion-gutter': { width: '2.5em' },
+        }),
         // 変換済みマーク（ガター + StateField）
         conversionMarksField,
         conversionGutterExtension(),
+        // Vim 拡張（Compartment で動的切替、T-7-05）
+        vimCompartmentRef.current.of(keybindingMode === 'vim' ? createVimExtension() : []),
         EditorView.updateListener.of((u) => {
           if (u.docChanged && !applyingExternal.current) {
             onChangeRef.current(u.state.doc.toString());
           }
+          // Phase 7 T-7-05: CodeMirror の Vim mode 変化を検知して App へ通知
+          if (keybindingMode === 'vim') {
+            const mode = getCodeMirrorVimMode(view);
+            if (mode && mode !== lastVimModeRef.current) {
+              lastVimModeRef.current = mode;
+              onVimModeChangeRef.current?.(mode);
+            }
+          }
         }),
         // キーバインド: ⌘/Ctrl+Enter でTODO化、⌘/Ctrl+Shift+B で障害化（T-5-09、[§6.2]）
-        // domEventHandlers で実装し、preventDefault で競合を防ぐ
+        // 併せて Post-MVP ショートカットの握り潰し（T-7-10、AC-22）
         EditorView.domEventHandlers({
           keydown: (event) => {
             const e = event as KeyboardEvent;
             // IME 変換中はスキップ（[ui_interaction_spec.md §9.1]、T-4-06 と同じパターン）
             if (e.isComposing || e.keyCode === 229) return false;
+
+            // Post-MVP ショートカットの握り潰し（T-7-10、AC-22）
+            if (handlePostMvpShortcut(e)) return true;
 
             // ⌘/Ctrl+Enter でTODO化（Shift なし）
             if ((e.metaKey || e.ctrlKey) && e.key === 'Enter' && !e.shiftKey) {
@@ -284,15 +304,32 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(function
     viewRef.current = view;
 
     return () => {
-      // 再生成（keybindingMode 変更時）に直前の編集内容を引き継ぐため、
-      // 破棄前に現在の doc を initialValueRef へ退避する（T-7-05）。
-      if (viewRef.current) {
-        initialValueRef.current = viewRef.current.state.doc.toString();
-      }
       view.destroy();
       viewRef.current = null;
     };
-    // keybindingMode が変わったらCodeMirrorを再生成（Vim拡張の切替、T-7-05）。
+    // 初回マウントのみ（keybindingMode は別 effect で reconfigure）。
+    // keybindingMode を依存配列に含めないのは意図的: 再生成せず Compartment で切替えるため。
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Phase 7 T-7-05: keybindingMode 変更時に Vim 拡張を動的 reconfigure。
+  // CodeMirror を再生成しないため、カーソル位置・スクロール・ガターマークが保持される。
+  useEffect(() => {
+    const view = viewRef.current;
+    if (!view) return;
+    view.dispatch({
+      effects: vimCompartmentRef.current.reconfigure(
+        keybindingMode === 'vim' ? createVimExtension() : [],
+      ),
+    });
+    // reconfigure 後、Vim mode の通知をリセット
+    if (keybindingMode === 'vim') {
+      const mode = getCodeMirrorVimMode(view);
+      lastVimModeRef.current = mode;
+      if (mode) onVimModeChangeRef.current?.(mode);
+    } else {
+      lastVimModeRef.current = null;
+    }
   }, [keybindingMode]);
 
   /**

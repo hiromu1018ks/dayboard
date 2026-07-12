@@ -58,13 +58,14 @@ export function ReflectionColumn({ reflection, onEdit }: ReflectionColumnProps) 
     <section
       className="flex flex-col rounded-lg border border-stone-200 bg-white p-5"
       aria-label="振り返り"
+      data-focus-section="reflection"
     >
       <h2 className="mb-3 text-sm font-semibold text-stone-600">
         <span className="mr-1 text-stone-400">③</span>振り返り
       </h2>
 
-      {/* Phase 7: 最初のセクション（できたこと）へ data-focus-section="reflection" を付与
-          （⌘3, Vim h/l/Space 3 の列フォーカス対象） */}
+      {/* Phase 7: 最初のセクション（できたこと）へ data-focus-input を付与
+          （⌘3, Vim h/l/Space 3, i の列フォーカス対象） */}
       <div className="flex-1 space-y-4">
         {SECTIONS.map((section, i) => (
           <div key={section.key}>
@@ -75,7 +76,7 @@ export function ReflectionColumn({ reflection, onEdit }: ReflectionColumnProps) 
               placeholder={section.placeholder}
               maxLength={4000}
               rows={4}
-              {...(i === 0 ? { 'data-focus-section': 'reflection' } : {})}
+              {...(i === 0 ? { 'data-focus-input': true } : {})}
               className="w-full resize-none rounded border border-stone-200 bg-stone-50/50 px-2 py-1.5 text-sm text-stone-700 outline-none placeholder:text-stone-300 focus:border-stone-400 focus:bg-white"
               aria-label={section.label}
             />

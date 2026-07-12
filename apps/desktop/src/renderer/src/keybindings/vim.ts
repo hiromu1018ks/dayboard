@@ -23,7 +23,7 @@ import type { Extension } from '@codemirror/state';
 import type { EditorView } from '@codemirror/view';
 import type { ViewMode } from '../state/viewMode.js';
 import type { VimState } from '../components/VimStateBadge.js';
-import { focusAdjacentSection, focusItemInCurrentSection, focusSection } from './focus.js';
+import { focusAdjacentSection, focusItemInCurrentSection, focusSectionInput } from './focus.js';
 
 // ============================================================================
 // T-7-05: CodeMirror Vim 拡張の有効化
@@ -81,8 +81,10 @@ export type VimWorkContext = {
 /**
  * Vim のキーイベント処理結果。
  * - `'handled'`: アプリ層で処理した（preventDefault 推奨）
- * - `'leader-pending'`: Space リーダー待ち状態に入った（後続キーを待つ）
  * - `'none'`: 該当なし（親ハンドラで他処理へ流す）
+ *
+ * Space リーダー待ち状態（`leader-pending`）は親（App.tsx）の `spaceLeaderPending`
+ * state で管理するため、本関数からは返さない。
  */
 export type VimHandleResult = 'handled' | 'none';
 
@@ -180,13 +182,13 @@ export function handleSpaceLeader(commandKey: string): SpaceLeaderResult {
       // モード切替（親で flush 付き切替を実行）
       return { status: 'handled', requestToggleMode: true };
     case '1':
-      focusSection('todo');
+      focusSectionInput('todo');
       return { status: 'handled' };
     case '2':
-      focusSection('blocker');
+      focusSectionInput('blocker');
       return { status: 'handled' };
     case '3':
-      focusSection('reflection');
+      focusSectionInput('reflection');
       return { status: 'handled' };
     // Space t / Space b はノートモード専用。仕事整理モードでは無意味（何もしないで終了）
     case 't':

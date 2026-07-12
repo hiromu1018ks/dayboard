@@ -92,7 +92,9 @@ export function BlockerItem({
         type="button"
         onClick={onToggleResolved}
         aria-label={blocker.resolved ? '未解消に戻す' : '解消済みにする'}
-        className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-stone-300 text-xs disabled:opacity-40"
+        data-focus-item={blocker.id}
+        tabIndex={0}
+        className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-stone-300 text-xs disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-stone-400 focus-visible:ring-offset-1"
         aria-pressed={blocker.resolved}
       >
         {blocker.resolved && <span aria-hidden="true">✓</span>}

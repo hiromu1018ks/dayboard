@@ -118,8 +118,9 @@ export function Header({
       </div>
 
       {/* テーマ入力欄（[要件 7.2]: 未入力可。Phase 2 で自動保存接続、T-2-09）
-          Phase 7: data-focus-section="theme" で列フォーカス（⌘無し,Vim h/l）対応 */}
-      <div className="mt-3 flex items-center gap-2">
+          Phase 7: data-focus-section="theme" で列フォーカス（Vim h/l）対応。
+          コンテナ（この div）へ section、入力へ input を付与。 */}
+      <div className="mt-3 flex items-center gap-2" data-focus-section="theme">
         <label htmlFor="theme-input" className="text-sm text-stone-500">
           今日のテーマ：
         </label>
@@ -130,7 +131,7 @@ export function Header({
           onChange={(e) => handleThemeChange(e.target.value)}
           placeholder="今日のテーマを入力"
           maxLength={200}
-          data-focus-section="theme"
+          data-focus-input
           className="flex-1 border-b border-stone-200 bg-transparent px-1 py-0.5 text-stone-700 outline-none placeholder:text-stone-300 focus:border-stone-400"
         />
         {/* 設定（歯車）アイコン（[ui_interaction_spec.md §8.1]、Phase 7 T-7-02） */}

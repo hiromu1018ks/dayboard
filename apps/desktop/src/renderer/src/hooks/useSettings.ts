@@ -10,7 +10,7 @@
  *   （settings.keybindingMode を参照する各ハンドラが再描画で切り替わる）
  */
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import type { KeybindingMode, UserSettings, VimDefaultState } from 'shared-types';
 import { fetchSettings, patchSettings } from '../api/client.js';
 
@@ -48,11 +48,16 @@ export type UseSettingsResult = {
  *
  * マウント時に1回 GET /api/settings を呼び出す。設定の部分更新は楽観的に行い、
  * API失敗時は直前の値へ戻す。
+ *
+ * レース対策: 連続した PATCH リクエストの応答順序が入れ替わった場合でも、
+ * 最新のリクエストの結果のみを反映するよう、リクエストトークンで判定する。
  */
 export function useSettings(): UseSettingsResult {
   const [settings, setSettings] = useState<UserSettings>(INITIAL_SETTINGS);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
+  // 最新の更新リクエストを追跡（応答順序入れ替わり対策）
+  const latestReqRef = useRef(0);
 
   const refetch = useCallback(async () => {
     try {
@@ -74,20 +79,24 @@ export function useSettings(): UseSettingsResult {
   /** 部分更新の共通処理（楽観的更新、失敗時は戻す） */
   const updateWith = useCallback(
     async (patch: { keybindingMode?: KeybindingMode; vimDefaultState?: VimDefaultState }) => {
-      const prev = settings;
-      // 楽観的反映
-      setSettings({ ...prev, ...patch });
+      // 一意のリクエストトークンを発行。応答順序入れ替わり対策。
+      const reqToken = ++latestReqRef.current;
+      // 楽観的反映（関数形式で最新 state から派生）
+      setSettings((prev) => ({ ...prev, ...patch }));
       try {
         const updated = await patchSettings(patch);
+        // 自リクエストより新しいリクエストが発行済みの場合は結果を破棄
+        if (reqToken !== latestReqRef.current) return;
         setSettings(updated);
         setError(null);
       } catch (err) {
-        // 失敗時は直前の値へ戻す
-        setSettings(prev);
+        if (reqToken !== latestReqRef.current) return;
+        // 失敗時は最新 state を再取得して戻す（関数形式で直前の state を参照しない）
+        void refetch();
         setError(err instanceof Error ? err : new Error(String(err)));
       }
     },
-    [settings],
+    [refetch],
   );
 
   const updateKeybindingMode = useCallback(

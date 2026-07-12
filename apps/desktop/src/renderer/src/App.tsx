@@ -1,5 +1,5 @@
 /**
- * アプリケーションルート（[roadmap.md T-1-12/13/14, T-2-07〜11, T-3-09/14, T-4-04〜09]）
+ * アプリケーションルート（[roadmap.md T-1-12/13/14, T-2-07〜11, T-3-09/14, T-4-04〜09, T-7-03〜10]）
  *
  * 起動時に今日の DayNote を取得し（AC-01）、Header に日付・曜日・テーマ入力欄・
  * 日付移動ボタンを表示する（[要件 6.2]）。日付移動で currentDate が変わると
@@ -23,6 +23,17 @@
  * - モード切替前に flush、localStorage 書込成功で切替（T-4-08）
  * - IME 変換中はショートカット判定をスキップ（T-4-06、AC-19 基盤）
  * - Esc の優先順位（T-4-07）。Phase 4 は「ノートモード → work 戻り」のみ
+ *
+ * Phase 7 で追加:
+ * - ユーザー設定（keybindingMode / vimDefaultState）の取得・更新（T-7-01/02、AC-15）
+ * - 設定モーダル（SettingsModal）。歯車アイコンから開く、即時保存（T-7-02）
+ * - 標準キーバインド（仕事整理モード: ⌘1/2/3 列フォーカス、⌘Enter TODO追加）
+ *   + 日付移動（⌘T 今日、Option←/→ 前日翌日、AC-10）（T-7-03/04）
+ * - Vim キーバインド（仕事整理モード: h/j/k/l, i, x, Space 系）（T-7-05/06/07）
+ * - Vim操作状態（vimState）。ノートモードは CodeMirror 内部が権威で onVimModeChange で同期
+ * - VimStateBadge 表示（T-7-08）
+ * - Esc の4段優先順位完成（Vim Insert→Normal、モーダル、モード戻り）（T-7-09、AC-17/18/19）
+ * - Post-MVP ショートカット（⌘K/⌘Shift+R/⌘Shift+M）の握り潰し（T-7-10、AC-22）
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -77,7 +88,7 @@ import {
 } from './keybindings/standard.js';
 import { handlePostMvpShortcut } from './keybindings/postMvp.js';
 import { handleSpaceLeader, handleVimWorkKey, SPACE_LEADER_TIMEOUT_MS } from './keybindings/vim.js';
-import { focusSection, getFocusedItemId } from './keybindings/focus.js';
+import { focusSectionInput, getFocusedItemId, getFocusedSection } from './keybindings/focus.js';
 import type { Reflection } from 'shared-types';
 
 /** テーマ保存対象の識別子（T-2-09） */
@@ -724,17 +735,17 @@ export default function App() {
 
       // ----- 標準キーバインド専用（仕事整理モードのみ、[要件 8.2]） -----
       if (settings.keybindingMode === 'standard' && viewMode === 'work') {
-        // ⌘/Ctrl+1/2/3: 列フォーカス
+        // ⌘/Ctrl+1/2/3: 列フォーカス（入力要素へ）
         const section = matchColumnFocusShortcut(e);
         if (section !== null) {
           e.preventDefault();
-          focusSection(section);
+          focusSectionInput(section);
           return;
         }
         // ⌘/Ctrl+Enter: TODO追加（TODO列の追加入力欄へフォーカス）
         if (isAddTodoShortcut(e)) {
           e.preventDefault();
-          focusSection('todo');
+          focusSectionInput('todo');
           return;
         }
         return;
@@ -785,9 +796,12 @@ export default function App() {
           return;
         }
 
-        // i: Insert へ（AC-16）
+        // i: Insert へ（AC-16）。現在セクションの入力要素へフォーカスして入力可能にする。
+        // フォーカスがどのセクションにも無い場合は todo 列へ（要件11.1 朝の利用フロー）。
         if (e.key === 'i' && !e.metaKey && !e.ctrlKey && !e.altKey && vimState === 'normal') {
           e.preventDefault();
+          const currentSection = getFocusedSection();
+          focusSectionInput(currentSection ?? 'todo');
           setVimState('insert');
           return;
         }
@@ -839,6 +853,7 @@ export default function App() {
           onConvertTodo={handleConvertTodo}
           onConvertBlocker={handleConvertBlocker}
           keybindingMode={settings.keybindingMode}
+          onVimModeChange={setVimState}
         />
 
         {/* 変換成功・エラーのトースト通知（Phase 5、[§6.2]） */}
