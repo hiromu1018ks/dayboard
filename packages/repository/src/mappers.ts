@@ -7,8 +7,22 @@
  * 返すため、ドメイン型（ISO 8601 文字列）へ変換する。
  */
 
-import type { BlockerItem, DayNote, NoteEntry, Reflection, TodoItem } from 'shared-types';
-import type { blockerItems, dayNotes, noteEntries, reflections, todoItems } from './schema/index.js';
+import type {
+  BlockerItem,
+  DayNote,
+  NoteEntry,
+  NoteLineMeta,
+  Reflection,
+  TodoItem,
+} from 'shared-types';
+import type {
+  blockerItems,
+  dayNotes,
+  noteEntries,
+  noteLineMetas,
+  reflections,
+  todoItems,
+} from './schema/index.js';
 
 /** Drizzle の timestamp `Date` を ISO 8601 文字列へ。NULL はそのまま。 */
 function toIso(date: Date | null | undefined): string | null {
@@ -80,6 +94,24 @@ export function mapBlockerItem(row: typeof blockerItems.$inferSelect): BlockerIt
     order: row.order,
     createdAt: toIso(row.createdAt) as string,
     resolvedAt: toIso(row.resolvedAt),
+    updatedAt: toIso(row.updatedAt) as string,
+  };
+}
+
+/** note_line_metas row → NoteLineMeta ドメイン型 */
+export function mapNoteLineMeta(row: typeof noteLineMetas.$inferSelect): NoteLineMeta {
+  return {
+    id: row.id,
+    noteEntryId: row.noteEntryId,
+    lineNumberAtConversion: row.lineNumberAtConversion,
+    normalizedLineText: row.normalizedLineText,
+    lineHash: row.lineHash,
+    lineText: row.lineText,
+    convertedToTodoId: row.convertedToTodoId,
+    convertedToBlockerId: row.convertedToBlockerId,
+    convertedToReflection: row.convertedToReflection,
+    convertedAt: toIso(row.convertedAt) as string,
+    createdAt: toIso(row.createdAt) as string,
     updatedAt: toIso(row.updatedAt) as string,
   };
 }

@@ -20,10 +20,13 @@ export type {
   BlockerRepository,
   ReflectionRepository,
   NoteEntryRepository,
+  NoteLineMetaRepository,
   DayNoteUpdateInput,
   TodoUpdateInput,
   BlockerUpdateInput,
   ReflectionUpdateInput,
+  NoteEntryUpdateInput,
+  NoteLineMetaCreateInput,
   Tx,
 } from './types.js';
 
@@ -36,5 +39,10 @@ export * as noteEntryRepository from './noteEntryRepository.js';
 export * as todoRepository from './todoRepository.js';
 export * as blockerRepository from './blockerRepository.js';
 
+// リポジトリ実装（Phase 5: ノート変換）
+export * as noteLineMetaRepository from './noteLineMetaRepository.js';
+
 // DayNote aggregator（AC-01: 自動生成 + DayNoteFull 編成）
 export { getOrCreateFull, patchDayNote, dayNoteExists } from './dayNoteAggregator.js';
+// Phase 6: 持ち越しAPI用（既存トランザクション内で翌日DayNoteを取得/生成）
+export { getOrCreateDayNoteIdInTx } from './dayNoteAggregator.js';

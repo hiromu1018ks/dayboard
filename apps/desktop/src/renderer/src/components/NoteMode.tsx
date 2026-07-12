@@ -10,10 +10,15 @@
  * - `⌘/Ctrl+J` と `Esc` による work 戻りは App のグローバルキーハンドラで処理（T-4-05/07/08）
  * - editorRef を公開し、モード切替直後に App からフォーカスを当てる（[§4.1]）
  * - loading 中は本文の代わりに「読み込み中…」を表示（日付移動直後の空白画面防止）
+ *
+ * Phase 5 で追加:
+ * - 変換済みマーク（ガター）表示のため、noteEntryId と noteLineMetas を NoteEditor へ伝播（T-5-10）
+ * - TODO化・障害化のキー操作を NoteEditor へ伝播（T-5-09）
  */
 
 import { forwardRef } from 'react';
 import { getWeekdayLabel } from '@dayboard/domain';
+import type { NoteLineMeta } from 'shared-types';
 import { NoteEditor, type NoteEditorHandle } from './NoteEditor.js';
 
 /** YYYY-MM-DD を「2026/07/08」形式に整形（Header.tsx と共通の表示形式） */
@@ -31,10 +36,27 @@ export type NoteModeProps = {
   onBodyChange: (body: string) => void;
   /** データロード中か（true のとき本文の代わりに読み込み中表示） */
   loading?: boolean;
+  /** NoteEntry の id（lineHash 計算・ガター表示用、Phase 5） */
+  noteEntryId?: string;
+  /** 変換済みメタ（ガター表示用、Phase 5） */
+  noteLineMetas?: NoteLineMeta[];
+  /** TODO化キー（⌘/Ctrl+Enter）押下時（Phase 5） */
+  onConvertTodo?: (lineNumber: number, lineText: string) => void;
+  /** 障害化キー（⌘/Ctrl+Shift+B）押下時（Phase 5） */
+  onConvertBlocker?: (lineNumber: number, lineText: string) => void;
 };
 
 export const NoteMode = forwardRef<NoteEditorHandle, NoteModeProps>(function NoteMode(
-  { currentDate, body, onBodyChange, loading = false },
+  {
+    currentDate,
+    body,
+    onBodyChange,
+    loading = false,
+    noteEntryId,
+    noteLineMetas,
+    onConvertTodo,
+    onConvertBlocker,
+  },
   ref,
 ) {
   const displayDate = formatDisplayDate(currentDate);
@@ -78,7 +100,15 @@ export const NoteMode = forwardRef<NoteEditorHandle, NoteModeProps>(function Not
           <p className="text-sm text-stone-500">読み込み中…</p>
         ) : (
           <div className="flex-1 overflow-hidden rounded-lg border border-stone-200 bg-white shadow-sm">
-            <NoteEditor ref={ref} value={body} onChange={onBodyChange} />
+            <NoteEditor
+              ref={ref}
+              value={body}
+              onChange={onBodyChange}
+              noteEntryId={noteEntryId}
+              noteLineMetas={noteLineMetas}
+              onConvertTodo={onConvertTodo}
+              onConvertBlocker={onConvertBlocker}
+            />
           </div>
         )}
       </main>

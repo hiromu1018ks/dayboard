@@ -6,7 +6,7 @@
  */
 
 import type { Dispatch } from 'react';
-import type { DayNoteFull, TodoItem, BlockerItem, Reflection } from 'shared-types';
+import type { DayNoteFull, NoteLineMeta, TodoItem, BlockerItem, Reflection } from 'shared-types';
 import { BlockerColumn } from './BlockerColumn.js';
 import { ReflectionColumn } from './ReflectionColumn.js';
 import { TodoColumn } from './TodoColumn.js';
@@ -20,6 +20,8 @@ export type WorkModeHandlers = {
   onEditTodoTitle: (id: string, title: string) => void;
   onDeleteTodo: (id: string) => void;
   onReorderTodos: (orderedIds: string[]) => void;
+  /** 未完了TODOを翌日に持ち越す（Phase 6、要件 7.10） */
+  onCarryOverTodos: (todoIds: string[]) => void;
   // Blocker
   onAddBlocker: (text: string, linkedTodoId: string | null) => void;
   onToggleBlockerResolved: (id: string) => void;
@@ -38,6 +40,12 @@ export type WorkModeProps = {
   reflection: Reflection;
   dispatch: Dispatch<WorkAction>;
   handlers: WorkModeHandlers;
+  /** sourceNoteLineMetaId → NoteLineMeta のマップ（発生元表示用、Phase 5） */
+  noteLineMetaMap?: Map<string, NoteLineMeta>;
+  /** ハイライト対象のTODO id セット（Phase 5、変換成功後の1.2s） */
+  highlightTodoIds?: Set<string>;
+  /** ハイライト対象の障害 id セット（Phase 5） */
+  highlightBlockerIds?: Set<string>;
 };
 
 /**
@@ -46,7 +54,16 @@ export type WorkModeProps = {
  * 各カラムは `rounded-lg border border-stone-200 bg-white` のカードで、
  * 紙ノート余白を表現するため `p-5` のパディングを持つ（[要件 14.1]）。
  */
-export function WorkMode({ date, todos, blockers, reflection, handlers }: WorkModeProps) {
+export function WorkMode({
+  date,
+  todos,
+  blockers,
+  reflection,
+  handlers,
+  noteLineMetaMap,
+  highlightTodoIds,
+  highlightBlockerIds,
+}: WorkModeProps) {
   return (
     <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
       <TodoColumn
@@ -57,6 +74,9 @@ export function WorkMode({ date, todos, blockers, reflection, handlers }: WorkMo
         onEditTitle={handlers.onEditTodoTitle}
         onDelete={handlers.onDeleteTodo}
         onReorder={handlers.onReorderTodos}
+        onCarryOverTodos={handlers.onCarryOverTodos}
+        noteLineMetaMap={noteLineMetaMap}
+        highlightIds={highlightTodoIds}
       />
       <BlockerColumn
         date={date}
@@ -68,6 +88,8 @@ export function WorkMode({ date, todos, blockers, reflection, handlers }: WorkMo
         onChangeLinkedTodo={handlers.onChangeBlockerLinkedTodo}
         onDelete={handlers.onDeleteBlocker}
         onReorder={handlers.onReorderBlockers}
+        noteLineMetaMap={noteLineMetaMap}
+        highlightIds={highlightBlockerIds}
       />
       <ReflectionColumn reflection={reflection} onEdit={handlers.onEditReflection} />
     </div>

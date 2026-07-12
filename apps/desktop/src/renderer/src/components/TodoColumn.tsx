@@ -10,7 +10,7 @@
  */
 
 import { useEffect, useRef, useState } from 'react';
-import type { TodoItem as TodoItemType } from 'shared-types';
+import type { NoteLineMeta, TodoItem as TodoItemType } from 'shared-types';
 import { TodoItem } from './TodoItem.js';
 
 export type TodoColumnProps = {
@@ -21,6 +21,12 @@ export type TodoColumnProps = {
   onEditTitle: (id: string, title: string) => void;
   onDelete: (id: string) => void;
   onReorder: (orderedIds: string[]) => void;
+  /** 未完了TODOを翌日に持ち越す（Phase 6、要件 7.10） */
+  onCarryOverTodos: (todoIds: string[]) => void;
+  /** sourceNoteLineMetaId → NoteLineMeta のマップ（発生元表示用、Phase 5） */
+  noteLineMetaMap?: Map<string, NoteLineMeta>;
+  /** ハイライト対象のTODO id セット（Phase 5） */
+  highlightIds?: Set<string>;
 };
 
 export function TodoColumn({
@@ -31,13 +37,18 @@ export function TodoColumn({
   onEditTitle,
   onDelete,
   onReorder,
+  onCarryOverTodos,
+  noteLineMetaMap,
+  highlightIds,
 }: TodoColumnProps) {
   const [draft, setDraft] = useState('');
+  const [confirmCarryOver, setConfirmCarryOver] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
   // date が変わったら入力欄をクリア
   useEffect(() => {
     setDraft('');
+    setConfirmCarryOver(false);
   }, [date]);
 
   const commit = () => {
@@ -51,6 +62,9 @@ export function TodoColumn({
     // フォーカス維持（連続追加、[ui_interaction_spec.md §5.1]）
     requestAnimationFrame(() => inputRef.current?.focus());
   };
+
+  // 持ち越し対象: 未完了（status='todo'）のみ。done/carried は除外
+  const incompleteTodos = todos.filter((t) => t.status === 'todo');
 
   /** 指定 index の TODO を一つ上へ移動 */
   const moveUp = (index: number) => {
@@ -84,6 +98,12 @@ export function TodoColumn({
             todo={todo}
             isFirst={i === 0}
             isLast={i === todos.length - 1}
+            sourceNoteLineMeta={
+              todo.sourceNoteLineMetaId && noteLineMetaMap
+                ? (noteLineMetaMap.get(todo.sourceNoteLineMetaId) ?? null)
+                : null
+            }
+            highlight={highlightIds?.has(todo.id) ?? false}
             onToggle={() => onToggle(todo.id)}
             onEditTitle={(title) => onEditTitle(todo.id, title)}
             onDelete={() => onDelete(todo.id)}
@@ -95,6 +115,46 @@ export function TodoColumn({
           <li className="py-4 text-center text-xs text-stone-300">TODOはありません</li>
         )}
       </ul>
+
+      {/* 未完了TODOの翌日持ち越しボタン（Phase 6、要件 7.10）
+          未完了（status='todo'）のTODOがある場合のみ表示。
+          持ち越しは不可逆操作（carried は終端状態）のため確認ダイアログを挟む */}
+      {incompleteTodos.length > 0 && !confirmCarryOver && (
+        <div className="mt-3 border-t border-stone-100 pt-3">
+          <button
+            type="button"
+            onClick={() => setConfirmCarryOver(true)}
+            className="text-xs text-stone-500 hover:text-stone-800 hover:underline"
+          >
+            未完了を翌日へ持ち越し（{incompleteTodos.length}件）
+          </button>
+        </div>
+      )}
+      {incompleteTodos.length > 0 && confirmCarryOver && (
+        <div className="mt-3 rounded border border-amber-200 bg-amber-50 p-2 text-xs text-amber-800">
+          <p>未完了TODO {incompleteTodos.length}件を翌日に持ち越しますか？</p>
+          <p className="mt-0.5 text-amber-600">持ち越し後は元に戻せません。</p>
+          <div className="mt-1 flex gap-2">
+            <button
+              type="button"
+              onClick={() => {
+                setConfirmCarryOver(false);
+                onCarryOverTodos(incompleteTodos.map((t) => t.id));
+              }}
+              className="rounded bg-amber-600 px-2 py-0.5 text-white hover:bg-amber-700"
+            >
+              持ち越す
+            </button>
+            <button
+              type="button"
+              onClick={() => setConfirmCarryOver(false)}
+              className="rounded border border-amber-300 px-2 py-0.5 hover:bg-amber-100"
+            >
+              キャンセル
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* 追加入力欄（[ui_interaction_spec.md §5.1]） */}
       <div className="mt-3 border-t border-stone-100 pt-3">

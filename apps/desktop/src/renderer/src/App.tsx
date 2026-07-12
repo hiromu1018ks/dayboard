@@ -27,11 +27,13 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { addDays, todayLocal, toggleDone, type SaveTarget } from '@dayboard/domain';
+import { DuplicateConversionDialog } from './components/DuplicateConversionDialog.js';
 import { FlushFailDialog } from './components/FlushFailDialog.js';
 import { Header } from './components/Header.js';
 import { NoteMode } from './components/NoteMode.js';
 import type { NoteEditorHandle } from './components/NoteEditor.js';
 import { SaveStatus } from './components/SaveStatus.js';
+import { Toast, type ToastMessage } from './components/Toast.js';
 import { WorkMode } from './components/WorkMode.js';
 import {
   createBlockerOrderSaver,
@@ -48,7 +50,11 @@ import {
   deleteBlocker as apiDeleteBlocker,
   deleteTodo as apiDeleteTodo,
   postBlocker as apiPostBlocker,
+  postCarryOver as apiPostCarryOver,
+  postConvertBlocker as apiPostConvertBlocker,
+  postConvertTodo as apiPostConvertTodo,
   postTodo as apiPostTodo,
+  ApiClientError,
 } from './api/client.js';
 import { useDateNavigation } from './hooks/useDateNavigation.js';
 import { useAutosave } from './hooks/useAutosave.js';
@@ -73,9 +79,33 @@ const NOTE_ENTRY_TARGET: SaveTarget = { type: 'noteEntry' };
 
 export default function App() {
   const { currentDate, goTo, isToday } = useDateNavigation();
-  const { data, loading, error } = useDayNote(currentDate);
+  const { data, loading, error, refetch } = useDayNote(currentDate);
   const { workData, dispatch } = useWorkData(data, currentDate);
   const { viewMode, setMode } = useViewMode();
+
+  // --- Phase 5: 変換（TODO化 / 障害化） ---
+  // トースト通知（[§6.2] 2s）
+  const [toast, setToast] = useState<ToastMessage | null>(null);
+  // 変換成功後のハイライト（[§4.3] 1.2s）
+  const [highlightTodoIds, setHighlightTodoIds] = useState<Set<string>>(new Set());
+  const [highlightBlockerIds, setHighlightBlockerIds] = useState<Set<string>>(new Set());
+  // 重複確認ダイアログ（[§7]）
+  const [duplicateDialog, setDuplicateDialog] = useState<{
+    target: 'todo' | 'blocker';
+    existingTitle: string | undefined;
+    retry: () => Promise<void>;
+  } | null>(null);
+
+  // noteLineMetas を sourceNoteLineMetaId → NoteLineMeta のマップへ（発生元表示用、T-5-13）
+  const noteLineMetaMap = useMemo(() => {
+    const map = new Map<string, import('shared-types').NoteLineMeta>();
+    if (data) {
+      for (const m of data.noteLineMetas) {
+        map.set(m.id, m);
+      }
+    }
+    return map;
+  }, [data]);
 
   // --- NoteEntry の楽観的 state（Phase 4） ---
   // CodeMirror の本文全文を data.noteEntry.body とは別にローカルで保持する。
@@ -298,6 +328,45 @@ export default function App() {
     [dispatch, saveNow],
   );
 
+  /**
+   * 未完了TODOの翌日持ち越し（Phase 6、要件 7.10、AC-11/12）。
+   *
+   * [api_contract.md §10]: 常に HTTP 200（部分成功）。
+   * - carried の各 sourceTodoId について楽観的に status='carried' へ更新
+   * - skipped があれば info 通知、無ければ success 通知
+   * - エラー時は error 通知
+   */
+  const handleCarryOverTodos = useCallback(
+    async (todoIds: string[]) => {
+      if (todoIds.length === 0) return;
+      try {
+        const result = await apiPostCarryOver(currentDate, todoIds);
+        // 持ち越し成功分を楽観的に carried 化（サーバー側で処理済み）
+        for (const c of result.carried) {
+          dispatch({ type: 'UPDATE_TODO', id: c.sourceTodoId, patch: { status: 'carried' } });
+        }
+        // 通知（skipped があれば情報付記）
+        if (result.skipped.length > 0 && result.carried.length > 0) {
+          setToast({
+            kind: 'success',
+            text: `${result.carried.length}件を翌日に持ち越しました（${result.skipped.length}件は持ち越し済み）`,
+          });
+        } else if (result.skipped.length > 0) {
+          setToast({
+            kind: 'info',
+            text: `${result.skipped.length}件はすでに翌日に持ち越し済みです`,
+          });
+        } else {
+          setToast({ kind: 'success', text: `${result.carried.length}件を翌日に持ち越しました` });
+        }
+      } catch (err) {
+        console.error('持ち越しに失敗:', err);
+        setToast({ kind: 'error', text: '持ち越しに失敗しました' });
+      }
+    },
+    [currentDate, dispatch],
+  );
+
   // --- Blocker ---
 
   /** 障害追加: 即時 API 呼出 + 楽観的 state 更新 */
@@ -395,6 +464,108 @@ export default function App() {
   );
 
   // ============================================================================
+  // Phase 5: ノート行変換（TODO化 / 障害化）（T-5-09/11/12）
+  // ============================================================================
+
+  /**
+   * ハイライトを1.2秒後に消去する（[§4.3]）。
+   * 変換成功後、仕事整理モードに戻った際に対象アイテムを軽くハイライトする。
+   */
+  const triggerHighlight = useCallback((ids: string[], kind: 'todo' | 'blocker') => {
+    const setter = kind === 'todo' ? setHighlightTodoIds : setHighlightBlockerIds;
+    setter(new Set(ids));
+    setTimeout(() => setter(new Set()), 1200);
+  }, []);
+
+  /**
+   * 変換の共通処理（TODO化・障害化）。
+   *
+   * [note_conversion_spec.md §1] フロー:
+   * - 空行（lineNumber=0 or lineText=""）は通知して終了
+   * - API呼出 → 成功時 refetch + トースト + ハイライト予約
+   * - 409 DUPLICATE_CONVERSION はダイアログ表示（[§7]）
+   * - その他エラーはトーストで通知
+   */
+  const performConvert = useCallback(
+    async (
+      target: 'todo' | 'blocker',
+      lineNumber: number,
+      lineText: string,
+      opts: { force?: boolean } = {},
+    ): Promise<void> => {
+      // 空行チェック（[§1] step 2）
+      if (lineNumber === 0 || lineText.trim().length === 0) {
+        setToast({ kind: 'info', text: '空行は変換できません' });
+        return;
+      }
+
+      if (!data) return;
+      const noteEntryId = data.noteEntry.id;
+
+      try {
+        if (target === 'todo') {
+          const result = await apiPostConvertTodo(
+            currentDate,
+            { noteEntryId, lineNumber, lineText },
+            opts,
+          );
+          // ガター（noteLineMetas）とTODO列を更新するため refetch
+          await refetch();
+          // 変換後もノートモードに留まる（[要件 9.3]）。ハイライトは仕事整理モード復帰時に表示
+          triggerHighlight([result.todo.id], 'todo');
+          // 切り詰め通知（200文字超の場合、[§4.5]）。
+          // タイトルが「…」で終わる場合のみ切り詰め発生と判定する（extractTitle の仕様）
+          if (result.todo.title.endsWith('…')) {
+            setToast({ kind: 'info', text: '長いため200文字に切り詰めました' });
+          } else {
+            setToast({ kind: 'success', text: `TODOに追加しました: ${result.todo.title}` });
+          }
+        } else {
+          const result = await apiPostConvertBlocker(
+            currentDate,
+            { noteEntryId, lineNumber, lineText },
+            opts,
+          );
+          await refetch();
+          triggerHighlight([result.blocker.id], 'blocker');
+          setToast({ kind: 'success', text: `障害に追加しました: ${result.blocker.text}` });
+        }
+      } catch (err) {
+        // 409 重複確認ダイアログ（[§7]）
+        if (err instanceof ApiClientError && err.code === 'DUPLICATE_CONVERSION') {
+          const details = err.details as { existing?: { id: string; title?: string } } | undefined;
+          setDuplicateDialog({
+            target,
+            existingTitle: details?.existing?.title,
+            retry: () => performConvert(target, lineNumber, lineText, { force: true }),
+          });
+          return;
+        }
+        // その他のエラー
+        console.error('変換に失敗:', err);
+        setToast({ kind: 'error', text: '変換に失敗しました' });
+      }
+    },
+    [data, currentDate, refetch, triggerHighlight],
+  );
+
+  /** TODO化キー（⌘/Ctrl+Enter）押下時 */
+  const handleConvertTodo = useCallback(
+    (lineNumber: number, lineText: string) => {
+      void performConvert('todo', lineNumber, lineText);
+    },
+    [performConvert],
+  );
+
+  /** 障害化キー（⌘/Ctrl+Shift+B）押下時 */
+  const handleConvertBlocker = useCallback(
+    (lineNumber: number, lineText: string) => {
+      void performConvert('blocker', lineNumber, lineText);
+    },
+    [performConvert],
+  );
+
+  // ============================================================================
   // Phase 4: モード切替のグローバルキーハンドラ（T-4-05/06/07/08）
   // ============================================================================
 
@@ -463,7 +634,14 @@ export default function App() {
           body={noteBody}
           onBodyChange={handleEditNoteBody}
           loading={loading || !data}
+          noteEntryId={data?.noteEntry.id}
+          noteLineMetas={data?.noteLineMetas}
+          onConvertTodo={handleConvertTodo}
+          onConvertBlocker={handleConvertBlocker}
         />
+
+        {/* 変換成功・エラーのトースト通知（Phase 5、[§6.2]） */}
+        <Toast message={toast} onClose={() => setToast(null)} />
 
         {/* 保存状態表示（右上、ノートモードでも共通） */}
         <div className="pointer-events-none fixed right-4 top-3 z-40">
@@ -471,6 +649,19 @@ export default function App() {
             <SaveStatus status={saveStatus} onRetry={retryAll} />
           </div>
         </div>
+
+        {/* 重複変換確認ダイアログ（Phase 5、[§7]） */}
+        <DuplicateConversionDialog
+          open={duplicateDialog !== null}
+          target={duplicateDialog?.target ?? 'todo'}
+          existingTitle={duplicateDialog?.existingTitle}
+          onForce={() => {
+            const d = duplicateDialog;
+            setDuplicateDialog(null);
+            if (d) void d.retry();
+          }}
+          onCancel={() => setDuplicateDialog(null)}
+        />
 
         {/* localStorage 書込失敗時の確認ダイアログ（§9.3、モード切替兼用） */}
         <FlushFailDialog
@@ -534,6 +725,7 @@ export default function App() {
               onEditTodoTitle: handleEditTodoTitle,
               onDeleteTodo: handleDeleteTodo,
               onReorderTodos: handleReorderTodos,
+              onCarryOverTodos: handleCarryOverTodos,
               onAddBlocker: handleAddBlocker,
               onToggleBlockerResolved: handleToggleBlockerResolved,
               onEditBlockerText: handleEditBlockerText,
@@ -542,9 +734,15 @@ export default function App() {
               onReorderBlockers: handleReorderBlockers,
               onEditReflection: handleEditReflection,
             }}
+            noteLineMetaMap={noteLineMetaMap}
+            highlightTodoIds={highlightTodoIds}
+            highlightBlockerIds={highlightBlockerIds}
           />
         )}
       </main>
+
+      {/* 変換成功・エラーのトースト通知（Phase 5、[§6.2]） */}
+      <Toast message={toast} onClose={() => setToast(null)} />
 
       {/* localStorage 書込失敗時の確認ダイアログ（§9.3、モード切替兼用） */}
       <FlushFailDialog

@@ -24,10 +24,16 @@ export const listByDayNote: IBlockerRepository['listByDayNote'] = async (dayNote
   return rows.map(mapBlockerItem);
 };
 
-/** id で検索。存在しない場合は null。 */
-export const findById: IBlockerRepository['findById'] = async (id) => {
-  const db = getDb();
-  const rows = await db.select().from(blockerItems).where(eq(blockerItems.id, id)).limit(1);
+/**
+ * id で検索。存在しない場合は null。
+ *
+ * @param tx 任意。トランザクション内で実行する場合に指定。指定しない場合は
+ *           プールから別クライアントを取得するため、トランザクション内の
+ *           未コミット変更は見えない点に注意（update/delete の内部利用時は tx を渡すこと）。
+ */
+export const findById: IBlockerRepository['findById'] = async (id, tx?) => {
+  const conn = tx ?? getDb();
+  const rows = await conn.select().from(blockerItems).where(eq(blockerItems.id, id)).limit(1);
   return rows.length > 0 ? mapBlockerItem(rows[0]!) : null;
 };
 
@@ -41,7 +47,13 @@ export const findById: IBlockerRepository['findById'] = async (id) => {
  *                     呼び出し元で検証済みの前提（[edge_cases.md §10.2]）。
  * @param tx           任意。トランザクション内で実行する場合に指定。
  */
-export const create: IBlockerRepository['create'] = async (id, dayNoteId, text, linkedTodoId, tx?) => {
+export const create: IBlockerRepository['create'] = async (
+  id,
+  dayNoteId,
+  text,
+  linkedTodoId,
+  tx?,
+) => {
   const conn = tx ?? getDb();
   const nextOrder = await nextOrderForDayNote(dayNoteId, conn);
   const rows = await conn
@@ -78,9 +90,13 @@ export const update: IBlockerRepository['update'] = async (id, input, tx?) => {
   if (input.text !== undefined) {
     patch.text = input.text;
   }
+  if (input.sourceNoteLineMetaId !== undefined) {
+    patch.sourceNoteLineMetaId = input.sourceNoteLineMetaId;
+  }
   if (input.resolved !== undefined) {
-    // resolvedAt の判定のため現在 resolved を取得
-    const current = await findById(id);
+    // resolvedAt の判定のため現在 resolved を取得。
+    // tx が渡された場合は同一トランザクション内で読む（未コミット変更を確実に反映）。
+    const current = await findById(id, tx);
     if (!current) return null;
     if (input.resolved && !current.resolved) {
       needResolvedAtNow = true;
@@ -97,7 +113,7 @@ export const update: IBlockerRepository['update'] = async (id, input, tx?) => {
   if (needResolvedAtNull) patch.resolvedAt = null;
 
   if (Object.keys(patch).length === 0) {
-    return findById(id);
+    return findById(id, tx);
   }
 
   const rows = await conn
@@ -140,7 +156,7 @@ export const reorder: IBlockerRepository['reorder'] = async (dayNoteId, orderedI
  */
 export const delete_: IBlockerRepository['delete'] = async (id, tx?) => {
   const conn = tx ?? getDb();
-  const target = await findById(id);
+  const target = await findById(id, tx);
   if (!target) return false;
 
   await conn.delete(blockerItems).where(eq(blockerItems.id, id));

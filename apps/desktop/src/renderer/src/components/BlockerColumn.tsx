@@ -6,7 +6,11 @@
  */
 
 import { useEffect, useRef, useState } from 'react';
-import type { BlockerItem as BlockerItemType, TodoItem as TodoItemType } from 'shared-types';
+import type {
+  BlockerItem as BlockerItemType,
+  NoteLineMeta,
+  TodoItem as TodoItemType,
+} from 'shared-types';
 import { BlockerItem } from './BlockerItem.js';
 
 export type BlockerColumnProps = {
@@ -19,6 +23,10 @@ export type BlockerColumnProps = {
   onChangeLinkedTodo: (id: string, linkedTodoId: string | null) => void;
   onDelete: (id: string) => void;
   onReorder: (orderedIds: string[]) => void;
+  /** sourceNoteLineMetaId → NoteLineMeta のマップ（発生元表示用、Phase 5） */
+  noteLineMetaMap?: Map<string, NoteLineMeta>;
+  /** ハイライト対象の障害 id セット（Phase 5） */
+  highlightIds?: Set<string>;
 };
 
 export function BlockerColumn({
@@ -31,6 +39,8 @@ export function BlockerColumn({
   onChangeLinkedTodo,
   onDelete,
   onReorder,
+  noteLineMetaMap,
+  highlightIds,
 }: BlockerColumnProps) {
   const [draft, setDraft] = useState('');
   const inputRef = useRef<HTMLInputElement>(null);
@@ -81,6 +91,12 @@ export function BlockerColumn({
             todos={todos}
             isFirst={i === 0}
             isLast={i === blockers.length - 1}
+            sourceNoteLineMeta={
+              blocker.sourceNoteLineMetaId && noteLineMetaMap
+                ? (noteLineMetaMap.get(blocker.sourceNoteLineMetaId) ?? null)
+                : null
+            }
+            highlight={highlightIds?.has(blocker.id) ?? false}
             onToggleResolved={() => onToggleResolved(blocker.id)}
             onEditText={(text) => onEditText(blocker.id, text)}
             onChangeLinkedTodo={(linkedTodoId) => onChangeLinkedTodo(blocker.id, linkedTodoId)}

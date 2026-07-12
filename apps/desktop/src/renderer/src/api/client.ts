@@ -11,9 +11,11 @@
 
 import type {
   BlockerItem,
+  CarryOverResult,
   DayNote,
   DayNoteFull,
   NoteEntry,
+  NoteLineMeta,
   Reflection,
   TodoItem,
   ViewMode,
@@ -252,4 +254,96 @@ export async function patchNoteEntry(date: string, patch: { body?: string }): Pr
   });
   await assertOk(res);
   return (await res.json()) as NoteEntry;
+}
+
+// ============================================================================
+// Phase 5: ノート行変換（TODO化 / 障害化）
+// ============================================================================
+
+/** 変換リクエストのボディ（[api_contract.md §9]） */
+type ConvertRequestBody = {
+  noteEntryId: string;
+  /** 1始まり（[note_conversion_spec.md §2.1]） */
+  lineNumber: number;
+  lineText: string;
+};
+
+/** 変換成功レスポンス（TODO化） */
+type ConvertTodoResponse = { todo: TodoItem; noteLineMeta: NoteLineMeta };
+
+/** 変換成功レスポンス（障害化） */
+type ConvertBlockerResponse = { blocker: BlockerItem; noteLineMeta: NoteLineMeta };
+
+/**
+ * POST /api/day-notes/:date/convert/todo — ノート選択行をTODO化（[api_contract.md §9]）。
+ *
+ * @param opts.force 重複確認で「別TODO作成」を選んだ場合に true（?force=1）
+ * @throws {ApiClientError} code='DUPLICATE_CONVERSION' の場合、details.existing に既存TODO情報
+ */
+export async function postConvertTodo(
+  date: string,
+  body: ConvertRequestBody,
+  opts: { force?: boolean } = {},
+): Promise<ConvertTodoResponse> {
+  const query = opts.force ? '?force=1' : '';
+  const res = await fetch(
+    `${getApiBaseUrl()}/day-notes/${encodeURIComponent(date)}/convert/todo${query}`,
+    {
+      method: 'POST',
+      headers: postHeaders(createIdempotencyKey()),
+      body: JSON.stringify(body),
+    },
+  );
+  await assertOk(res);
+  return (await res.json()) as ConvertTodoResponse;
+}
+
+/**
+ * POST /api/day-notes/:date/convert/blocker — ノート選択行を障害化（[api_contract.md §9]）。
+ *
+ * @param opts.force 重複確認で「別障害作成」を選んだ場合に true（?force=1）
+ * @throws {ApiClientError} code='DUPLICATE_CONVERSION' の場合、details.existing に既存障害情報
+ */
+export async function postConvertBlocker(
+  date: string,
+  body: ConvertRequestBody,
+  opts: { force?: boolean } = {},
+): Promise<ConvertBlockerResponse> {
+  const query = opts.force ? '?force=1' : '';
+  const res = await fetch(
+    `${getApiBaseUrl()}/day-notes/${encodeURIComponent(date)}/convert/blocker${query}`,
+    {
+      method: 'POST',
+      headers: postHeaders(createIdempotencyKey()),
+      body: JSON.stringify(body),
+    },
+  );
+  await assertOk(res);
+  return (await res.json()) as ConvertBlockerResponse;
+}
+
+// ============================================================================
+// Phase 6: 未完了TODOの翌日持ち越し
+// ============================================================================
+
+/**
+ * POST /api/day-notes/:date/carry-over — 未完了TODOを翌日に持ち越す（[api_contract.md §10]）。
+ *
+ * 常に HTTP 200（部分成功）。重複は `skipped` 配列で返されるためエラーは投げない。
+ * Idempotency-Key は付与しない（サーバー側で carriedFromTodoId 重複判定が冪等性を担保）。
+ *
+ * @param date     持ち越し元日付（YYYY-MM-DD）
+ * @param todoIds  持ち越し対象のTODO id 群（未完了のみ推奨。carried は skipped、done はエラー）
+ */
+export async function postCarryOver(
+  date: string,
+  todoIds: string[],
+): Promise<CarryOverResult> {
+  const res = await fetch(`${getApiBaseUrl()}/day-notes/${encodeURIComponent(date)}/carry-over`, {
+    method: 'POST',
+    headers: postHeaders(),
+    body: JSON.stringify({ todoIds }),
+  });
+  await assertOk(res);
+  return (await res.json()) as CarryOverResult;
 }

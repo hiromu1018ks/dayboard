@@ -15,11 +15,12 @@
  */
 
 import { and, asc, eq } from 'drizzle-orm';
+import { shouldSetCompletedAt } from '@dayboard/domain';
+import type { TodoItem } from 'shared-types';
 import { getDb } from './db.js';
 import { mapTodoItem } from './mappers.js';
 import { todoItems } from './schema/index.js';
 import type { TodoRepository as ITodoRepository, TodoUpdateInput, Tx } from './types.js';
-import { shouldSetCompletedAt } from '@dayboard/domain';
 
 /** 指定 DayNote の TODO を order 昇順で取得。 */
 export const listByDayNote: ITodoRepository['listByDayNote'] = async (dayNoteId) => {
@@ -32,10 +33,16 @@ export const listByDayNote: ITodoRepository['listByDayNote'] = async (dayNoteId)
   return rows.map(mapTodoItem);
 };
 
-/** id で検索。存在しない場合は null。 */
-export const findById: ITodoRepository['findById'] = async (id) => {
-  const db = getDb();
-  const rows = await db.select().from(todoItems).where(eq(todoItems.id, id)).limit(1);
+/**
+ * id で検索。存在しない場合は null。
+ *
+ * @param tx 任意。トランザクション内で実行する場合に指定。指定しない場合は
+ *           プールから別クライアントを取得するため、トランザクション内の
+ *           未コミット変更は見えない点に注意（update/delete の内部利用時は tx を渡すこと）。
+ */
+export const findById: ITodoRepository['findById'] = async (id, tx?) => {
+  const conn = tx ?? getDb();
+  const rows = await conn.select().from(todoItems).where(eq(todoItems.id, id)).limit(1);
   return rows.length > 0 ? mapTodoItem(rows[0]!) : null;
 };
 
@@ -48,24 +55,31 @@ export const findById: ITodoRepository['findById'] = async (id) => {
  * @param tx        任意。トランザクション内で実行する場合に指定。
  */
 export const create: ITodoRepository['create'] = async (id, dayNoteId, title, tx?) => {
-  const conn = tx ?? getDb();
-  const nextOrder = await nextOrderForDayNote(dayNoteId, conn);
-  const rows = await conn
-    .insert(todoItems)
-    .values({
-      id,
-      dayNoteId,
-      title,
-      status: 'todo',
-      order: nextOrder,
-      sourceNoteLineMetaId: null,
-      carriedFromTodoId: null,
-      carriedFromDate: null,
-    })
-    .returning();
-  const row = rows[0];
-  if (!row) throw new Error(`todoRepository.create: insert returned no row for ${id}`);
-  return mapTodoItem(row);
+  return insertTodo(id, dayNoteId, title, null, null, tx);
+};
+
+/**
+ * 持ち越し先TODOを作成する（[api_contract.md §10]、要件 7.10）。
+ *
+ * 通常の create と異なり `carriedFromTodoId` / `carriedFromDate` を設定する。
+ * 2つのフィールドは [database_schema.md §3.3] の CHECK 制約により必ずセットで指定する。
+ *
+ * @param id                新規TODOのID
+ * @param dayNoteId         翌日DayNoteのID
+ * @param title             持ち越し元TODOのtitleスナップショット
+ * @param carriedFromTodoId 持ち越し元TODOのID（自己参照・FK制約なし）
+ * @param carriedFromDate   持ち越し元DayNoteの日付（YYYY-MM-DD）
+ * @param tx                任意。トランザクション内で実行する場合に指定。
+ */
+export const createCarriedOver: ITodoRepository['createCarriedOver'] = async (
+  id,
+  dayNoteId,
+  title,
+  carriedFromTodoId,
+  carriedFromDate,
+  tx?,
+) => {
+  return insertTodo(id, dayNoteId, title, carriedFromTodoId, carriedFromDate, tx);
 };
 
 /**
@@ -88,9 +102,13 @@ export const update: ITodoRepository['update'] = async (id, input, tx?) => {
   if (input.title !== undefined) {
     patch.title = input.title;
   }
+  if (input.sourceNoteLineMetaId !== undefined) {
+    patch.sourceNoteLineMetaId = input.sourceNoteLineMetaId;
+  }
   if (input.status !== undefined) {
-    // completedAt の設定判定のため現在 status を取得
-    const current = await findById(id);
+    // completedAt の設定判定のため現在 status を取得。
+    // tx が渡された場合は同一トランザクション内で読む（未コミット変更を確実に反映）。
+    const current = await findById(id, tx);
     if (!current) return null;
     fromStatus = current.status;
     patch.status = input.status;
@@ -102,7 +120,7 @@ export const update: ITodoRepository['update'] = async (id, input, tx?) => {
   }
 
   if (Object.keys(patch).length === 0) {
-    return findById(id);
+    return findById(id, tx);
   }
 
   const rows = await conn
@@ -148,7 +166,7 @@ export const reorder: ITodoRepository['reorder'] = async (dayNoteId, orderedIds,
  */
 export const delete_: ITodoRepository['delete'] = async (id, tx?) => {
   const conn = tx ?? getDb();
-  const target = await findById(id);
+  const target = await findById(id, tx);
   if (!target) return false;
 
   await conn.delete(todoItems).where(eq(todoItems.id, id));
@@ -187,8 +205,46 @@ export const findByCarriedFrom: ITodoRepository['findByCarriedFrom'] = async (to
 
 // ---- 内部ヘルパー ----
 
+/**
+ * TODO を INSERT する共通ヘルパー（create / createCarriedOver で共用）。
+ *
+ * `carriedFromTodoId` と `carriedFromDate` は [database_schema.md §3.3] の CHECK 制約により
+ * 両方 null または両方非 null でなければならない。通常TODOは両方 null、
+ * 持ち越し先TODOは両方非 null で渡す。
+ */
+async function insertTodo(
+  id: string,
+  dayNoteId: string,
+  title: string,
+  carriedFromTodoId: string | null,
+  carriedFromDate: string | null,
+  tx?: Tx,
+): Promise<TodoItem> {
+  const conn = tx ?? getDb();
+  const nextOrder = await nextOrderForDayNote(dayNoteId, conn);
+  const rows = await conn
+    .insert(todoItems)
+    .values({
+      id,
+      dayNoteId,
+      title,
+      status: 'todo',
+      order: nextOrder,
+      sourceNoteLineMetaId: null,
+      carriedFromTodoId,
+      carriedFromDate,
+    })
+    .returning();
+  const row = rows[0];
+  if (!row) throw new Error(`todoRepository.insertTodo: insert returned no row for ${id}`);
+  return mapTodoItem(row);
+}
+
 /** 指定 DayNote の次の order（末尾）を取得。空の場合は 0。 */
-async function nextOrderForDayNote(dayNoteId: string, conn: Tx | ReturnType<typeof getDb>): Promise<number> {
+async function nextOrderForDayNote(
+  dayNoteId: string,
+  conn: Tx | ReturnType<typeof getDb>,
+): Promise<number> {
   const rows = await conn
     .select({ order: todoItems.order })
     .from(todoItems)
@@ -203,6 +259,7 @@ export const _implements: ITodoRepository = {
   listByDayNote,
   findById,
   create,
+  createCarriedOver,
   update,
   reorder,
   delete: delete_,

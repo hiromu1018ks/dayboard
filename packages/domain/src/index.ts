@@ -30,6 +30,7 @@ export {
   todayLocal,
   isValidDateString,
   getWeekdayLabel,
+  formatMonthDay,
   WEEKDAY_LABELS_JA,
 } from './date.js';
 export { createId } from './id.js';
@@ -80,3 +81,16 @@ export {
 
 // TODO状態遷移（ピュア関数、[roadmap.md Phase 3]）
 export { canTransition, toggleDone, shouldSetCompletedAt } from './todo/transitions.js';
+
+// 持ち越しユースケース（ピュア関数、[roadmap.md Phase 6]）
+export {
+  type CarryPlanItem,
+  type PlanCarryOverInput,
+  CarryOverValidationError,
+  planCarryOver,
+} from './usecases/carryOver.js';
+
+// ノート変換（ピュア関数、[roadmap.md Phase 5]）
+export { normalizeLineText } from './conversion/normalize.js';
+export { extractTitle, TITLE_MAX_LENGTH } from './conversion/extractTitle.js';
+export { computeLineHash } from './conversion/lineHash.js';

@@ -26,6 +26,7 @@ import { getDb } from './db.js';
 import * as blockerRepository from './blockerRepository.js';
 import * as dayNoteRepository from './dayNoteRepository.js';
 import * as noteEntryRepository from './noteEntryRepository.js';
+import * as noteLineMetaRepository from './noteLineMetaRepository.js';
 import * as reflectionRepository from './reflectionRepository.js';
 import * as todoRepository from './todoRepository.js';
 import type { Tx } from './types.js';
@@ -81,6 +82,27 @@ export async function dayNoteExists(date: string): Promise<boolean> {
   return dayNoteRepository.existsByDate(date);
 }
 
+/**
+ * 指定日付の DayNote を取得または生成し、その id を返す（Phase 6: 持ち越しAPI用）。
+ *
+ * [api_contract.md §10 step1]: 持ち越し実行時に翌日の DayNote が未作成の場合、
+ * carry-over エンドポイント内で自動生成する。本関数はそれを既存トランザクション内で
+ * 行うため、`tx` を受け取る。Reflection / NoteEntry の空行も同時作成する
+ * （Phase 1 の自動生成ロジックと同じ振る舞い）。
+ *
+ * @param date YYYY-MM-DD
+ * @param tx   呼出元が編成したトランザクション接続
+ * @returns 当該日付の DayNote の id（存在しなかった場合は新規生成したもの）
+ */
+export async function getOrCreateDayNoteIdInTx(date: string, tx: Tx): Promise<string> {
+  const existing = await dayNoteRepository.findByDate(date);
+  if (existing) return existing.id;
+
+  // 未生成の場合は同一 tx 上で DayNote + Reflection + NoteEntry を生成
+  const created = await createFullInTx(date, tx);
+  return created.dayNote.id;
+}
+
 // ---- 内部ヘルパー ----
 
 /**
@@ -93,35 +115,46 @@ export async function dayNoteExists(date: string): Promise<boolean> {
 async function createFullInTransaction(date: string): Promise<DayNoteFull> {
   const db = getDb();
   return db.transaction(async (tx: Tx) => {
-    // 入力値をピュア関数で生成（ID は domain.createId）
-    const dayNoteInput = buildNewDayNoteInput(date, createId);
-    const reflectionInput = buildNewReflectionInput(dayNoteInput.id, createId);
-    const noteEntryInput = buildNewNoteEntryInput(dayNoteInput.id, createId);
-
-    // 3リソースを同一トランザクションでリポジトリ関数経由で作成。
-    // トランザクションは単一クライアントを使うため、Promise.all による並行クエリは
-    // pg @9 で非推奨。順次実行で安全に扱う。
-    const dayNote = await dayNoteRepository.create(dayNoteInput.id, dayNoteInput.date, tx);
-    const reflection = await reflectionRepository.create(
-      reflectionInput.id,
-      reflectionInput.dayNoteId,
-      tx,
-    );
-    const noteEntry = await noteEntryRepository.create(
-      noteEntryInput.id,
-      noteEntryInput.dayNoteId,
-      tx,
-    );
-
-    return {
-      dayNote,
-      todos: [],
-      blockers: [],
-      reflection,
-      noteEntry,
-      noteLineMetas: [],
-    } satisfies DayNoteFull;
+    return createFullInTx(date, tx);
   });
+}
+
+/**
+ * 既存トランザクション内で DayNote + Reflection + NoteEntry を新規生成する。
+ *
+ * `getOrCreateFull`（GET /full）からも、`getOrCreateDayNoteIdInTx`（持ち越しAPI、Phase 6）
+ * からも呼ばれる共通の生成処理。呼出元がトランザクションを編成するため、本関数は
+ * トランザクションを開始せず、渡された `tx` 上で順次 INSERT する。
+ *
+ * トランザクションは単一クライアントを使うため、Promise.all による並行クエリは
+ * pg @9 で非推奨。順次実行で安全に扱う。
+ */
+async function createFullInTx(date: string, tx: Tx): Promise<DayNoteFull> {
+  // 入力値をピュア関数で生成（ID は domain.createId）
+  const dayNoteInput = buildNewDayNoteInput(date, createId);
+  const reflectionInput = buildNewReflectionInput(dayNoteInput.id, createId);
+  const noteEntryInput = buildNewNoteEntryInput(dayNoteInput.id, createId);
+
+  const dayNote = await dayNoteRepository.create(dayNoteInput.id, dayNoteInput.date, tx);
+  const reflection = await reflectionRepository.create(
+    reflectionInput.id,
+    reflectionInput.dayNoteId,
+    tx,
+  );
+  const noteEntry = await noteEntryRepository.create(
+    noteEntryInput.id,
+    noteEntryInput.dayNoteId,
+    tx,
+  );
+
+  return {
+    dayNote,
+    todos: [],
+    blockers: [],
+    reflection,
+    noteEntry,
+    noteLineMetas: [],
+  } satisfies DayNoteFull;
 }
 
 /**
@@ -132,6 +165,8 @@ async function createFullInTransaction(date: string): Promise<DayNoteFull> {
  * `getOrCreateFull` はこの場合 `createFullInTransaction` を呼ぶが、DayNote 行が
  * 存在するため一意制約違反となり、最終的に例外を再送する（自動修復は行わない）。
  * これは安全側に倒れた挙動であり、管理者の介入を前提とする。
+ *
+ * Phase 5: noteLineMetas を NoteEntry のID経由で取得し、変換済みマーク表示に供する。
  */
 async function findFullByDate(date: string): Promise<DayNoteFull | null> {
   const dayNote = await dayNoteRepository.findByDate(date);
@@ -147,13 +182,16 @@ async function findFullByDate(date: string): Promise<DayNoteFull | null> {
   ]);
   if (!reflection || !noteEntry) return null;
 
+  // noteLineMetas は NoteEntry のIDで取得（変換済みマーク表示用、Phase 5）
+  const noteLineMetas = await noteLineMetaRepository.listByNoteEntry(noteEntry.id);
+
   return {
     dayNote,
     todos,
     blockers,
     reflection,
     noteEntry,
-    noteLineMetas: [],
+    noteLineMetas,
   } satisfies DayNoteFull;
 }
 

@@ -46,6 +46,26 @@ export class ApiHttpError extends Error {
   static invalidTransition(message = 'この操作は現在の状態では実行できません。'): ApiHttpError {
     return new ApiHttpError('INVALID_TRANSITION', 400, message);
   }
+
+  /**
+   * DUPLICATE_CONVERSION を生成するヘルパー（[api_contract.md §9]、Phase 5）。
+   *
+   * 重複変換先（既存TODO/障害）の情報を `details.existing` に添付する。
+   * クライアントはこれを受けて重複確認ダイアログを表示する（[note_conversion_spec.md §7]）。
+   *
+   * @param existing 重複先アイテムの情報（id, title, sourceNoteLineMetaId）
+   * @param target   変換先（'todo' or 'blocker'）。メッセージを切り替える
+   */
+  static duplicateConversion(
+    existing: { id: string; title?: string; sourceNoteLineMetaId?: string | null },
+    target: 'todo' | 'blocker',
+  ): ApiHttpError {
+    const message =
+      target === 'todo'
+        ? 'この行はすでにTODO化されています。'
+        : 'この行はすでに障害化されています。';
+    return new ApiHttpError('DUPLICATE_CONVERSION', 409, message, { existing });
+  }
 }
 
 /**

@@ -11,6 +11,8 @@ import { Hono } from 'hono';
 import { corsMiddleware } from './middleware/cors.js';
 import { errorHandler } from './middleware/errorHandler.js';
 import { blockerRoutes } from './routes/blockers.js';
+import { carryOverRoutes } from './routes/carryOver.js';
+import { convertRoutes } from './routes/convert.js';
 import { dayNoteRoutes } from './routes/dayNotes.js';
 import { healthRoutes } from './routes/health.js';
 import { todoRoutes } from './routes/todos.js';
@@ -24,7 +26,11 @@ export function createApp(): Hono {
 
   // ルートマウント（`/api` プレフィックス）
   app.route('/api', healthRoutes);
+  // dayNoteRoutes / convertRoutes / carryOverRoutes は同じ /api/day-notes プレフィックスを共有。
+  // 各 :date/convert/*, :date/carry-over は dayNoteRoutes と衝突しないため併存可能。
   app.route('/api/day-notes', dayNoteRoutes);
+  app.route('/api/day-notes', convertRoutes);
+  app.route('/api/day-notes', carryOverRoutes);
   app.route('/api/todos', todoRoutes);
   app.route('/api/blockers', blockerRoutes);
 

@@ -10,13 +10,21 @@
  */
 
 import { useEffect, useRef, useState } from 'react';
-import type { BlockerItem as BlockerItemType, TodoItem as TodoItemType } from 'shared-types';
+import type {
+  BlockerItem as BlockerItemType,
+  NoteLineMeta,
+  TodoItem as TodoItemType,
+} from 'shared-types';
 
 export type BlockerItemProps = {
   blocker: BlockerItemType;
   todos: TodoItemType[];
   isFirst: boolean;
   isLast: boolean;
+  /** 発生元ノート行のスナップショット（Phase 5、AC-08） */
+  sourceNoteLineMeta?: NoteLineMeta | null;
+  /** 変換成功後の一時ハイライト（Phase 5、[§4.3] 1.2s） */
+  highlight?: boolean;
   onToggleResolved: () => void;
   onEditText: (text: string) => void;
   onChangeLinkedTodo: (linkedTodoId: string | null) => void;
@@ -30,6 +38,8 @@ export function BlockerItem({
   todos,
   isFirst,
   isLast,
+  sourceNoteLineMeta,
+  highlight = false,
   onToggleResolved,
   onEditText,
   onChangeLinkedTodo,
@@ -72,12 +82,12 @@ export function BlockerItem({
     setEditing(false);
   };
 
-  const linkedTodo = blocker.linkedTodoId
-    ? todos.find((t) => t.id === blocker.linkedTodoId)
-    : null;
+  const linkedTodo = blocker.linkedTodoId ? todos.find((t) => t.id === blocker.linkedTodoId) : null;
 
   return (
-    <li className="group flex items-start gap-2 py-1">
+    <li
+      className={`group flex items-start gap-2 rounded px-1 py-1 transition-colors duration-700 ${highlight ? 'bg-amber-100' : ''}`}
+    >
       <button
         type="button"
         onClick={onToggleResolved}
@@ -122,8 +132,15 @@ export function BlockerItem({
                 → {linkedTodo.title}
               </span>
             )}
-            {blocker.resolved && (
-              <span className="text-xs text-stone-400">解消済み</span>
+            {blocker.resolved && <span className="text-xs text-stone-400">解消済み</span>}
+            {/* 発生元ノート行スナップショット（Phase 5、AC-08、[note_conversion_spec.md §9.2]） */}
+            {sourceNoteLineMeta && (
+              <span className="relative">
+                <span className="cursor-help text-xs text-stone-300 hover:text-stone-500">ⓘ</span>
+                <span className="pointer-events-none absolute left-0 top-5 z-20 hidden max-w-xs rounded border border-stone-200 bg-white px-2 py-1 text-xs text-stone-600 shadow-md group-hover:block whitespace-pre-wrap">
+                  元ノート行: {sourceNoteLineMeta.lineText}
+                </span>
+              </span>
             )}
           </div>
         )}

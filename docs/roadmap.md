@@ -503,73 +503,73 @@
 
 ### タスク
 
-- [ ] **T-5-01** [domain] `normalizeLineText`
+- [x] **T-5-01** [domain] `normalizeLineText`
   - 依存: T-1-03
   - 対象AC: AC-05, AC-07
   - 出力: `packages/domain/src/conversion/normalize.ts`（[note_conversion_spec.md §3](note_conversion_spec.md): 前後空白trim、半角/全角スペース・タブの連続空白を半角スペース1つに圧縮。全角英数字・全角カタカナ正規化と行頭記号除去は含めない）
   - 完了条件: [§3.1](note_conversion_spec.md) の正規化例を全て満たし、全角英数字・全角カタカナが保持される
-- [ ] **T-5-02** [domain] `extractTitle`
+- [x] **T-5-02** [domain] `extractTitle`
   - 依存: T-5-01
   - 対象AC: AC-05, AC-07
   - 出力: `packages/domain/src/conversion/extractTitle.ts`（[note_conversion_spec.md §4](note_conversion_spec.md): リスト記号/番号リスト/特定ラベル除去、空時エラー、200文字超は先頭199+`…`）
   - 完了条件: [§4.2](note_conversion_spec.md) の適用例と [§4.3](note_conversion_spec.md) の除去対象外を全て満たす
-- [ ] **T-5-03** [domain] `computeLineHash`
+- [x] **T-5-03** [domain] `computeLineHash`
   - 依存: T-5-01
   - 対象AC: AC-05, AC-06
   - 出力: `packages/domain/src/conversion/lineHash.ts`（`sha256(noteEntryId + "\n" + normalizedLineText).slice(0,16)`、[note_conversion_spec.md §5](note_conversion_spec.md)）
   - 完了条件: 同一入力で同じハッシュ、異なる `noteEntryId` で別ハッシュ
-- [ ] **T-5-04** [test] 変換ピュア関数 Unit テスト（重点）
+- [x] **T-5-04** [test] 変換ピュア関数 Unit テスト（重点）
   - 依存: T-5-01, T-5-02, T-5-03
   - 対象AC: AC-05, AC-06, AC-07
   - 出力: `packages/domain/test/conversion/*.test.ts`（[test_strategy.md §3.5](test_strategy.md) + [edge_cases.md §5](edge_cases.md) の全バリエーション）
   - 完了条件: 行頭記号バリエーション、ラベル除去、空行、200文字超を全ケース化
-- [ ] **T-5-05** [repo] NoteLineMetaRepository
+- [x] **T-5-05** [repo] NoteLineMetaRepository
   - 依存: T-0-05, T-3-03
   - 対象AC: AC-05, AC-06, AC-08
   - 出力: `packages/repository/src/noteLineMetaRepository.ts`（`findByNoteEntryAndLineHash`, `create`、重複候補検索）
   - 完了条件: 重複インデックス（[database_schema.md §3.7](database_schema.md)）が効く
-- [ ] **T-5-06** [domain/api] 変換ユースケース（TODO化）
+- [x] **T-5-06** [domain/api] 変換ユースケース（TODO化）
   - 依存: T-5-01, T-5-02, T-5-03, T-5-05, T-3-03
   - 対象AC: AC-05, AC-06, AC-08
   - 出力: `packages/domain/src/usecases/convertLineToTodo.ts`、`apps/api/src/routes/convert.ts`（`POST /api/day-notes/:date/convert/todo`、`?force=1`、[api_contract.md §9](api_contract.md)）
   - 完了条件: 1トランザクションで TodoItem + NoteLineMeta 作成、重複時 409 `DUPLICATE_CONVERSION`（`details.existing` 添付）
-- [ ] **T-5-07** [api] 変換ユースケース（障害化）
+- [x] **T-5-07** [api] 変換ユースケース（障害化）
   - 依存: T-5-06, T-3-05
   - 対象AC: AC-07
   - 出力: `POST /api/day-notes/:date/convert/blocker`、`?force=1`（[api_contract.md §9](api_contract.md)）
   - 完了条件: TODO化と同じ構造・重複ルール
-- [ ] **T-5-08** [test] 変換 Integration テスト
+- [x] **T-5-08** [test] 変換 Integration テスト
   - 依存: T-5-06, T-5-07
   - 対象AC: AC-05, AC-06, AC-07, AC-08
   - 出力: `apps/api/test/convert.integration.test.ts`（[test_strategy.md §4.2](test_strategy.md): 新規作成、409重複、`?force=1`、トランザクション失敗ロールバック、`ON DELETE SET NULL`）
   - 完了条件: [edge_cases.md §4.2/§10.3](edge_cases.md) を含む
-- [ ] **T-5-09** [ui] 行選択とTODO化・障害化のキー操作
+- [x] **T-5-09** [ui] 行選択とTODO化・障害化のキー操作
   - 依存: T-5-06, T-5-07, T-4-03
   - 対象AC: AC-05, AC-07
   - 対象US: US-MVP-009, US-MVP-010
   - 出力: `NoteEditor.tsx` の行選択（カーソル行取得）、`⌘/Ctrl+Enter` でTODO化、`⌘/Ctrl+Shift+B` で障害化（[ui_interaction_spec.md §6.2](ui_interaction_spec.md)）、空行は通知でAPI呼ばない
   - 完了条件: 変換後もノートモードに留まる（[要件 9.3](dayborad_requirements.md)）
-- [ ] **T-5-10** [ui] 変換済みマーク（ガター `✓T` / `✓B`）
+- [x] **T-5-10** [ui] 変換済みマーク（ガター `✓T` / `✓B`）
   - 依存: T-5-09
   - 対象AC: AC-05, AC-07
   - 出力: CodeMirrorガター拡張（[note_conversion_spec.md §8](note_conversion_spec.md)）、行編集後の `lineHash` 追従（編集行と前後のみ再計算、[edge_cases.md §6.2](edge_cases.md)）
   - 完了条件: マークが正しい行に追従する
-- [ ] **T-5-11** [ui] 重複確認ダイアログ
+- [x] **T-5-11** [ui] 重複確認ダイアログ
   - 依存: T-5-09
   - 対象AC: AC-06
   - 出力: `apps/desktop/renderer/src/components/DuplicateConversionDialog.tsx`（409受領時、[note_conversion_spec.md §7](note_conversion_spec.md)）
   - 完了条件: キャンセルで作成しない、「別TODO作成」で `?force=1`
-- [ ] **T-5-12** [ui] 変換成功トースト + 復帰時ハイライト
+- [x] **T-5-12** [ui] 変換成功トースト + 復帰時ハイライト
   - 依存: T-5-09, T-4-05
   - 対象AC: AC-05, AC-07
   - 出力: `Toast.tsx`（2s、[ui_interaction_spec.md §6.2](ui_interaction_spec.md)）、仕事整理モード復帰時の1.2sハイライト（[§4.3](ui_interaction_spec.md)）
   - 完了条件: 通知とハイライトが仕様時間で動作
-- [ ] **T-5-13** [ui] 発生元スナップショット表示
+- [x] **T-5-13** [ui] 発生元スナップショット表示
   - 依存: T-5-06
   - 対象AC: AC-08
   - 出力: `TodoItem.tsx` / `BlockerItem.tsx` のホバーで `NoteLineMeta.lineText` ポップアップ（[note_conversion_spec.md §9.2](note_conversion_spec.md)）
   - 完了条件: 元行編集/削除後もTODO側に発生元原文が表示できる
-- [ ] **T-5-14** [test] 変換 E2E
+- [x] **T-5-14** [test] 変換 E2E
   - 依存: T-5-09, T-5-10, T-5-11
   - 対象AC: AC-05, AC-06, AC-07, AC-08
   - 出力: `apps/desktop/e2e/convert.spec.ts`（[test_strategy.md §5.2 4.3](test_strategy.md)）
@@ -577,10 +577,10 @@
 
 ### Phase 5 のチェック基準
 
-- [ ] 選択行のTODO化・障害化が動作、ノートモードに留まる（AC-05, AC-07）
-- [ ] 重複確認が表示されキャンセルで作成しない（AC-06）
-- [ ] 元行編集後もTODO本文不変、発生元スナップショット確認可能（AC-08）
-- [ ] 変換 Unit/Integration テストが通る
+- [x] 選択行のTODO化・障害化が動作、ノートモードに留まる（AC-05, AC-07）
+- [x] 重複確認が表示されキャンセルで作成しない（AC-06）
+- [x] 元行編集後もTODO本文不変、発生元スナップショット確認可能（AC-08）
+- [x] 変換 Unit/Integration テストが通る
 
 ---
 
@@ -595,34 +595,34 @@
 
 ### タスク
 
-- [ ] **T-6-01** [domain] 持ち越しユースケース
+- [x] **T-6-01** [domain] 持ち越しユースケース
   - 依存: T-3-01, T-3-03, T-1-07
   - 対象AC: AC-11, AC-12
   - 出力: `packages/domain/src/usecases/carryOver.ts`（[test_strategy.md §3.3](test_strategy.md): 翌日DayNote自動生成、未完了のみ、`carriedFromTodoId` 重複でスキップ、元TODO `carried` 化）
   - 完了条件: 部分成功（`carried`/`skipped`）を返す
-- [ ] **T-6-02** [test] 持ち越し Unit テスト
+- [x] **T-6-02** [test] 持ち越し Unit テスト
   - 依存: T-6-01
   - 対象AC: AC-11, AC-12
   - 出力: `packages/domain/test/usecases/carryOver.test.ts`（[test_strategy.md §3.3](test_strategy.md): 未完了のみ、重複スキップ、翌日自動生成、`carriedFromDate` 保持）
   - 完了条件: [edge_cases.md §4.3/§4.4](edge_cases.md) を含む
-- [ ] **T-6-03** [api] `POST /api/day-notes/:date/carry-over`
+- [x] **T-6-03** [api] `POST /api/day-notes/:date/carry-over`
   - 依存: T-6-01
   - 対象AC: AC-11, AC-12
   - 対象US: US-MVP-012
   - 出力: `apps/api/src/routes/carryOver.ts`（1トランザクション、`carried`/`skipped` 部分成功応答、[api_contract.md §10](api_contract.md)）
   - 完了条件: HTTP 200 で部分成功、翌日DayNote自動生成を含む
-- [ ] **T-6-04** [test] 持ち越し Integration テスト
+- [x] **T-6-04** [test] 持ち越し Integration テスト
   - 依存: T-6-03
   - 対象AC: AC-11, AC-12
   - 出力: `apps/api/test/carryOver.integration.test.ts`（[test_strategy.md §4.2](test_strategy.md)）
   - 完了条件: トランザクション・重複スキップ・翌日自動生成が実DBで確認できる
-- [ ] **T-6-05** [ui] 持ち越しUI（一括 + 個別）
+- [x] **T-6-05** [ui] 持ち越しUI（一括 + 個別）
   - 依存: T-6-03, T-3-10
   - 対象AC: AC-11, AC-12
   - 対象US: US-MVP-012
   - 出力: `TodoColumn.tsx` に「未完了を翌日へ持ち越し」導線（[implementation_plan.md Phase 6](implementation_plan.md): 一括を主軸、個別は副導線）、`skipped` の通知表示
   - 完了条件: 持ち越し実行後、当日は `carried` 表示、翌日は「7/8から持ち越し」表示
-- [ ] **T-6-06** [ui] 持ち越し先TODOの表示
+- [x] **T-6-06** [ui] 持ち越し先TODOの表示
   - 依存: T-6-05, T-3-14
   - 対象AC: AC-11
   - 出力: `TodoItem.tsx` で `carriedFromDate` を使い「M/Dから持ち越し」表示（[要件 7.10 表示例](dayborad_requirements.md)）
@@ -630,9 +630,9 @@
 
 ### Phase 6 のチェック基準
 
-- [ ] 未完了TODOが翌日に持ち越され、元は `carried`、`carriedFromTodoId`/`carriedFromDate` 付き（AC-11）
-- [ ] 重複持ち越しはスキップ（AC-12）
-- [ ] 持ち越し Unit/Integration テストが通る
+- [x] 未完了TODOが翌日に持ち越され、元は `carried`、`carriedFromTodoId`/`carriedFromDate` 付き（AC-11）
+- [x] 重複持ち越しはスキップ（AC-12）
+- [x] 持ち越し Unit/Integration テストが通る
 
 ---
 
@@ -874,11 +874,11 @@ T-0-01 → T-0-05 → T-1-04 → T-1-07 → T-1-08 → T-2-07 → T-3-10 → T-4
 | Phase 2 | 15 | 15 | 完了 |
 | Phase 3 | 14 | 14 | 完了 |
 | Phase 4 | 10 | 10 | 完了 |
-| Phase 5 | 14 | 0 | 未着手 |
-| Phase 6 | 6 | 0 | 未着手 |
+| Phase 5 | 14 | 14 | 完了 |
+| Phase 6 | 6 | 6 | 完了 |
 | Phase 7 | 11 | 0 | 未着手 |
 | Phase 8 | 7 | 0 | 未着手 |
-| **合計** | **103** | **65** | — |
+| **合計** | **103** | **85** | — |
 
 ---
 

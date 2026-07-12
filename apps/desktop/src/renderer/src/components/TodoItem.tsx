@@ -13,7 +13,8 @@
  */
 
 import { useEffect, useRef, useState } from 'react';
-import type { TodoItem as TodoItemType } from 'shared-types';
+import { formatMonthDay } from '@dayboard/domain';
+import type { NoteLineMeta, TodoItem as TodoItemType } from 'shared-types';
 
 export type TodoItemProps = {
   todo: TodoItemType;
@@ -21,6 +22,13 @@ export type TodoItemProps = {
   isFirst: boolean;
   /** 末尾か（↓ ボタンの無効判定） */
   isLast: boolean;
+  /**
+   * 発生元ノート行のスナップショット（Phase 5、AC-08）。
+   * sourceNoteLineMetaId が null の場合は渡さない（ホバー時のポップアップ非表示）。
+   */
+  sourceNoteLineMeta?: NoteLineMeta | null;
+  /** 変換成功後の一時ハイライト（Phase 5、[§4.3] 1.2s） */
+  highlight?: boolean;
   onToggle: () => void;
   onEditTitle: (title: string) => void;
   onDelete: () => void;
@@ -32,6 +40,8 @@ export function TodoItem({
   todo,
   isFirst,
   isLast,
+  sourceNoteLineMeta,
+  highlight = false,
   onToggle,
   onEditTitle,
   onDelete,
@@ -79,7 +89,9 @@ export function TodoItem({
   const isCarried = todo.status === 'carried';
 
   return (
-    <li className="group flex items-start gap-2 py-1">
+    <li
+      className={`group flex items-start gap-2 rounded px-1 py-1 transition-colors duration-700 ${highlight ? 'bg-amber-100' : ''}`}
+    >
       {/* 完了チェック（carried は操作不可） */}
       <button
         type="button"
@@ -127,9 +139,20 @@ export function TodoItem({
                 → 翌日へ持ち越し済み
               </span>
             )}
-            {/* 持ち越し元の日付表示（[要件 7.10]） */}
+            {/* 持ち越し元の日付表示（[要件 7.10] 表示例「7/8から持ち越し」） */}
             {todo.carriedFromDate && (
-              <span className="text-xs text-stone-400">{todo.carriedFromDate} から持ち越し</span>
+              <span className="text-xs text-stone-400">
+                {formatMonthDay(todo.carriedFromDate)} から持ち越し
+              </span>
+            )}
+            {/* 発生元ノート行スナップショット（Phase 5、AC-08、[note_conversion_spec.md §9.2]） */}
+            {sourceNoteLineMeta && (
+              <span className="relative">
+                <span className="cursor-help text-xs text-stone-300 hover:text-stone-500">ⓘ</span>
+                <span className="pointer-events-none absolute left-0 top-5 z-20 hidden max-w-xs rounded border border-stone-200 bg-white px-2 py-1 text-xs text-stone-600 shadow-md group-hover:block whitespace-pre-wrap">
+                  元ノート行: {sourceNoteLineMeta.lineText}
+                </span>
+              </span>
             )}
           </div>
         )}
