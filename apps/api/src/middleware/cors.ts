@@ -31,7 +31,9 @@ function isAllowedOrigin(origin: string | null | undefined): boolean {
 export const corsMiddleware = cors({
   origin: (origin) => (isAllowedOrigin(origin) ? origin : null),
   allowMethods: ['GET', 'POST', 'PATCH', 'DELETE', 'OPTIONS'],
-  allowHeaders: ['Content-Type', 'Authorization'],
+  // Idempotency-Key: POST 系の重複排除（T-2-14、[autosave_spec.md §8.2]）で
+  // Renderer が送信するカスタムヘッダ。プリフライトで許可しないと CORS 違反で弾かれる。
+  allowHeaders: ['Content-Type', 'Authorization', 'Idempotency-Key'],
   credentials: false,
   maxAge: 600,
 });
