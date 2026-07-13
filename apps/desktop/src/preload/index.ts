@@ -4,6 +4,11 @@
  * main プロセスが決定したAPIベースURLを Renderer の `window.__API_BASE_URL__` に注入する
  * （[architecture.md §6.1/§7]）。
  *
+ * URL受け渡し方針: main プロセスが Hono を起動した後に決定したポートを、
+ * 同期IPC（`get-api-base-url` の sendSync）で preload が受け取る。
+ * 従来の `process.env.INJECTED_API_BASE_URL` は sandbox 環境やコンテキスト分離により
+ * 安定して伝播しないため、IPC 同期呼び出しを一次源とする。
+ *
  * また、終了時の flush（[autosave_spec.md §10]）のためのIPCブリッジを提供する:
  * - main → renderer: `flush-all` 要求（before-quit 時）
  * - renderer → main: flush 完了通知
@@ -14,10 +19,22 @@
 
 import { contextBridge, ipcRenderer } from 'electron';
 
-const apiBaseUrl = process.env['INJECTED_API_BASE_URL'];
+// main プロセスへ同期IPCで API ベースURL を問い合わせる。
+// createWindow() の前に ipcMain.handle('get-api-base-url') が登録済みであること。
+let apiBaseUrl: string | undefined;
+try {
+  apiBaseUrl = ipcRenderer.sendSync('get-api-base-url') as string | undefined;
+} catch (err) {
+  console.error('[preload] failed to get API base URL via IPC:', err);
+}
+
+// フォールバック: IPC 不応答時は従来の環境変数（開発時の分離起動向け）
+if (!apiBaseUrl) {
+  apiBaseUrl = process.env['INJECTED_API_BASE_URL'];
+}
 
 if (!apiBaseUrl) {
-  console.error('[preload] INJECTED_API_BASE_URL is not set. API通信ができません。');
+  console.error('[preload] API base URL is not set. API通信ができません。');
 }
 
 contextBridge.exposeInMainWorld('__API_BASE_URL__', apiBaseUrl);

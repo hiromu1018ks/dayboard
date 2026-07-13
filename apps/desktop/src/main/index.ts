@@ -21,6 +21,19 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 let apiServer: StartedServer | null = null;
 
 /**
+ * preload へ渡す API ベースURL（Hono 起動後に決定）。
+ * preload は `get-api-base-url` 同期IPCでこの値を取りに来る。
+ */
+let injectedApiBaseUrl: string | undefined;
+
+// preload からの API ベースURL 問い合わせを受け付ける同期ハンドラ。
+// createWindow の前にこのハンドラが登録済みであることが前提。
+// （BrowserWindow 生成 → preload 読込 の順のため、モジュール初期化時に登録する）
+ipcMain.on('get-api-base-url', (event) => {
+  event.returnValue = injectedApiBaseUrl;
+});
+
+/**
  * 全 BrowserWindow へ flush-all を要求し、flush-done を待つ（[roadmap.md T-2-13]）。
  *
  * [autosave_spec.md §10.1]: before-quit で Renderer へ flush-all を要求し、
@@ -109,6 +122,11 @@ async function bootstrap(): Promise<StartedServer> {
  * API ベースURLは preload 経由で `window.__API_BASE_URL__` に注入する。
  */
 function createWindow(apiBaseUrl: string): void {
+  // preload が IPC（get-api-base-url）で取りに来るため、BrowserWindow 生成前に設定。
+  // 従来の process.env.INJECTED_API_BASE_URL はフォールバック兼開発時分離起動用。
+  injectedApiBaseUrl = apiBaseUrl;
+  process.env['INJECTED_API_BASE_URL'] = apiBaseUrl;
+
   const mainWindow = new BrowserWindow({
     width: 1280,
     height: 800,
@@ -141,10 +159,6 @@ function createWindow(apiBaseUrl: string): void {
   } else {
     void mainWindow.loadFile(join(__dirname, '../renderer/index.html'));
   }
-
-  // preload が API URL を読み取れるよう、main プロセス側で保持
-  // （preload の contextBridge で expose する値を固定するため）
-  process.env['INJECTED_API_BASE_URL'] = apiBaseUrl;
 }
 
 /**
