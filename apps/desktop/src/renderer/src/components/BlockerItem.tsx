@@ -86,7 +86,7 @@ export function BlockerItem({
 
   return (
     <li
-      className={`group flex items-start gap-2 rounded px-1 py-1 transition-colors duration-700 ${highlight ? 'bg-amber-100' : ''}`}
+      className={`group flex items-start gap-2 rounded px-1 py-1 transition-colors duration-700 ${highlight ? 'bg-warn/15' : ''}`}
     >
       <button
         type="button"
@@ -94,7 +94,7 @@ export function BlockerItem({
         aria-label={blocker.resolved ? '未解消に戻す' : '解消済みにする'}
         data-focus-item={blocker.id}
         tabIndex={0}
-        className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-stone-300 text-xs disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-stone-400 focus-visible:ring-offset-1"
+        className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-line text-xs disabled:opacity-40 hover:border-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1"
         aria-pressed={blocker.resolved}
       >
         {blocker.resolved && <span aria-hidden="true">✓</span>}
@@ -118,28 +118,28 @@ export function BlockerItem({
               }
             }}
             maxLength={200}
-            className="w-full border-b border-stone-300 bg-transparent px-1 py-0.5 text-stone-700 outline-none focus:border-stone-500"
+            className="w-full border-b border-line bg-transparent px-1 py-0.5 text-ink outline-none focus:border-accent"
           />
         ) : (
           <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
             <span
               onDoubleClick={startEdit}
-              className={`text-stone-700 ${blocker.resolved ? 'text-stone-400 line-through' : ''}`}
+              className={`text-ink ${blocker.resolved ? 'text-faint line-through' : ''}`}
             >
               ・{blocker.text}
             </span>
             {/* 紐づくTODO表示 */}
             {linkedTodo && (
-              <span className="rounded bg-stone-100 px-1.5 py-0.5 text-xs text-stone-500">
+              <span className="rounded bg-raised px-1.5 py-0.5 text-xs text-sub">
                 → {linkedTodo.title}
               </span>
             )}
-            {blocker.resolved && <span className="text-xs text-stone-400">解消済み</span>}
+            {blocker.resolved && <span className="text-xs text-faint">解消済み</span>}
             {/* 発生元ノート行スナップショット（Phase 5、AC-08、[note_conversion_spec.md §9.2]） */}
             {sourceNoteLineMeta && (
               <span className="relative">
-                <span className="cursor-help text-xs text-stone-300 hover:text-stone-500">ⓘ</span>
-                <span className="pointer-events-none absolute left-0 top-5 z-20 hidden max-w-xs rounded border border-stone-200 bg-white px-2 py-1 text-xs text-stone-600 shadow-md group-hover:block whitespace-pre-wrap">
+                <span className="cursor-help text-xs text-faint hover:text-sub">ⓘ</span>
+                <span className="pointer-events-none absolute left-0 top-5 z-20 hidden max-w-xs rounded border border-line bg-panel px-2 py-1 text-xs text-sub shadow-md group-hover:block whitespace-pre-wrap">
                   元ノート行: {sourceNoteLineMeta.lineText}
                 </span>
               </span>
@@ -152,7 +152,7 @@ export function BlockerItem({
           <select
             value={blocker.linkedTodoId ?? ''}
             onChange={(e) => onChangeLinkedTodo(e.target.value === '' ? null : e.target.value)}
-            className="mt-1 bg-transparent text-xs text-stone-400 outline-none hover:text-stone-600"
+            className="mt-1 bg-transparent text-xs text-faint outline-none hover:text-sub"
             aria-label="紐づくTODO"
           >
             <option value="">（TODO紐付けなし）</option>
@@ -166,7 +166,7 @@ export function BlockerItem({
 
         {/* 削除確認ダイアログ */}
         {confirmDelete && (
-          <div className="mt-1 rounded border border-amber-200 bg-amber-50 p-2 text-xs text-amber-800">
+          <div className="mt-1 rounded border border-warn/40 bg-warn/10 p-2 text-xs text-warn">
             <p>本文が空です。この障害を削除しますか？</p>
             <div className="mt-1 flex gap-2">
               <button
@@ -175,7 +175,7 @@ export function BlockerItem({
                   setConfirmDelete(false);
                   onDelete();
                 }}
-                className="rounded bg-amber-600 px-2 py-0.5 text-white hover:bg-amber-700"
+                className="rounded bg-warn px-2 py-0.5 text-bg hover:brightness-110"
               >
                 削除
               </button>
@@ -185,7 +185,7 @@ export function BlockerItem({
                   setConfirmDelete(false);
                   startEdit();
                 }}
-                className="rounded border border-amber-300 px-2 py-0.5 hover:bg-amber-100"
+                className="rounded border border-warn/60 px-2 py-0.5 text-warn hover:bg-warn/10"
               >
                 編集に戻る
               </button>
@@ -202,7 +202,7 @@ export function BlockerItem({
             onClick={onMoveUp}
             disabled={isFirst}
             aria-label="上へ移動"
-            className="rounded px-1 text-stone-400 hover:text-stone-700 disabled:opacity-30"
+            className="rounded px-1 text-faint hover:text-ink disabled:opacity-30"
           >
             ↑
           </button>
@@ -211,7 +211,7 @@ export function BlockerItem({
             onClick={onMoveDown}
             disabled={isLast}
             aria-label="下へ移動"
-            className="rounded px-1 text-stone-400 hover:text-stone-700 disabled:opacity-30"
+            className="rounded px-1 text-faint hover:text-ink disabled:opacity-30"
           >
             ↓
           </button>
@@ -219,7 +219,7 @@ export function BlockerItem({
             type="button"
             onClick={startEdit}
             aria-label="編集"
-            className="rounded px-1 text-stone-400 hover:text-stone-700"
+            className="rounded px-1 text-faint hover:text-ink"
           >
             ✎
           </button>
@@ -227,7 +227,7 @@ export function BlockerItem({
             type="button"
             onClick={onDelete}
             aria-label="削除"
-            className="rounded px-1 text-stone-400 hover:text-red-600"
+            className="rounded px-1 text-faint hover:text-danger"
           >
             ×
           </button>

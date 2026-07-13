@@ -1,3 +1,72 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* ===========================================================================
+   墨と波（Sumi to Nami）テーマ
+   Kanagawa Wave（ダーク＝墨）/ Lotus 系（ライト＝和紙）の配色を CSS 変数で定義。
+   季節アクセントは日付（月）から自動判定し data-season 属性で切り替える。
+   =========================================================================== */
+
+/* ---- 和紙ライト（既定）: index.css の :root を和紙にしておき、
+        main.tsx 起動直前に localStorage を見て html.dark を付与する。
+        それまでのわずかな間は和紙で描画される（FOUC 最小化）。 ---- */
+:root {
+  --bg: 245 241 232; /* 生成り #F5F1E8 */
+  --panel: 252 249 242; /* 和紙 #FCF9F2 */
+  --raised: 236 230 215; /* 軽い浮き */
+  --ink: 42 38 32; /* 墨 #2A2620 */
+  --sub: 96 84 64; /* 薄墨 */
+  --faint: 160 144 116; /* 控えめ */
+  --line: 216 205 178; /* 罫線 */
+  --linesoft: 228 220 200; /* 細仕切り */
+  --ok: 90 125 58; /* 苔緑 */
+  --warn: 138 109 59; /* 山吹 */
+  --danger: 183 65 14; /* 弁柄 */
+  /* --accent は季節で上書き（既定は夏＝波青） */
+  --accent: 127 180 202;
+}
+
+/* ---- 墨ダーク（Kanagawa Wave） ---- */
+html.dark {
+  --bg: 22 22 29; /* sumiInk0 #16161D */
+  --panel: 31 31 40; /* sumiInk1 #1F1F28 */
+  --raised: 42 42 55; /* sumiInk2 #2A2A37 */
+  --ink: 220 215 186; /* fujiWhite #DCD7BA */
+  --sub: 200 192 147; /* oldWhite #C8C093 */
+  --faint: 124 122 111;
+  --line: 54 54 70; /* sumiInk3 #363646 */
+  --linesoft: 38 38 51;
+  --ok: 152 187 108; /* springGreen */
+  --warn: 230 195 132; /* carpYellow */
+  --danger: 228 104 118; /* waveRed */
+  --accent: 127 180 202; /* springBlue（夏） */
+}
+
+/* ---- 季節アクセント（日付の月から自動判定）
+        dayborad の「日次」軸を活かす仕掛け。useTheme が data-season を設定する。
+        春(3-5)=桜 / 夏(6-8)=波青 / 秋(9-11)=山吹 / 冬(12-2)=藍 ---- */
+html[data-season='spring'] {
+  --accent: 210 126 153; /* sakuraPink #D27E99 */
+}
+html[data-season='autumn'] {
+  --accent: 230 195 132; /* carpYellow #E6C384 */
+}
+html[data-season='winter'] {
+  --accent: 126 156 209; /* roninBlue #7E9CD1 */
+}
+/* 夏は既定（--accent: 127 180 202）なので上書き不要 */
+
+/* ---- ベース ---- */
+html {
+  font-family: theme('fontFamily.sans');
+}
+body {
+  background-color: rgb(var(--bg));
+  color: rgb(var(--ink));
+}
+/* 和紙ライトにだけ微細な繊維ノイズを重ねる（紙の質感） */
+html:not(.dark) body {
+  background-image: radial-gradient(rgba(120, 100, 70, 0.035) 1px, transparent 1px);
+  background-size: 3px 3px;
+}

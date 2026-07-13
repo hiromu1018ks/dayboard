@@ -23,11 +23,11 @@ export type ToastProps = {
   onClose: () => void;
 };
 
-/** ToastKind ごとのスタイル・アイコン */
+/** ToastKind ごとのスタイル・アイコン（墨と波テーマの状態色） */
 const TOAST_STYLES: Record<ToastKind, { bg: string; icon: string }> = {
-  success: { bg: 'bg-emerald-600', icon: '✓' },
-  info: { bg: 'bg-stone-600', icon: 'ℹ' },
-  error: { bg: 'bg-red-600', icon: '!' },
+  success: { bg: 'bg-ok', icon: '✓' },
+  info: { bg: 'bg-sub', icon: 'ℹ' },
+  error: { bg: 'bg-danger', icon: '!' },
 };
 
 export function Toast({ message, durationMs = 2000, onClose }: ToastProps) {
@@ -44,7 +44,7 @@ export function Toast({ message, durationMs = 2000, onClose }: ToastProps) {
   return (
     <div className="pointer-events-none fixed bottom-6 right-6 z-50">
       <div
-        className={`pointer-events-auto flex items-center gap-2 rounded-lg ${style.bg} px-4 py-2 text-sm text-white shadow-lg`}
+        className={`pointer-events-auto flex items-center gap-2 rounded-lg ${style.bg} px-4 py-2 text-sm text-bg shadow-lg`}
         role="status"
         aria-live="polite"
         data-testid="toast"

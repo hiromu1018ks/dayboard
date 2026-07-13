@@ -32,7 +32,9 @@ export {
   getWeekdayLabel,
   formatMonthDay,
   WEEKDAY_LABELS_JA,
+  getSeason,
 } from './date.js';
+export type { Season } from './date.js';
 export { createId } from './id.js';
 
 // ユースケース（ピュア関数）

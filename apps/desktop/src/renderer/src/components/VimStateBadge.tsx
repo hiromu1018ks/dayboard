@@ -45,8 +45,8 @@ export function VimStateBadge({ keybindingMode, vimState }: VimStateBadgeProps) 
       data-testid="vim-state-badge"
     >
       <span
-        className={`rounded px-2 py-0.5 font-mono text-xs tracking-wide ${
-          isInsert ? 'bg-emerald-100 text-emerald-700' : 'bg-stone-200 text-stone-500'
+        className={`rounded px-2 py-0.5 mono text-xs tracking-wide ${
+          isInsert ? 'bg-ok/20 text-ok' : 'bg-raised text-sub'
         }`}
       >
         {label}

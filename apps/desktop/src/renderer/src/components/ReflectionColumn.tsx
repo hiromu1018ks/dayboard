@@ -56,12 +56,12 @@ export function ReflectionColumn({ reflection, onEdit }: ReflectionColumnProps) 
 
   return (
     <section
-      className="flex flex-col rounded-lg border border-stone-200 bg-white p-5"
+      className="flex flex-col rounded-lg border border-line bg-panel p-5"
       aria-label="振り返り"
       data-focus-section="reflection"
     >
-      <h2 className="mb-3 text-sm font-semibold text-stone-600">
-        <span className="mr-1 text-stone-400">③</span>振り返り
+      <h2 className="head mb-3 text-sm text-sub">
+        <span className="mr-1 text-faint">③</span>振り返り
       </h2>
 
       {/* Phase 7: 最初のセクション（できたこと）へ data-focus-input を付与
@@ -69,7 +69,7 @@ export function ReflectionColumn({ reflection, onEdit }: ReflectionColumnProps) 
       <div className="flex-1 space-y-4">
         {SECTIONS.map((section, i) => (
           <div key={section.key}>
-            <label className="mb-1 block text-xs font-medium text-stone-500">{section.label}</label>
+            <label className="mb-1 block text-xs font-medium text-sub">{section.label}</label>
             <textarea
               value={drafts[section.key]}
               onChange={handleChange(section.key)}
@@ -77,7 +77,7 @@ export function ReflectionColumn({ reflection, onEdit }: ReflectionColumnProps) 
               maxLength={4000}
               rows={4}
               {...(i === 0 ? { 'data-focus-input': true } : {})}
-              className="w-full resize-none rounded border border-stone-200 bg-stone-50/50 px-2 py-1.5 text-sm text-stone-700 outline-none placeholder:text-stone-300 focus:border-stone-400 focus:bg-white"
+              className="w-full resize-none rounded border border-line bg-bg/50 px-2 py-1.5 text-sm text-ink outline-none placeholder:text-faint focus:border-accent focus:bg-bg"
               aria-label={section.label}
             />
           </div>

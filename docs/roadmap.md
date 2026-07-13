@@ -272,8 +272,8 @@
 - [x] **T-2-08** [ui] 保存状態表示
   - 依存: T-2-07
   - 対象AC: AC-13, AC-14
-  - 出力: `apps/desktop/renderer/src/components/SaveStatus.tsx`（[ui_interaction_spec.md §10](ui_interaction_spec.md): 右上、`保存中...` / `保存済み` / `保存できませんでした` + 再試行ボタン）
-  - 完了条件: 4状態が仕様どおり色・文言で表示される
+  - 出力: `apps/desktop/renderer/src/components/SaveStatus.tsx`（[ui_interaction_spec.md §10](ui_interaction_spec.md): 原則非表示・saving/error のみ右下表示 + 再試行ボタン）
+  - 完了条件: idle/saved は非表示、saving/error が仕様どおり色・文言で表示される
 - [x] **T-2-09** [ui] テーマ入力の自動保存接続
   - 依存: T-2-07, T-1-13
   - 対象AC: AC-13

@@ -9,7 +9,7 @@
  * - useAutosave でテーマ編集を800ms後に自動保存（AC-13/14、T-2-09）
  * - 日付移動の直前に flush を呼び、localStorage 同期書込成功で遷移（T-2-10）
  * - localStorage 書込失敗時は FlushFailDialog で確認（T-2-11）
- * - 右上に SaveStatus を表示（T-2-08）
+ * - 右下に SaveStatus を表示（T-2-08。Header 操作と重ならないよう右下端）
  *
  * Phase 3 で追加:
  * - 仕事整理モードの3カラム（TODO/障害/振り返り）を統合（T-3-09）
@@ -74,6 +74,7 @@ import { useAutosave } from './hooks/useAutosave.js';
 import { useDayNote } from './hooks/useDayNote.js';
 import { useFlushOnQuit } from './hooks/useFlushOnQuit.js';
 import { useSettings } from './hooks/useSettings.js';
+import { useTheme } from './hooks/useTheme.js';
 import { useWorkData } from './hooks/useWorkData.js';
 import { useViewMode } from './state/viewMode.js';
 import { isComposing } from './keybindings/guardIme.js';
@@ -110,6 +111,9 @@ export default function App() {
 
   // --- Phase 7: ユーザー設定・キーバインド ---
   const { settings, updateKeybindingMode, updateVimDefaultState } = useSettings();
+  // 外観テーマ（墨ダーク／和紙ライト／System=OS追従）。永続化は localStorage。
+  // 季節アクセントは表示中の日付の月から自動判定するため currentDate を渡す。
+  const { theme, setTheme, resolvedMode } = useTheme(currentDate);
   // Vim操作状態（仕事整理モード用。ノートモードは CodeMirror 内部状態が権威）
   const [vimState, setVimState] = useState<VimState>('normal');
   // 設定モーダル（[ui_interaction_spec.md §8]）
@@ -849,7 +853,7 @@ export default function App() {
   // ノートモード: CodeMirror 本文を画面いっぱいに表示（[要件 6.3]、[§9.1 ④非同時表示]）
   if (viewMode === 'note') {
     return (
-      <div className="min-h-screen bg-stone-50 text-stone-800">
+      <div className="min-h-screen bg-bg text-ink">
         <NoteMode
           ref={noteEditorRef}
           currentDate={currentDate}
@@ -862,15 +866,17 @@ export default function App() {
           onConvertBlocker={handleConvertBlocker}
           keybindingMode={settings.keybindingMode}
           onVimModeChange={setVimState}
+          resolvedMode={resolvedMode}
         />
 
         {/* 変換成功・エラーのトースト通知（Phase 5、[§6.2]） */}
         <Toast message={toast} onClose={() => setToast(null)} />
 
-        {/* 保存状態表示（右上、ノートモードでも共通）。
-            ラッパは pointer-events-none で下の UI（日付移動ボタン等）のクリックを透過し、
+        {/* 保存状態表示（右下、ノートモードでも共通）。
+            右上は Header の日付ナビと重なるため右下に配置。Vim バッジの上に積む。
+            ラッパは pointer-events-none で下の UI のクリックを透過し、
             error 時の再試行ボタンのみ SaveStatus 側で pointer-events-auto を持つ。 */}
-        <div className="pointer-events-none fixed right-4 top-3 z-40">
+        <div className="pointer-events-none fixed bottom-10 right-4 z-40">
           <SaveStatus status={saveStatus} onRetry={retryAll} />
         </div>
 
@@ -887,6 +893,8 @@ export default function App() {
           onChangeVimDefaultState={(state) => {
             void updateVimDefaultState(state);
           }}
+          theme={theme}
+          onChangeTheme={setTheme}
           onClose={() => setSettingsOpen(false)}
         />
 
@@ -921,7 +929,7 @@ export default function App() {
 
   // 仕事整理モード（デフォルト）
   return (
-    <div className="min-h-screen bg-stone-50 text-stone-800">
+    <div className="min-h-screen bg-bg text-ink">
       <Header
         currentDate={currentDate}
         theme={data?.dayNote.theme ?? null}
@@ -933,10 +941,11 @@ export default function App() {
         onOpenSettings={() => setSettingsOpen(true)}
       />
 
-      {/* 保存状態表示（右上、[ui_interaction_spec.md §10]）。
+      {/* 保存状態表示（右下、[ui_interaction_spec.md §10]）。
+          右上は Header の日付ナビと重なるため右下に配置。Vim バッジの上に積む。
           ラッパは pointer-events-none で下の UI のクリックを透過し、
           error 時の再試行ボタンのみ SaveStatus 側で pointer-events-auto を持つ。 */}
-      <div className="pointer-events-none fixed right-4 top-3 z-40">
+      <div className="pointer-events-none fixed bottom-10 right-4 z-40">
         <SaveStatus status={saveStatus} onRetry={retryAll} />
       </div>
 
@@ -944,13 +953,13 @@ export default function App() {
       <VimStateBadge keybindingMode={settings.keybindingMode} vimState={vimState} />
 
       <main className="mx-auto max-w-6xl px-8 py-6">
-        {loading && <p className="text-sm text-stone-500">読み込み中…</p>}
+        {loading && <p className="text-sm text-sub">読み込み中…</p>}
 
         {error && (
-          <div className="rounded border border-red-200 bg-red-50 p-4 text-sm text-red-700">
-            <p className="font-semibold">データの取得に失敗しました。</p>
-            <p className="mt-1 text-red-600">{error.message}</p>
-            <p className="mt-2 text-xs text-red-400">
+          <div className="rounded border border-danger/40 bg-danger/10 p-4 text-sm text-danger">
+            <p className="head font-semibold">データの取得に失敗しました。</p>
+            <p className="mt-1">{error.message}</p>
+            <p className="mt-2 text-xs opacity-80">
               dayborad_dev への PostgreSQL 接続とマイグレーションを確認してください。
             </p>
           </div>
@@ -998,6 +1007,8 @@ export default function App() {
         onChangeVimDefaultState={(state) => {
           void updateVimDefaultState(state);
         }}
+        theme={theme}
+        onChangeTheme={setTheme}
         onClose={() => setSettingsOpen(false)}
       />
 

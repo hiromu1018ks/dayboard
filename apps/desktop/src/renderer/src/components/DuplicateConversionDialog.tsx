@@ -53,7 +53,7 @@ export function DuplicateConversionDialog({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/30"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40"
       onClick={onCancel}
       role="dialog"
       aria-modal="true"
@@ -61,36 +61,36 @@ export function DuplicateConversionDialog({
       data-testid="duplicate-conversion-dialog"
     >
       <div
-        className="mx-4 max-w-md rounded-lg bg-white p-6 shadow-xl"
+        className="mx-4 max-w-md rounded-lg border border-line bg-panel p-6 shadow-xl"
         onClick={(e) => e.stopPropagation()}
       >
-        <h2 id="duplicate-dialog-title" className="text-lg font-semibold text-stone-800">
+        <h2 id="duplicate-dialog-title" className="head text-lg text-ink">
           この行はすでに{targetLabel}化されています
         </h2>
 
         {existingTitle !== undefined && (
-          <div className="mt-3 rounded border border-stone-200 bg-stone-50 px-3 py-2">
-            <p className="text-xs text-stone-500">既存の{targetLabel}:</p>
-            <p className="mt-0.5 text-stone-700">
+          <div className="mt-3 rounded border border-line bg-bg px-3 py-2">
+            <p className="text-xs text-faint">既存の{targetLabel}:</p>
+            <p className="mt-0.5 text-ink">
               {target === 'todo' ? '□' : '・'} {existingTitle}
             </p>
           </div>
         )}
 
-        <p className="mt-4 text-sm text-stone-600">別の{targetLabel}として追加しますか？</p>
+        <p className="mt-4 text-sm text-sub">別の{targetLabel}として追加しますか？</p>
 
         <div className="mt-5 flex justify-end gap-2">
           <button
             type="button"
             onClick={onCancel}
-            className="rounded border border-stone-300 px-4 py-1.5 text-sm text-stone-600 hover:bg-stone-100"
+            className="rounded border border-line px-4 py-1.5 text-sm text-sub hover:bg-raised"
           >
             キャンセル
           </button>
           <button
             type="button"
             onClick={onForce}
-            className="rounded bg-stone-700 px-4 py-1.5 text-sm text-white hover:bg-stone-800"
+            className="rounded bg-accent px-4 py-1.5 text-sm text-bg hover:brightness-110"
             autoFocus
           >
             {buttonLabel}

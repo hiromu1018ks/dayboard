@@ -132,7 +132,7 @@ Phase 8: 統合・E2E・リリース確認
    - [autosave_spec.md §5](autosave_spec.md) の FSM（`idle`/`saving`/`saved`/`error`）
    - 編集対象ごとのデバウンス（800ms、[§3](autosave_spec.md)）
 2. **保存状態表示**
-   - [ui_interaction_spec.md §10](ui_interaction_spec.md): 右上に「保存中...」/「保存済み」/「保存できませんでした」
+   - [ui_interaction_spec.md §10](ui_interaction_spec.md): 右下に「保存中...」/「保存済み」/「保存できませんでした」
 3. **即時保存とflush**
    - [autosave_spec.md §2.2/§4](autosave_spec.md): 追加/削除/完了/並替/変換/持ち越しは即時保存
    - flush トリガ: 日付移動・アプリ終了（[§4](autosave_spec.md)）。モード切替は Phase 4 で接続する。遷移の完了条件はlocalStorageへの対象別スナップショット同期であり、サーバーリトライ完了ではない

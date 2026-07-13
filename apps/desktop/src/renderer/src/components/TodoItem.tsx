@@ -90,7 +90,7 @@ export function TodoItem({
 
   return (
     <li
-      className={`group flex items-start gap-2 rounded px-1 py-1 transition-colors duration-700 ${highlight ? 'bg-amber-100' : ''}`}
+      className={`group flex items-start gap-2 rounded px-1 py-1 transition-colors duration-700 ${highlight ? 'bg-warn/15' : ''}`}
     >
       {/* 完了チェック（carried は操作不可）
           Phase 7: data-focus-item で Vim j/k（項目移動）・x（完了切替、AC-09）のターゲット */}
@@ -101,7 +101,7 @@ export function TodoItem({
         aria-label={isDone ? '未完了に戻す' : '完了にする'}
         data-focus-item={todo.id}
         tabIndex={0}
-        className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded border border-stone-300 text-xs disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-stone-400 focus-visible:ring-offset-1"
+        className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded border border-line text-xs disabled:opacity-40 hover:border-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1"
         aria-pressed={isDone}
       >
         {isDone && <span aria-hidden="true">✓</span>}
@@ -126,33 +126,33 @@ export function TodoItem({
               }
             }}
             maxLength={200}
-            className="w-full border-b border-stone-300 bg-transparent px-1 py-0.5 text-stone-700 outline-none focus:border-stone-500"
+            className="w-full border-b border-line bg-transparent px-1 py-0.5 text-ink outline-none focus:border-accent"
           />
         ) : (
           <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
             <span
               onDoubleClick={startEdit}
-              className={`text-stone-700 ${isDone ? 'text-stone-400 line-through' : ''} ${isCarried ? 'text-stone-400' : ''}`}
+              className={`text-ink ${isDone ? 'text-faint line-through' : ''} ${isCarried ? 'text-faint' : ''}`}
             >
               {todo.title}
             </span>
             {/* carried ラベル（[要件 7.10]） */}
             {isCarried && (
-              <span className="rounded bg-stone-100 px-1.5 py-0.5 text-xs text-stone-500">
+              <span className="rounded bg-raised px-1.5 py-0.5 text-xs text-sub">
                 → 翌日へ持ち越し済み
               </span>
             )}
             {/* 持ち越し元の日付表示（[要件 7.10] 表示例「7/8から持ち越し」） */}
             {todo.carriedFromDate && (
-              <span className="text-xs text-stone-400">
+              <span className="text-xs text-faint">
                 {formatMonthDay(todo.carriedFromDate)} から持ち越し
               </span>
             )}
             {/* 発生元ノート行スナップショット（Phase 5、AC-08、[note_conversion_spec.md §9.2]） */}
             {sourceNoteLineMeta && (
               <span className="relative">
-                <span className="cursor-help text-xs text-stone-300 hover:text-stone-500">ⓘ</span>
-                <span className="pointer-events-none absolute left-0 top-5 z-20 hidden max-w-xs rounded border border-stone-200 bg-white px-2 py-1 text-xs text-stone-600 shadow-md group-hover:block whitespace-pre-wrap">
+                <span className="cursor-help text-xs text-faint hover:text-sub">ⓘ</span>
+                <span className="pointer-events-none absolute left-0 top-5 z-20 hidden max-w-xs rounded border border-line bg-panel px-2 py-1 text-xs text-sub shadow-md group-hover:block whitespace-pre-wrap">
                   元ノート行: {sourceNoteLineMeta.lineText}
                 </span>
               </span>
@@ -162,7 +162,7 @@ export function TodoItem({
 
         {/* 削除確認ダイアログ（[edge_cases.md §2.1]） */}
         {confirmDelete && (
-          <div className="mt-1 rounded border border-amber-200 bg-amber-50 p-2 text-xs text-amber-800">
+          <div className="mt-1 rounded border border-warn/40 bg-warn/10 p-2 text-xs text-warn">
             <p>本文が空です。このTODOを削除しますか？</p>
             <div className="mt-1 flex gap-2">
               <button
@@ -171,7 +171,7 @@ export function TodoItem({
                   setConfirmDelete(false);
                   onDelete();
                 }}
-                className="rounded bg-amber-600 px-2 py-0.5 text-white hover:bg-amber-700"
+                className="rounded bg-warn px-2 py-0.5 text-bg hover:brightness-110"
               >
                 削除
               </button>
@@ -181,7 +181,7 @@ export function TodoItem({
                   setConfirmDelete(false);
                   startEdit();
                 }}
-                className="rounded border border-amber-300 px-2 py-0.5 hover:bg-amber-100"
+                className="rounded border border-warn/60 px-2 py-0.5 text-warn hover:bg-warn/10"
               >
                 編集に戻る
               </button>
@@ -198,7 +198,7 @@ export function TodoItem({
             onClick={onMoveUp}
             disabled={isFirst}
             aria-label="上へ移動"
-            className="rounded px-1 text-stone-400 hover:text-stone-700 disabled:opacity-30"
+            className="rounded px-1 text-faint hover:text-ink disabled:opacity-30"
           >
             ↑
           </button>
@@ -207,7 +207,7 @@ export function TodoItem({
             onClick={onMoveDown}
             disabled={isLast}
             aria-label="下へ移動"
-            className="rounded px-1 text-stone-400 hover:text-stone-700 disabled:opacity-30"
+            className="rounded px-1 text-faint hover:text-ink disabled:opacity-30"
           >
             ↓
           </button>
@@ -215,7 +215,7 @@ export function TodoItem({
             type="button"
             onClick={startEdit}
             aria-label="編集"
-            className="rounded px-1 text-stone-400 hover:text-stone-700"
+            className="rounded px-1 text-faint hover:text-ink"
           >
             ✎
           </button>
@@ -223,7 +223,7 @@ export function TodoItem({
             type="button"
             onClick={onDelete}
             aria-label="削除"
-            className="rounded px-1 text-stone-400 hover:text-red-600"
+            className="rounded px-1 text-faint hover:text-danger"
           >
             ×
           </button>

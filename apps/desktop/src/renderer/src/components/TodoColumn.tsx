@@ -84,12 +84,12 @@ export function TodoColumn({
 
   return (
     <section
-      className="flex flex-col rounded-lg border border-stone-200 bg-white p-5"
+      className="flex flex-col rounded-lg border border-line bg-panel p-5"
       aria-label="TODO"
       data-focus-section="todo"
     >
-      <h2 className="mb-3 text-sm font-semibold text-stone-600">
-        <span className="mr-1 text-stone-400">①</span>TODO
+      <h2 className="head mb-3 text-sm text-sub">
+        <span className="mr-1 text-faint">①</span>TODO
       </h2>
 
       <ul className="flex-1 space-y-0.5">
@@ -113,7 +113,7 @@ export function TodoColumn({
           />
         ))}
         {todos.length === 0 && (
-          <li className="py-4 text-center text-xs text-stone-300">TODOはありません</li>
+          <li className="py-4 text-center text-xs text-faint">TODOはありません</li>
         )}
       </ul>
 
@@ -121,20 +121,20 @@ export function TodoColumn({
           未完了（status='todo'）のTODOがある場合のみ表示。
           持ち越しは不可逆操作（carried は終端状態）のため確認ダイアログを挟む */}
       {incompleteTodos.length > 0 && !confirmCarryOver && (
-        <div className="mt-3 border-t border-stone-100 pt-3">
+        <div className="mt-3 border-t border-linesoft pt-3">
           <button
             type="button"
             onClick={() => setConfirmCarryOver(true)}
-            className="text-xs text-stone-500 hover:text-stone-800 hover:underline"
+            className="text-xs text-sub hover:text-ink hover:underline"
           >
             未完了を翌日へ持ち越し（{incompleteTodos.length}件）
           </button>
         </div>
       )}
       {incompleteTodos.length > 0 && confirmCarryOver && (
-        <div className="mt-3 rounded border border-amber-200 bg-amber-50 p-2 text-xs text-amber-800">
+        <div className="mt-3 rounded border border-warn/40 bg-warn/10 p-2 text-xs text-warn">
           <p>未完了TODO {incompleteTodos.length}件を翌日に持ち越しますか？</p>
-          <p className="mt-0.5 text-amber-600">持ち越し後は元に戻せません。</p>
+          <p className="mt-0.5 opacity-80">持ち越し後は元に戻せません。</p>
           <div className="mt-1 flex gap-2">
             <button
               type="button"
@@ -142,14 +142,14 @@ export function TodoColumn({
                 setConfirmCarryOver(false);
                 onCarryOverTodos(incompleteTodos.map((t) => t.id));
               }}
-              className="rounded bg-amber-600 px-2 py-0.5 text-white hover:bg-amber-700"
+              className="rounded bg-warn px-2 py-0.5 text-bg hover:brightness-110"
             >
               持ち越す
             </button>
             <button
               type="button"
               onClick={() => setConfirmCarryOver(false)}
-              className="rounded border border-amber-300 px-2 py-0.5 hover:bg-amber-100"
+              className="rounded border border-warn/60 px-2 py-0.5 text-warn hover:bg-warn/10"
             >
               キャンセル
             </button>
@@ -159,7 +159,7 @@ export function TodoColumn({
 
       {/* 追加入力欄（[ui_interaction_spec.md §5.1]）
           Phase 7: data-focus-input で列フォーカス（⌘1, Vim h/l/Space 1, i）の対象 */}
-      <div className="mt-3 border-t border-stone-100 pt-3">
+      <div className="mt-3 border-t border-linesoft pt-3">
         <input
           ref={inputRef}
           type="text"
@@ -174,7 +174,7 @@ export function TodoColumn({
           placeholder="TODOを追加して Enter"
           maxLength={200}
           data-focus-input
-          className="w-full border-b border-stone-200 bg-transparent px-1 py-0.5 text-sm text-stone-700 outline-none placeholder:text-stone-300 focus:border-stone-400"
+          className="w-full border-b border-linesoft bg-transparent px-1 py-0.5 text-sm text-ink outline-none placeholder:text-faint focus:border-accent"
           aria-label="新規TODO入力"
         />
       </div>

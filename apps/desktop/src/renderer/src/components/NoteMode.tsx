@@ -48,6 +48,8 @@ export type NoteModeProps = {
   keybindingMode?: KeybindingMode;
   /** CodeMirror の Vim mode 変化通知（Phase 7 T-7-05） */
   onVimModeChange?: (mode: 'normal' | 'insert') => void;
+  /** 外観モード（墨と波テーマ）。CodeMirror の配色切替に使用 */
+  resolvedMode?: 'dark' | 'light';
 };
 
 export const NoteMode = forwardRef<NoteEditorHandle, NoteModeProps>(function NoteMode(
@@ -62,6 +64,7 @@ export const NoteMode = forwardRef<NoteEditorHandle, NoteModeProps>(function Not
     onConvertBlocker,
     keybindingMode,
     onVimModeChange,
+    resolvedMode,
   },
   ref,
 ) {
@@ -69,29 +72,29 @@ export const NoteMode = forwardRef<NoteEditorHandle, NoteModeProps>(function Not
   const weekday = getWeekdayLabel(currentDate);
 
   return (
-    <div className="flex h-screen flex-col bg-stone-50 text-stone-800">
-      <header className="border-b border-stone-200 bg-white px-8 py-4">
+    <div className="flex h-screen flex-col bg-bg text-ink">
+      <header className="border-b border-line bg-panel px-8 py-4">
         <div className="flex items-center justify-between">
           {/* 日付・曜日・モード名 */}
           <div className="flex items-baseline gap-3">
-            <h1 className="text-2xl font-semibold tracking-tight text-stone-800">
-              <span className="font-mono">{displayDate}</span>
-              <span className="ml-2 text-stone-500">{weekday}</span>
+            <h1 className="head text-2xl tracking-tight text-ink">
+              <span className="mono">{displayDate}</span>
+              <span className="ml-2 text-sub">{weekday}</span>
             </h1>
-            <span className="text-sm text-stone-400">会議・打ち合わせ・会話メモ</span>
+            <span className="text-sm text-faint">会議・打ち合わせ・会話メモ</span>
           </div>
 
           {/* 戻る操作の案内（[要件 6.3]） */}
-          <div className="flex items-center gap-3 text-sm text-stone-400">
+          <div className="flex items-center gap-3 text-sm text-faint">
             <span>
-              <kbd className="rounded border border-stone-300 px-1.5 py-0.5 font-sans text-xs text-stone-500">
+              <kbd className="rounded border border-line bg-raised px-1.5 py-0.5 font-sans text-xs text-sub">
                 Esc
               </kbd>{' '}
               戻る
             </span>
-            <span className="text-stone-300">/</span>
+            <span className="text-faint">/</span>
             <span>
-              <kbd className="rounded border border-stone-300 px-1.5 py-0.5 font-sans text-xs text-stone-500">
+              <kbd className="rounded border border-line bg-raised px-1.5 py-0.5 font-sans text-xs text-sub">
                 ⌘J
               </kbd>{' '}
               戻る
@@ -103,9 +106,9 @@ export const NoteMode = forwardRef<NoteEditorHandle, NoteModeProps>(function Not
       {/* CodeMirror 本文エリア（[要件 6.3]: 広いテキストエリアを主役に） */}
       <main className="mx-auto flex w-full max-w-5xl flex-1 flex-col px-8 py-4">
         {loading ? (
-          <p className="text-sm text-stone-500">読み込み中…</p>
+          <p className="text-sm text-sub">読み込み中…</p>
         ) : (
-          <div className="flex-1 overflow-hidden rounded-lg border border-stone-200 bg-white shadow-sm">
+          <div className="flex-1 overflow-hidden rounded-lg border border-line bg-panel shadow-sm shadow-black/20">
             <NoteEditor
               ref={ref}
               value={body}
@@ -116,6 +119,7 @@ export const NoteMode = forwardRef<NoteEditorHandle, NoteModeProps>(function Not
               onConvertBlocker={onConvertBlocker}
               keybindingMode={keybindingMode}
               onVimModeChange={onVimModeChange}
+              resolvedMode={resolvedMode}
             />
           </div>
         )}

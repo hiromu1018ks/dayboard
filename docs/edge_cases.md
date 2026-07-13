@@ -260,7 +260,7 @@
 
 > **ケース:** 3回リトライすべて失敗
 > **期待される挙動:**
-> - `saveStatus=error`（最終）、画面右上に「保存できませんでした」+「再試行」ボタン（[autosave_spec.md §7.2](autosave_spec.md)）
+> - `saveStatus=error`（最終）、画面右下に「保存できませんでした」+「再試行」ボタン（[autosave_spec.md §7.2](autosave_spec.md)）
 > - トースト「保存に失敗しました。入力内容は保持されています。再試行してください。」
 > - ローカルバッファにはデータが残る
 > **根拠:** [autosave_spec.md §7.2](autosave_spec.md)

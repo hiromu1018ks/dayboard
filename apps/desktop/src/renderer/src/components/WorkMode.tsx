@@ -51,8 +51,9 @@ export type WorkModeProps = {
 /**
  * 仕事整理モードの3カラムレイアウト。
  *
- * 各カラムは `rounded-lg border border-stone-200 bg-white` のカードで、
- * 紙ノート余白を表現するため `p-5` のパディングを持つ（[要件 14.1]）。
+ * 各カラムは `rounded-lg border border-line bg-panel` のカード（墨と波テーマ。
+ * 背景は CSS 変数で墨ダーク／和紙ライトを切替）で、紙ノート余白を表現するため
+ * `p-5` のパディングを持つ（[要件 14.1]）。
  */
 export function WorkMode({
   date,

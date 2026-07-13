@@ -120,3 +120,22 @@ export function getWeekdayLabel(dateStr: string): string {
   d.setFullYear(year);
   return WEEKDAY_LABELS_JA[d.getDay()] ?? '';
 }
+
+/**
+ * 季節ラベル（テーマのアクセント色を選ぶために用いる）。
+ *
+ * dayborad の「日次」軸を活かし、表示中の日付の月から季節アクセントを自動選ぶ
+ * （春=3-5月 / 夏=6-8月 / 秋=9-11月 / 冬=12-2月）。UI 側は戻り値を `data-season`
+ * 属性へ設定し、CSS 変数 `--accent` を季節ごとに切り替える。
+ *
+ * 事前条件: `dateStr` は `isValidDateString` を満たす実在日付であること。
+ */
+export type Season = 'spring' | 'summer' | 'autumn' | 'winter';
+
+export function getSeason(dateStr: string): Season {
+  const { month } = parseYyyyMmDd(dateStr);
+  if (month >= 3 && month <= 5) return 'spring';
+  if (month >= 6 && month <= 8) return 'summer';
+  if (month >= 9 && month <= 11) return 'autumn';
+  return 'winter';
+}

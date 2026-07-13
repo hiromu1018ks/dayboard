@@ -9,6 +9,7 @@ import { describe, expect, it } from 'vitest';
 import {
   addDays,
   formatMonthDay,
+  getSeason,
   getWeekdayLabel,
   isValidDateString,
   toLocalDateString,
@@ -197,5 +198,34 @@ describe('formatMonthDay', () => {
     expect(() => formatMonthDay('invalid')).toThrow(RangeError);
     expect(() => formatMonthDay('2026/07/08')).toThrow(RangeError);
     expect(() => formatMonthDay('')).toThrow(RangeError);
+  });
+});
+
+describe('getSeason', () => {
+  // 季節アクセント（春=3-5月 / 夏=6-8月 / 秋=9-11月 / 冬=12-2月）。
+  // 各季節の境界月を検証する。
+  it('春: 3〜5月', () => {
+    expect(getSeason('2026-03-01')).toBe('spring');
+    expect(getSeason('2026-04-15')).toBe('spring');
+    expect(getSeason('2026-05-31')).toBe('spring');
+  });
+
+  it('夏: 6〜8月', () => {
+    expect(getSeason('2026-06-01')).toBe('summer');
+    expect(getSeason('2026-07-13')).toBe('summer');
+    expect(getSeason('2026-08-31')).toBe('summer');
+  });
+
+  it('秋: 9〜11月', () => {
+    expect(getSeason('2026-09-01')).toBe('autumn');
+    expect(getSeason('2026-10-20')).toBe('autumn');
+    expect(getSeason('2026-11-30')).toBe('autumn');
+  });
+
+  it('冬: 12〜2月（年末年始を跨ぐ）', () => {
+    expect(getSeason('2026-12-01')).toBe('winter');
+    expect(getSeason('2026-12-31')).toBe('winter');
+    expect(getSeason('2026-01-01')).toBe('winter');
+    expect(getSeason('2026-02-28')).toBe('winter');
   });
 });

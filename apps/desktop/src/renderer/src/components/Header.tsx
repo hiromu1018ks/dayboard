@@ -97,18 +97,15 @@ export function Header({
   };
 
   return (
-    <header className="border-b border-stone-200 bg-white px-8 py-4">
+    <header className="border-b border-line bg-panel px-8 py-4">
       <div className="flex items-center justify-between">
         {/* 日付・曜日 */}
         <div className="flex items-baseline gap-3">
-          <h1
-            className="text-2xl font-semibold tracking-tight text-stone-800"
-            data-testid="date-display"
-          >
-            <span className="font-mono">{displayDate}</span>
-            <span className="ml-2 text-stone-500">{weekday}</span>
+          <h1 className="head text-2xl tracking-tight text-ink" data-testid="date-display">
+            <span className="mono">{displayDate}</span>
+            <span className="ml-2 text-sub">{weekday}</span>
           </h1>
-          <span className="text-sm text-stone-400">今日の仕事ノート</span>
+          <span className="text-sm text-faint">今日の仕事ノート</span>
         </div>
 
         {/* 日付移動ボタン（[要件 6.2]） */}
@@ -116,7 +113,7 @@ export function Header({
           <button
             type="button"
             onClick={onPrevDay}
-            className="rounded px-3 py-1 text-stone-600 hover:bg-stone-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-stone-400 focus-visible:ring-offset-1"
+            className="rounded px-3 py-1 text-sub hover:bg-raised focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1"
             aria-label="前日へ"
           >
             ‹
@@ -125,14 +122,14 @@ export function Header({
             type="button"
             onClick={onToday}
             disabled={isToday}
-            className="rounded border border-stone-300 px-3 py-1 text-sm text-stone-700 hover:bg-stone-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-stone-400 focus-visible:ring-offset-1 disabled:cursor-default disabled:opacity-40 disabled:hover:bg-transparent"
+            className="rounded border border-line px-3 py-1 text-sm text-ink hover:bg-raised focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1 disabled:cursor-default disabled:opacity-40 disabled:hover:bg-transparent"
           >
             今日
           </button>
           <button
             type="button"
             onClick={onNextDay}
-            className="rounded px-3 py-1 text-stone-600 hover:bg-stone-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-stone-400 focus-visible:ring-offset-1"
+            className="rounded px-3 py-1 text-sub hover:bg-raised focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1"
             aria-label="翌日へ"
           >
             ›
@@ -144,7 +141,7 @@ export function Header({
           Phase 7: data-focus-section="theme" で列フォーカス（Vim h/l）対応。
           コンテナ（この div）へ section、入力へ input を付与。 */}
       <div className="mt-3 flex items-center gap-2" data-focus-section="theme">
-        <label htmlFor="theme-input" className="text-sm text-stone-500">
+        <label htmlFor="theme-input" className="text-sm text-sub">
           今日のテーマ：
         </label>
         <input
@@ -155,14 +152,14 @@ export function Header({
           placeholder="今日のテーマを入力"
           maxLength={200}
           data-focus-input
-          className="flex-1 border-b border-stone-200 bg-transparent px-1 py-0.5 text-stone-700 outline-none placeholder:text-stone-300 focus:border-stone-400"
+          className="flex-1 border-b border-line bg-transparent px-1 py-0.5 text-ink outline-none placeholder:text-faint focus:border-accent"
         />
         {/* 設定（歯車）アイコン（[ui_interaction_spec.md §8.1]、Phase 7 T-7-02） */}
         <button
           type="button"
           onClick={onOpenSettings}
           aria-label="設定を開く"
-          className="ml-2 rounded p-1 text-stone-400 hover:bg-stone-100 hover:text-stone-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-stone-400 focus-visible:ring-offset-1"
+          className="ml-2 rounded p-1 text-faint hover:bg-raised hover:text-sub focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1"
         >
           {/* 歯車アイコン（SVG） */}
           <svg

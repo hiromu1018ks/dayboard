@@ -24,8 +24,10 @@ import { basicSetup } from 'codemirror';
 import { EditorView, GutterMarker, gutter, keymap } from '@codemirror/view';
 import type { BlockInfo, ViewUpdate } from '@codemirror/view';
 import { markdown } from '@codemirror/lang-markdown';
+import { HighlightStyle, syntaxHighlighting } from '@codemirror/language';
 import { Compartment, Prec, StateEffect, StateField } from '@codemirror/state';
 import type { Extension } from '@codemirror/state';
+import { tags } from '@lezer/highlight';
 import type { KeybindingMode, NoteLineMeta } from 'shared-types';
 import { computeLineHash, normalizeLineText } from '@dayboard/domain';
 import { createVimExtension, getCodeMirrorVimMode } from '../keybindings/vim.js';
@@ -54,6 +56,11 @@ export type NoteEditorProps = {
    * keybindingMode='vim' のときのみ有意。
    */
   onVimModeChange?: (mode: 'normal' | 'insert') => void;
+  /**
+   * 外観モード（墨と波テーマ）。'dark'（墨）/'light'（和紙）。
+   * 未指定時は CodeMirror 既定の light 配色になる（後方互換）。
+   */
+  resolvedMode?: 'dark' | 'light';
 };
 
 /**
@@ -78,6 +85,89 @@ function shouldApplyExternalValue(view: EditorView, next: string): boolean {
   return view.state.doc.toString() !== next;
 }
 
+// ---- 墨と波テーマ: CodeMirror 配色（Kanagawa Wave/Lotus 系） ----
+
+/** モードごとの配色パレット（Kanagawa 由来） */
+const CM_PALETTE = {
+  dark: {
+    bg: '#1F1F28', // sumiInk1（カード背景に合わせる）
+    bgAlt: '#16161D', // sumiInk0（ガター等の一段暗い面）
+    text: '#DCD7BA', // fujiWhite
+    gutter: '#7E9CD1', // roninBlue（行番号）
+    activeLine: '#2A2A37', // sumiInk2
+    selection: 'rgba(127, 180, 202, 0.25)', // springBlue 薄
+    cursor: '#7FB4CA', // springBlue
+    border: '#363646', // sumiInk3
+    heading: '#7FB4CA', // springBlue
+    emphasis: '#E6C384', // carpYellow
+    link: '#98BB6C', // springGreen
+    quote: '#938AA9', // oniViolet（控えめ）
+  },
+  light: {
+    bg: '#FCF9F2', // 和紙
+    bgAlt: '#F5F1E8', // 生成り
+    text: '#2A2620', // 墨
+    gutter: '#A09074', // 薄墨
+    activeLine: '#ECE6D7', // 軽い浮き
+    selection: 'rgba(127, 156, 209, 0.20)', // roninBlue 薄
+    cursor: '#7E9CD1', // roninBlue
+    border: '#D8CDB2', // 罫線
+    heading: '#7E9CD1', // roninBlue
+    emphasis: '#8A6D3B', // 山吹
+    link: '#5A7D3A', // 苔緑
+    quote: '#8C7B6B', // 薄墨
+  },
+} as const;
+
+/**
+ * CodeMirror の UI（背景・ガター・選択・カーソル）テーマを生成する。
+ * レイアウト（フォント/サイズ/padding）は共通、配色だけ mode で切り替える。
+ */
+function createEditorTheme(mode: 'dark' | 'light'): Extension {
+  const p = CM_PALETTE[mode];
+  return EditorView.theme({
+    '&': { height: '100%', fontSize: '15px', backgroundColor: p.bg, color: p.text },
+    '.cm-scroller': {
+      fontFamily:
+        'ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace',
+      lineHeight: '1.7',
+    },
+    '.cm-content': { padding: '16px 20px', maxWidth: '100%', caretColor: p.cursor },
+    '&.cm-focused': { outline: 'none' },
+    '.cm-gutters': {
+      backgroundColor: p.bg,
+      color: p.gutter,
+      border: 'none',
+    },
+    '.cm-activeLine': { backgroundColor: p.activeLine },
+    '.cm-activeLineGutter': { backgroundColor: p.activeLine, color: p.text },
+    '.cm-selectionBackground, ::selection': { backgroundColor: p.selection },
+    '.cm-cursor, .cm-dropCursor': { borderLeftColor: p.cursor },
+    '.cm-conversion-gutter': { width: '2.5em' },
+  });
+}
+
+/**
+ * Markdown のシンタックスハイライト（見出し/強調/リンク等）の配色。
+ * basicSetup が内包する defaultHighlightStyle を上書きする。
+ */
+function createHighlightStyle(mode: 'dark' | 'light'): Extension {
+  const p = CM_PALETTE[mode];
+  return syntaxHighlighting(
+    HighlightStyle.define([
+      { tag: tags.heading1, color: p.heading, fontWeight: '700' },
+      { tag: tags.heading2, color: p.heading, fontWeight: '700' },
+      { tag: tags.heading3, color: p.heading, fontWeight: '600' },
+      { tag: tags.strong, color: p.emphasis, fontWeight: '700' },
+      { tag: tags.emphasis, color: p.emphasis, fontStyle: 'italic' },
+      { tag: tags.link, color: p.link, textDecoration: 'underline' },
+      { tag: tags.quote, color: p.quote, fontStyle: 'italic' },
+      { tag: tags.url, color: p.link },
+      { tag: tags.processingInstruction, color: p.quote },
+    ]),
+  );
+}
+
 // ---- 変換済みマーク（ガター、T-5-10）----
 
 /** ガターに表示するマーカー（`✓T` / `✓B` / `✓T ✓B`） */
@@ -88,7 +178,7 @@ class ConversionMarker extends GutterMarker {
   override toDOM() {
     const span = document.createElement('span');
     span.textContent = this.text;
-    span.className = 'text-xs text-stone-400';
+    span.className = 'text-xs text-accent';
     return span;
   }
 }
@@ -185,6 +275,7 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(function
     onConvertBlocker,
     keybindingMode = 'standard',
     onVimModeChange,
+    resolvedMode,
   },
   ref,
 ) {
@@ -231,28 +322,26 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(function
   // keybindingMode が変わっても CodeMirror を再生成せず、reconfigure で差し替える。
   // これによりカーソル位置・スクロール位置・ガターマークが保持される。
   const vimCompartmentRef = useRef(new Compartment());
+  // 外観テーマ（墨/和紙）も Compartment で動的切替。同じく再生成せず reconfigure で差し替える。
+  const themeCompartmentRef = useRef(new Compartment());
 
-  // 初回マウントで CodeMirror を生成（一度きり。keybindingMode 変更時は reconfigure）
+  // 初回マウントで CodeMirror を生成（一度きり。keybindingMode/resolvedMode 変更時は reconfigure）
   useEffect(() => {
     if (!hostRef.current) return;
 
+    const initialMode = resolvedMode ?? 'light';
     const view = new EditorView({
       doc: initialValueRef.current,
       extensions: [
         basicSetup,
         markdown(),
         EditorView.lineWrapping,
-        EditorView.theme({
-          '&': { height: '100%', fontSize: '15px' },
-          '.cm-scroller': {
-            fontFamily:
-              'ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace',
-            lineHeight: '1.7',
-          },
-          '.cm-content': { padding: '16px 20px', maxWidth: '100%' },
-          '&.cm-focused': { outline: 'none' },
-          '.cm-conversion-gutter': { width: '2.5em' },
-        }),
+        // 外観テーマ（墨と波）: UI 配色＋シンタックスハイライト。
+        // 後ろに置くことで basicSetup の defaultHighlightStyle を上書きする。
+        themeCompartmentRef.current.of([
+          createEditorTheme(initialMode),
+          createHighlightStyle(initialMode),
+        ]),
         // 変換済みマーク（ガター + StateField）
         conversionMarksField,
         conversionGutterExtension(),
@@ -350,6 +439,19 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(function
       lastVimModeRef.current = null;
     }
   }, [keybindingMode]);
+
+  // 外観テーマ（墨/和紙）変化時に CodeMirror の配色を動的 reconfigure。
+  // Vim と同じく Compartment で差し替え、カーソル位置・スクロール・ガターマークを保持する。
+  useEffect(() => {
+    const view = viewRef.current;
+    if (!view || !resolvedMode) return;
+    view.dispatch({
+      effects: themeCompartmentRef.current.reconfigure([
+        createEditorTheme(resolvedMode),
+        createHighlightStyle(resolvedMode),
+      ]),
+    });
+  }, [resolvedMode]);
 
   /**
    * 現在カーソル行を取得し、変換コールバックを呼ぶ。

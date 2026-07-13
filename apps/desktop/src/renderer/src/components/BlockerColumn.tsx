@@ -76,12 +76,12 @@ export function BlockerColumn({
 
   return (
     <section
-      className="flex flex-col rounded-lg border border-stone-200 bg-white p-5"
+      className="flex flex-col rounded-lg border border-line bg-panel p-5"
       aria-label="障害・詰まり"
       data-focus-section="blocker"
     >
-      <h2 className="mb-3 text-sm font-semibold text-stone-600">
-        <span className="mr-1 text-stone-400">②</span>障害・詰まり
+      <h2 className="head mb-3 text-sm text-sub">
+        <span className="mr-1 text-faint">②</span>障害・詰まり
       </h2>
 
       <ul className="flex-1 space-y-0.5">
@@ -107,12 +107,12 @@ export function BlockerColumn({
           />
         ))}
         {blockers.length === 0 && (
-          <li className="py-4 text-center text-xs text-stone-300">障害はありません</li>
+          <li className="py-4 text-center text-xs text-faint">障害はありません</li>
         )}
       </ul>
 
       {/* Phase 7: data-focus-input で列フォーカス（⌘2, Vim h/l/Space 2, i）の対象 */}
-      <div className="mt-3 border-t border-stone-100 pt-3">
+      <div className="mt-3 border-t border-linesoft pt-3">
         <input
           ref={inputRef}
           type="text"
@@ -127,7 +127,7 @@ export function BlockerColumn({
           placeholder="障害を追加して Enter"
           maxLength={200}
           data-focus-input
-          className="w-full border-b border-stone-200 bg-transparent px-1 py-0.5 text-sm text-stone-700 outline-none placeholder:text-stone-300 focus:border-stone-400"
+          className="w-full border-b border-linesoft bg-transparent px-1 py-0.5 text-sm text-ink outline-none placeholder:text-faint focus:border-accent"
           aria-label="新規障害入力"
         />
       </div>
