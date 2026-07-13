@@ -19,24 +19,45 @@ import { closeApp, launchApp, resetE2eDatabase } from './helpers.js';
 const THEME_INPUT = '#theme-input';
 
 /**
- * 指定要素に対し合成 compositionstart / compositionupdate / compositionend イベントを
- * 発火し、IME 変換中状態を擬似的に再現する（[test_strategy.md §5.2]）。
+ * 指定要素に対し合成 compositionstart / compositionupdate イベントを発火し、
+ * IME 変換中状態を擬似的に再現する（[test_strategy.md §5.2]）。
  *
- * 本テストでは compositionupdate の最中（isComposing===true）に keydown(Escape) を
- * 発火し、アプリ層がこれを無視する（ショートカットとして処理しない）ことを検証する。
+ * さらに、指定のキー（既定: Escape）を `isComposing: true` の合成 KeyboardEvent として
+ * 発火する。実際の Playwright の keyboard.press は OS 由来の isComposing フラグを
+ * 再現できないため、変換中の keydown を偽装するには合成イベントが必要。
+ *
+ * アプリ層のガード（guardIme.isComposing）は `e.isComposing === true || keyCode === 229`
+ * を見るため、合成 KeyboardEvent で `isComposing: true` を渡せばガードが発動する。
  */
-async function dispatchComposition(window: Page, selector: string, reading: string): Promise<void> {
+async function dispatchCompositionAndKey(
+  window: Page,
+  selector: string,
+  reading: string,
+  key: string = 'Escape',
+): Promise<void> {
   await window.evaluate(
-    ({ sel, text }) => {
+    ({ sel, text, keyName }) => {
       const el = document.querySelector(sel) as HTMLElement | null;
       if (!el) return;
       el.focus();
-      // compositionstart
+      // compositionstart → compositionupdate（変換中状態）
       el.dispatchEvent(new CompositionEvent('compositionstart', { data: '' }));
-      // compositionupdate
       el.dispatchEvent(new CompositionEvent('compositionupdate', { data: text }));
+      // 変換中の keydown を isComposing: true で合成発火
+      // 実際のIME変換中は KeyboardEvent.isComposing が true になる。
+      // OS 連携なしでこれを再現するには、合成イベントの isComposing を明示する。
+      const ev = new KeyboardEvent('keydown', {
+        key: keyName,
+        code: 'Escape',
+        bubbles: true,
+        cancelable: true,
+        composed: true,
+        // isComposing は KeyboardEventInit で渡す
+        isComposing: true,
+      });
+      el.dispatchEvent(ev);
     },
-    { sel: selector, text: reading },
+    { sel: selector, text: reading, keyName: key },
   );
 }
 
@@ -62,16 +83,13 @@ test.describe('IME 変換中の Esc 優先順位（AC-19）', () => {
     const NOTE_EDITOR = '[data-testid="note-editor"]';
     await expect(window.locator(NOTE_EDITOR)).toBeVisible({ timeout: 5_000 });
 
-    // CodeMirror の本文エリアで IME 変換を擬似開始
+    // CodeMirror の本文エリアで IME 変換中を擬似的に再現し、
+    // 変換中の Esc（isComposing: true）でガードが発動するか検証
     const CM_CONTENT = `${NOTE_EDITOR} .cm-content`;
     await window.locator(CM_CONTENT).click();
-    await dispatchComposition(window, CM_CONTENT, 'あ');
+    await dispatchCompositionAndKey(window, CM_CONTENT, 'あ', 'Escape');
 
-    // compositionupdate 中（isComposing===true）に Esc を押す
-    // → アプリ層のガードが発動し、work 戻りが起きないはず（AC-19）
-    await window.keyboard.press('Escape');
-
-    // ノートモードのまま（work へ戻らない）
+    // ガードが発動し work 戻りが起きないはず（AC-19）。ノートモードのまま。
     await expect(window.locator(NOTE_EDITOR)).toBeVisible();
   });
 

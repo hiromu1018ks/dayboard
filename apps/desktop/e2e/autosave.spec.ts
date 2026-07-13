@@ -17,7 +17,13 @@
  */
 
 import { expect, test, type ElectronApplication, type Page } from '@playwright/test';
-import { closeApp, launchApp, resetE2eDatabase } from './helpers.js';
+import {
+  closeApp,
+  createTempUserDataDir,
+  launchApp,
+  removeTempUserDataDir,
+  resetE2eDatabase,
+} from './helpers.js';
 
 /**
  * テーマ入力欄のセレクタ。
@@ -86,15 +92,64 @@ test.describe('自動保存: 再起動後の保持（AC-13/AC-02）', () => {
 });
 
 test.describe('自動保存: クラッシュ → localStorage リカバリ（要件 4.3）', () => {
-  // 注: 真のクラッシュ再現は難しいため、強制終了（kill）で擬似的に再現する。
-  // 編集ごとに localStorage へ書き込んでいるため、保存未完了でも localStorage に残る（§6.2）。
-  test.skip('保留中編集 → 強制終了 → 再起動 → localStorage から復元される', async () => {
-    // このテストは保留（skip）。理由:
-    // - 強制終了（SIGKILL）のタイミング制御が環境依存で不安定
-    // - Phase 2 の Unit/Integration テストで localStorage リカバリ経路は担保済み
-    // - T-8-03 で「自動保存失敗による入力喪失 0件」の完全 E2E を改めて整備
-    //
-    // シナリオ定義のみ残し、実行は T-8-03 に委ねる（[roadmap.md T-8-03]）。
+  // 注: 真のクラッシュ（SIGKILL）は localStorage のディスク永続化が保証されない
+  // （Chromium の LevelDB は非同期フラッシュ）。その代わり、設計上保証している経路は
+  // 「before-quit で flush-all が Renderer へ送られ、localStorage へ同期書き込みされる」
+  // （autosave_spec.md §6.2/§10.1）。本テストは SIGTERM（before-quit 発火）で終了し、
+  // flush-all → localStorage 保護 → 再起動で recoverOnStartup が再送する経路を検証する。
+  //
+  // シナリオ:
+  //   1. テーマ入力（デバウンス800ms発火前に終了 → サーバーへ未保存）
+  //   2. SIGTERM で終了（before-quit → flush-all → localStorage へ保留データ保護）
+  //   3. 再起動 → recoverOnStartup が localStorage の保留データを再送
+  //   4. テーマが復元される（入力喪失 0件、要件 4.3）
+  test('保留中編集 → SIGTERM終了 → 再起動 → localStorage から復元される', async () => {
+    // クラッシュ→復元では1回目と2回目で同じ localStorage（userData）を共有する必要がある。
+    // テスト全体で1つの userData ディレクトリを使い、最後に削除する。
+    // この describe には beforeEach がないため、テスト内で DB をリセットする。
+    await resetE2eDatabase();
+    const userDataDir = createTempUserDataDir();
+    try {
+      // 1回目起動: テーマ入力して、デバウンス発火前に SIGTERM で終了
+      let launched = await launchApp({ userDataDir });
+      const theme = `クラッシュ復元 ${Date.now()}`;
+      await launched.window.locator(THEME_INPUT).fill(theme);
+      // 編集が React state を経て edit → persistTarget されるまで短く待つ
+      await launched.window.waitForTimeout(300);
+      // デバウンス(800ms)発火前に SIGTERM。before-quit が flush-all を送り、
+      // Renderer が localStorage へ保留スナップショットを同期書き込みする。
+      // その後 apiServer.close → pool.close → app.quit へ。
+      const proc = launched.app.process();
+      if (proc) {
+        try {
+          process.kill(proc.pid, 'SIGTERM');
+        } catch {
+          // 既に終了している場合は無視
+        }
+      }
+      // before-quit の flush（最大2s）+ 終了処理が収束するまで待つ。
+      // closeApp の userData 削除を回避するため app.close を直接呼ぶ。
+      try {
+        await launched.app.close();
+      } catch {
+        // ignore
+      }
+      await new Promise((r) => setTimeout(r, 1500));
+
+      // 2回目起動: 同じ userDataDir を使う → 同じ localStorage を共有。
+      // recoverOnStartup が localStorage の保留データを再送する。
+      launched = await launchApp({ userDataDir });
+      await launched.window.waitForLoadState('domcontentloaded');
+      // recoverOnStartup → PATCH → refetch → UI 反映のラウンドトリップを待つ（最大20s）
+      await expect(launched.window.locator(THEME_INPUT)).toHaveValue(theme, { timeout: 20_000 });
+      try {
+        await launched.app.close();
+      } catch {
+        // ignore
+      }
+    } finally {
+      removeTempUserDataDir(userDataDir);
+    }
   });
 });
 

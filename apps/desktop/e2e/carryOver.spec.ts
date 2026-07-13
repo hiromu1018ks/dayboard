@@ -22,14 +22,26 @@ const NEW_TODO_INPUT = 'input[aria-label="新規TODO入力"]';
 const NEXT_BUTTON = 'button[aria-label="翌日へ"]';
 
 /**
- * TODOを1件追加するヘルパ。Enter で確定し、保存完了を待つ。
+ * TODOを1件追加するヘルパ。Enter で確定し、POST `/todos` の HTTP 201 を待つ。
+ *
+ * 「保存済み」表示は初期状態でも出ているため保存発火の目安にならない。
+ * また `getByText(title)` は入力欄の残文字に誤ヒットする恐れがある。
+ * そのため Playwright の waitForResponse で POST `/todos` の 201 を直接待ち、
+ * 保存ラウンドトリップの完了を確実に検知する。
  */
 async function addTodo(window: Page, title: string): Promise<void> {
   await window.locator(NEW_TODO_INPUT).click();
   await window.locator(NEW_TODO_INPUT).fill(title);
+  // Enter 押下と POST 完了を並行して待つ
+  const postPromise = window.waitForResponse(
+    (res) =>
+      res.url().includes('/todos') && res.request().method() === 'POST' && res.status() === 201,
+    { timeout: 10_000 },
+  );
   await window.keyboard.press('Enter');
-  // 即時保存（POST）のラウンドトリップを待つ
-  await window.waitForSelector('text=保存済み', { timeout: 10_000 });
+  await postPromise;
+  // 楽観的更新が React state へ反映されるまで短く待つ
+  await window.waitForTimeout(300);
 }
 
 test.describe('未完了TODO持ち越し（AC-11/AC-12）', () => {

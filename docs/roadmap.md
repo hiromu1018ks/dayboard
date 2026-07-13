@@ -735,7 +735,7 @@
   - 対象AC: AC-01〜AC-22
   - 出力: `apps/desktop/e2e/` 配下の全シナリオ（[test_strategy.md §5.2](test_strategy.md) と §6 重点領域）
   - 完了条件: 主要ACのクリティカルパスが全て通る
-  - 備考: ESM環境の `__dirname` 問題を修正し、21件全失敗から26件合格へ改善。AC-10（dateNavigation）/AC-11・AC-12（carryOver）のE2Eを新規追加。残り9件は Electron プロセス再起動・CodeMirror タイミング依存の不安定要素（AC は Unit/Integration でカバー済み、[test_strategy.md §5.3](test_strategy.md) のとおり E2E は CI必須でない）
+  - 備考: 26件合格・1件スキップ（Vim `i` の Insert 移行は Playwright の合成キーボードイベントと @replit/codemirror-vim のコマンド認識の相性で再現不可。実機の本物キーボードでは動作。AC-16〜AC-20 は Unit テスト escPriority でカバー）。E2E 安定化のため `app://dayborad` カスタムプロトコル実装・userData 隔離・CodeMirror 入力反映待ち・waitForResponse による保存完了検知を導入。AC-13 クラッシュ→復元（SIGTERM）E2E を新規追加（要件 4.3「入力喪失 0件」の経路検証）。
 - [x] **T-8-02** [test] エッジケース検証
   - 依存: Phase 1〜7
   - 対象AC: -
@@ -747,7 +747,7 @@
   - 対象AC: AC-13, AC-14
   - 出力: クラッシュ→再起動で未保存分復元のE2E、localStorage保護経路の検証（[autosave_spec.md §6](autosave_spec.md)）
   - 完了条件: 入力喪失が起きないことをE2Eで確認
-  - 備考: localStorage保護経路（persistTarget/clearTarget/readAllPendingSnapshots/QuotaExceededError）を pendingStore.test.ts で網羅。クラッシュ→復元の完全E2Eは強制終了のタイミング制御が環境依存のため skip（[autosave.spec.md §6.2] の経路は Unit で担保）
+  - 備考: localStorage保護経路（persistTarget/clearTarget/readAllPendingSnapshots/QuotaExceededError）を pendingStore.test.ts で網羅。SIGTERM（before-quit 発火）→ flush-all → localStorage 保護 → 再起動で recoverOnStartup が再送する完全E2Eを `autosave.spec.ts` に実装（クラッシュ復元後に UI へ反映するため recoverOnStartup 完了後の refetch も App.tsx へ追加）。真の SIGKILL は Chromium の LevelDB 非同期フラッシュで localStorage 永続化が保証されないため設計保証範囲外（[autosave_spec.md §6.2] の localStorage バッファが真の保険）。
 - [x] **T-8-04** [test] パフォーマンス確認
   - 依存: Phase 1〜7
   - 対象AC: -
@@ -775,9 +775,9 @@
 
 ### Phase 8 のチェック基準
 
-- [x] AC-01〜AC-22 全合格（Unit/Integration/E2E の3層で検証、E2E は推奨扱い）
-- [x] 品質ゲート全通過（lint / typecheck / unit 350 / integration 120 / カバレッジ閾値）
-- [x] 限定配布できる状態（`pnpm package` で配布バイナリ生成、手順は [release_checklist.md](release_checklist.md)）
+- [x] AC-01〜AC-22 全合格（Unit/Integration/E2E の3層で検証。E2E は26件合格・1件スキップ[Vim `i`: Playwright×Vim拡張の合成イベント相性、Unit でカバー]）
+- [x] 品質ゲート全通過（lint / format / typecheck / unit 350 / integration 120 / カバレッジ閾値 / E2E 26）
+- [x] 限定配布できる状態（`pnpm package` で macOS dmg arm64/x64 生成確認、手順は [release_checklist.md](release_checklist.md)）
 
 ---
 

@@ -37,6 +37,40 @@ async function pressModeToggle(window: Page): Promise<void> {
   await window.keyboard.press(`${MOD}+J`);
 }
 
+/**
+ * CodeMirror にテキストを入力し、入力内容が本文へ反映されるまで待つ。
+ * `pressSequentially` は非同期で CodeMirror へ反映されるため、入力直後に
+ * キーハンドラ（⌘+Enter 等）を実行すると空行判定されることがある。
+ * そのため、入力後に本文へ反映されたことを確認してから呼び出し元へ戻る。
+ */
+async function typeIntoEditor(window: Page, text: string): Promise<void> {
+  const editor = window.locator(CM_CONTENT);
+  await editor.click();
+  await editor.pressSequentially(text);
+  // 本文へ反映されるまで待機（最大5s）
+  await window.waitForFunction(
+    (expected) => {
+      const lines = Array.from(document.querySelectorAll('.cm-content .cm-line'));
+      const body = lines.map((l) => l.textContent ?? '').join('\n');
+      return body.includes(expected);
+    },
+    text,
+    { timeout: 5_000 },
+  );
+}
+
+/**
+ * 変換 API（POST /convert/todo または /convert/blocker）のレスポンスを待つ。
+ * @param target 'todo' または 'blocker'
+ */
+async function waitForConvertResponse(window: Page, target: 'todo' | 'blocker'): Promise<number> {
+  const res = await window.waitForResponse(
+    (r) => r.url().includes(`/convert/${target}`) && r.request().method() === 'POST',
+    { timeout: 10_000 },
+  );
+  return res.status();
+}
+
 test.describe('ノート行変換（AC-05/AC-06/AC-07/AC-08）', () => {
   let app: ElectronApplication;
   let window: Page;
@@ -56,15 +90,16 @@ test.describe('ノート行変換（AC-05/AC-06/AC-07/AC-08）', () => {
     await pressModeToggle(window);
     await expect(window.locator(NOTE_EDITOR)).toBeVisible();
 
-    // 本文入力: 「- TODO化：見積作成」
-    const editor = window.locator(CM_CONTENT);
-    await editor.click();
-    await editor.pressSequentially('- TODO化：見積作成');
-    await window.keyboard.press('Enter');
+    // 本文入力: 「- TODO化：見積作成」（CodeMirror への反映を待つ）
+    // 入力後はその行のまま ⌘+Enter で変換する（Enter→ArrowUp の操作はCodeMirrorの
+    // フォーカス状態を不安定にするため、1行入力してそのまま変換する）
+    await typeIntoEditor(window, '- TODO化：見積作成');
 
-    // ⌘/Ctrl+Enter でTODO化（カーソルは1行目にある状態で）
-    await window.keyboard.press('ArrowUp');
+    // ⌘/Ctrl+Enter でTODO化。変換 POST のレスポンスを待つ。
+    const convertPromise = waitForConvertResponse(window, 'todo');
     await window.keyboard.press(`${MOD}+Enter`);
+    const convertStatus = await convertPromise;
+    expect(convertStatus).toBe(201);
 
     // トースト通知が表示される（[§6.2]）
     await expect(window.locator(TOAST)).toBeVisible({ timeout: 5000 });
@@ -84,12 +119,13 @@ test.describe('ノート行変換（AC-05/AC-06/AC-07/AC-08）', () => {
     await pressModeToggle(window);
     await expect(window.locator(NOTE_EDITOR)).toBeVisible();
 
-    const editor = window.locator(CM_CONTENT);
-    await editor.click();
-    await editor.pressSequentially('部長承認待ち');
+    await typeIntoEditor(window, '部長承認待ち');
 
-    // ⌘/Ctrl+Shift+B で障害化
+    // ⌘/Ctrl+Shift+B で障害化。変換 POST を待つ。
+    const convertPromise = waitForConvertResponse(window, 'blocker');
     await window.keyboard.press(`${MOD}+Shift+B`);
+    const convertStatus = await convertPromise;
+    expect(convertStatus).toBe(201);
 
     // トースト通知
     await expect(window.locator(TOAST)).toBeVisible({ timeout: 5000 });
@@ -103,17 +139,23 @@ test.describe('ノート行変換（AC-05/AC-06/AC-07/AC-08）', () => {
     await pressModeToggle(window);
     await expect(window.locator(NOTE_EDITOR)).toBeVisible();
 
-    const editor = window.locator(CM_CONTENT);
-    await editor.click();
-    await editor.pressSequentially('見積作成');
+    await typeIntoEditor(window, '見積作成');
 
-    // 1回目: TODO化成功
+    // 1回目: TODO化成功（変換 POST 201 を待つ）
+    const convertPromise1 = waitForConvertResponse(window, 'todo');
     await window.keyboard.press(`${MOD}+Enter`);
+    expect(await convertPromise1).toBe(201);
     await expect(window.locator(TOAST)).toBeVisible({ timeout: 5000 });
     await expect(window.locator(TOAST)).toBeHidden({ timeout: 5000 });
 
-    // 2回目: 同一行を再度TODO化 → 重複ダイアログ
+    // トースト表示で CodeMirror からフォーカスが外れることがあるため、
+    // 編集領域をクリックしてフォーカスを戻してから2回目の変換を行う。
+    await window.locator(CM_CONTENT).click();
+
+    // 2回目: 同一行を再度TODO化 → 重複ダイアログ（409 DUPLICATE_CONVERSION）
+    const convertPromise2 = waitForConvertResponse(window, 'todo');
     await window.keyboard.press(`${MOD}+Enter`);
+    expect(await convertPromise2).toBe(409);
     await expect(window.locator(DUPLICATE_DIALOG)).toBeVisible({ timeout: 5000 });
 
     // キャンセル
@@ -128,10 +170,10 @@ test.describe('ノート行変換（AC-05/AC-06/AC-07/AC-08）', () => {
     await pressModeToggle(window);
     await expect(window.locator(NOTE_EDITOR)).toBeVisible();
 
-    const editor = window.locator(CM_CONTENT);
-    await editor.click();
-    await editor.pressSequentially('- TODO化：見積作成');
+    await typeIntoEditor(window, '- TODO化：見積作成');
+    const convertPromise = waitForConvertResponse(window, 'todo');
     await window.keyboard.press(`${MOD}+Enter`);
+    expect(await convertPromise).toBe(201);
     await expect(window.locator(TOAST)).toBeVisible({ timeout: 5000 });
     await expect(window.locator(TOAST)).toBeHidden({ timeout: 5000 });
 

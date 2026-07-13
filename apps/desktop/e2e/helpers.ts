@@ -12,7 +12,9 @@
  */
 
 import { _electron as electron, type ElectronApplication, type Page } from '@playwright/test';
-import { dirname, resolve } from 'node:path';
+import { mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -27,21 +29,59 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const DEFAULT_E2E_DATABASE_URL = 'postgres://localhost:5432/dayborad_e2e';
 
 /**
+ * launchApp で生成した一時 userData ディレクトリの履歴。
+ * closeApp 時に削除する。テスト間で localStorage・キャッシュを完全に隔離するため、
+ * 各起動で新しいディレクトリを作る（recoverOnStartup の localStorage 再送が
+ * 前テストのデータをリークしないようにする）。
+ */
+const tempUserDataDirs: string[] = [];
+
+/**
+ * テスト用の isolated な一時 userData ディレクトリを作成する。
+ * クラッシュ→復元等、同一テスト内で複数回 launchApp する際に同じ localStorage を
+ * 共有したい場合に使う。呼び出し元が cleanup も行う。
+ */
+export function createTempUserDataDir(): string {
+  return mkdtempSync(join(tmpdir(), 'dayborad-e2e-'));
+}
+
+/**
+ * 一時 userData ディレクトリを削除する（createTempUserDataDir の後処理用）。
+ */
+export function removeTempUserDataDir(dir: string): void {
+  try {
+    rmSync(dir, { recursive: true, force: true });
+  } catch {
+    // 削除失敗は無視
+  }
+}
+
+/**
  * テスト用 Electron アプリを起動し、最初のウィンドウを返す。
  *
  * @param options
  *   - env: 環境変数のオーバーライド（DATABASE_URL 等）
- *   - recordVideo: 動画録画（デバッグ用、既定 false）
+ *   - userDataDir: 同一テスト内で複数回起動し localStorage を共有したい場合に指定。
+ *     省略時は毎回新規の一時ディレクトリを作る（テスト間隔離）。
  */
 export async function launchApp(options?: {
   env?: Record<string, string>;
+  userDataDir?: string;
 }): Promise<{ app: ElectronApplication; window: Page }> {
   const mainPath = resolve(__dirname, '../out/main/index.js');
   // DATABASE_URL が未設定なら E2E 専用DBへ（開発用DB dayborad_dev の汚染防止）
   const databaseUrl = process.env.DATABASE_URL ?? DEFAULT_E2E_DATABASE_URL;
 
+  // userDataDir が指定されればそれを使い、未指定なら新規作成（テスト間隔離）。
+  // クラッシュ→復元テストのように「同一 localStorage を再利用」したい場合は
+  // 呼び出し元で createTempUserDataDir() して同じ dir を渡す。
+  const userDataDir = options?.userDataDir ?? mkdtempSync(join(tmpdir(), 'dayborad-e2e-'));
+  if (!options?.userDataDir) {
+    tempUserDataDirs.push(userDataDir);
+  }
+
   const app = await electron.launch({
-    args: [mainPath],
+    args: [mainPath, `--user-data-dir=${userDataDir}`],
     env: {
       // 既定環境変数を引き継ぎつつ上書き
       ...process.env,
@@ -65,6 +105,7 @@ export async function launchApp(options?: {
  * before-quit ハンドラ（flush-all + API close + pool close）の完了を待つため、
  * app.close() の後に短い待機を挟む。これにより、次の launchApp が前回プロセスの
  * リソース解放と競合するのを防ぐ（[autosave_spec.md §10.1]、T-2-13）。
+ * また、launchApp で作成した一時 userData ディレクトリを削除する。
  */
 export async function closeApp(app: ElectronApplication): Promise<void> {
   try {
@@ -74,6 +115,17 @@ export async function closeApp(app: ElectronApplication): Promise<void> {
   }
   // before-quit の非同期処理（最大2sのflushタイムアウト含む）が収束する余地を与える
   await new Promise((resolve) => setTimeout(resolve, 500));
+  // 一時 userData ディレクトリを削除（テスト間の localStorage リーク防止）
+  while (tempUserDataDirs.length > 0) {
+    const dir = tempUserDataDirs.pop();
+    if (dir) {
+      try {
+        rmSync(dir, { recursive: true, force: true });
+      } catch {
+        // 削除失敗は無視（OS の一時ディレクトリなので残っても害はない）
+      }
+    }
+  }
 }
 
 /**
