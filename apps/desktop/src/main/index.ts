@@ -10,15 +10,76 @@
  * main はドメインロジックを持たず（[architecture.md §3.1]）、起動・ライフサイクル管理のみを行う。
  */
 
-import { app, BrowserWindow, dialog, ipcMain, shell } from 'electron';
-import { dirname, join } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { app, BrowserWindow, dialog, ipcMain, net, protocol, shell } from 'electron';
+import nodePath, { dirname, join, resolve as resolvePath } from 'node:path';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { ping, closePool, runMigrations } from 'repository';
 import { startServer, type StartedServer } from 'api';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
 let apiServer: StartedServer | null = null;
+
+/**
+ * カスタムプロトコル `app://dayborad` を特権スキーマとして登録する
+ * （[architecture.md §7] の CORS契約）。
+ *
+ * `protocol.registerSchemesAsPrivileged` は app の ready イベントより前に
+ * 1度だけ呼ぶ必要がある。`secure: true` で secure context として扱い、
+ * `supportFetchAPI: true` で Renderer からの fetch 対象にする。
+ * `corsEnabled: false` は CORS 判定を Hono 側の cors.ts に一任するため
+ * （true にすると Electron が独自の CORS ヘッダを付与して二重管理になる）。
+ *
+ * このスキーマにより、Renderer の Origin は `file://`（= null）ではなく
+ * `app://dayborad` になり、cors.ts の許可リストと一致する。
+ */
+protocol.registerSchemesAsPrivileged([
+  {
+    scheme: 'app',
+    privileges: {
+      standard: true,
+      secure: true,
+      supportFetchAPI: true,
+      corsEnabled: false,
+    },
+  },
+]);
+
+/**
+ * Renderer の静的資産ディレクトリ（index.html を含む）を返す。
+ *
+ * 開発時・パッケージ版ともに `__dirname`（out/main/index.js の位置）から
+ * 1階層上の `renderer/` に配置されるため、`app.isPackaged` で分岐しない。
+ * パッケージ版では asar 内の同じ相対位置になる。
+ */
+function resolveRendererRoot(): string {
+  return join(__dirname, '../renderer');
+}
+
+/**
+ * `app://dayborad` プロトコルのリクエストハンドラを登録する。
+ *
+ * リクエスト URL の pathname（例: `/index.html`, `/assets/index-xxx.js`）を
+ * renderer ルートからの相対パスへ解決し、`net.fetch` + `pathToFileURL` で返す。
+ * パストラバーサル（`../../etc/passwd` 等）は相対パス検査で拒否する。
+ *
+ * app の ready 後に呼ぶこと（`protocol.handle` の前提）。
+ */
+function registerAppProtocol(): void {
+  protocol.handle('app', (req) => {
+    const { pathname } = new URL(req.url);
+    const rendererRoot = resolveRendererRoot();
+    // 先頭 `/` を除去して renderer ルートからの相対パスへ
+    const relativeResource = decodeURIComponent(pathname).replace(/^\//, '');
+    const resolved = resolvePath(rendererRoot, relativeResource);
+    const rel = nodePath.relative(rendererRoot, resolved);
+    // renderer ルートの外へ出る解決結果（`..` を含む、または絶対）は拒否
+    if (rel.startsWith('..') || nodePath.isAbsolute(rel)) {
+      return new Response('forbidden', { status: 403, headers: { 'content-type': 'text/plain' } });
+    }
+    return net.fetch(pathToFileURL(resolved).toString());
+  });
+}
 
 /**
  * preload へ渡す API ベースURL（Hono 起動後に決定）。
@@ -150,14 +211,16 @@ function createWindow(apiBaseUrl: string): void {
     return { action: 'deny' };
   });
 
-  // 開発時: HMR 付きの Renderer を読み込む
-  // プロダクション: ビルド済みファイルを読み込む
+  // 開発時: HMR 付きの Renderer を読み込む（Vite dev server の Origin は cors.ts で許可済み）
+  // プロダクション・E2E: app://dayborad カスタムプロトコルで読み込む。
+  //   file:// 由来の Origin: null を避け、Origin を固定して CORS を安定させる
+  //   （[architecture.md §7] の CORS契約）。loadFile は使わない。
   const isDev = !app.isPackaged;
   if (isDev && process.env['ELECTRON_RENDERER_URL']) {
     void mainWindow.loadURL(process.env['ELECTRON_RENDERER_URL']);
     mainWindow.webContents.openDevTools();
   } else {
-    void mainWindow.loadFile(join(__dirname, '../renderer/index.html'));
+    void mainWindow.loadURL('app://dayborad/index.html');
   }
 }
 
@@ -165,6 +228,9 @@ function createWindow(apiBaseUrl: string): void {
  * アプリ初期化後のエントリポイント。
  */
 app.whenReady().then(async () => {
+  // app://dayborad カスタムプロトコルのハンドラを登録（最初の loadURL より前）
+  registerAppProtocol();
+
   try {
     const server = await bootstrap();
     createWindow(server.baseUrl);

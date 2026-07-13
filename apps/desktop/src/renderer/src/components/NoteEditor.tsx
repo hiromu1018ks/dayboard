@@ -21,15 +21,14 @@
 
 import { forwardRef, useEffect, useImperativeHandle, useRef } from 'react';
 import { basicSetup } from 'codemirror';
-import { EditorView, GutterMarker, gutter } from '@codemirror/view';
+import { EditorView, GutterMarker, gutter, keymap } from '@codemirror/view';
 import type { BlockInfo, ViewUpdate } from '@codemirror/view';
 import { markdown } from '@codemirror/lang-markdown';
-import { Compartment, StateEffect, StateField } from '@codemirror/state';
+import { Compartment, Prec, StateEffect, StateField } from '@codemirror/state';
 import type { Extension } from '@codemirror/state';
 import type { KeybindingMode, NoteLineMeta } from 'shared-types';
 import { computeLineHash, normalizeLineText } from '@dayboard/domain';
 import { createVimExtension, getCodeMirrorVimMode } from '../keybindings/vim.js';
-import { handlePostMvpShortcut } from '../keybindings/postMvp.js';
 
 export type NoteEditorProps = {
   /** NoteEntry.body 全文 */
@@ -274,30 +273,50 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(function
         }),
         // キーバインド: ⌘/Ctrl+Enter でTODO化、⌘/Ctrl+Shift+B で障害化（T-5-09、[§6.2]）
         // 併せて Post-MVP ショートカットの握り潰し（T-7-10、AC-22）
-        EditorView.domEventHandlers({
-          keydown: (event) => {
-            const e = event as KeyboardEvent;
-            // IME 変換中はスキップ（[ui_interaction_spec.md §9.1]、T-4-06 と同じパターン）
-            if (e.isComposing || e.keyCode === 229) return false;
-
+        //
+        // CodeMirror の defaultKeymap が Mod-Enter（⌘/Ctrl+Enter）を
+        // 「insertBlankLine 等の行操作」へ割り当てており、domEventHandlers の
+        // keydown よりも先に消費されてしまう。そのため Prec.highest で最優先の
+        // keymap として登録し、defaultKeymap より前に処理させる。
+        // IME 変換中（isComposing / keyCode 229）は keymap に到達する前の
+        // ブラウザ層でガード済み（guardIme）のため、ここでは改行挿入等の通常動作になる。
+        Prec.highest(
+          keymap.of([
+            {
+              key: 'Mod-Enter',
+              preventDefault: true,
+              run: () => {
+                handleConvert('todo');
+                return true;
+              },
+            },
+            {
+              key: 'Mod-Shift-b',
+              preventDefault: true,
+              run: () => {
+                handleConvert('blocker');
+                return true;
+              },
+            },
             // Post-MVP ショートカットの握り潰し（T-7-10、AC-22）
-            if (handlePostMvpShortcut(e)) return true;
-
-            // ⌘/Ctrl+Enter でTODO化（Shift なし）
-            if ((e.metaKey || e.ctrlKey) && e.key === 'Enter' && !e.shiftKey) {
-              e.preventDefault();
-              handleConvert('todo');
-              return true;
-            }
-            // ⌘/Ctrl+Shift+B で障害化
-            if ((e.metaKey || e.ctrlKey) && e.shiftKey && (e.key === 'b' || e.key === 'B')) {
-              e.preventDefault();
-              handleConvert('blocker');
-              return true;
-            }
-            return false;
-          },
-        }),
+            // preventDefault で何も起きないようにする（入力内容は破壊しない）
+            {
+              key: 'Mod-k',
+              preventDefault: true,
+              run: () => true,
+            },
+            {
+              key: 'Mod-Shift-r',
+              preventDefault: true,
+              run: () => true,
+            },
+            {
+              key: 'Mod-Shift-m',
+              preventDefault: true,
+              run: () => true,
+            },
+          ]),
+        ),
       ],
       parent: hostRef.current,
     });

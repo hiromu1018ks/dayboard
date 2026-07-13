@@ -129,19 +129,53 @@ export function useWorkData(
 } {
   const [workData, dispatch] = useReducer(reducer, null as WorkData | null);
 
-  // 前回の日付を追跡し、日付が変わったら新データで置換（ユーザー入力を巻き戻さない）
+  // 前回取り込んだ data を参照し、以下のいずれかを満たすとき REPLACE_ALL する:
+  //   (a) workData === null（初回ロード時）
+  //   (b) 日付が変わった（prevDate !== date）。ただし data が新しい日付に切り替わった後。
+  //       日付変更直後は data がまだ前日値のことがあるため、data.dayNote.date === date
+  //       になるまで待つ（前日データで上書きしてしまうのを防ぐ）。
+  //   (c) 同一日付内の data 変化（refetch 等）。ただし前回取り込んだ data と異なる場合。
+  //       convert/addTodo 等の楽観的更新後の refetch でサーバー値を取り込むため。
+  //       ただし「ユーザー編集中の巻き戻り」を防ぐため、厳密な差分判定は行わず、
+  //       data オブジェクトの参照が変わったときだけ取り込む（React の state 更新に準拠）。
+  //
+  // 備考: 楽観的更新の巻き戻り防止は各 dispatch 呼び出し側で行う（ADD_TODO 等は
+  // ローカル state を即時更新し、refetch でサーバー値が来ても整合する設計）。
+  const prevDataRef = useRef<DayNoteFull | null>(null);
   const prevDateRef = useRef<string | null>(null);
 
   useEffect(() => {
     if (!data) return;
-    // 日付が変わった、または初回ロード時は全置換
-    if (prevDateRef.current !== date || workData === null) {
+    const isFirstLoad = prevDataRef.current === null;
+    const isDateChanged = prevDateRef.current !== date;
+    const isDataChanged = prevDataRef.current !== data;
+
+    if (isFirstLoad) {
+      // 初回ロード: 必ず取り込む
       dispatch({ type: 'REPLACE_ALL', data: toWorkData(data) });
+      prevDataRef.current = data;
       prevDateRef.current = date;
+      return;
     }
-    // 同一日付内の data 変化（サーバー応答の再フェッチ等）では
-    // ユーザー編集を保持するため何もしない（楽観的更新の整合性、[autosave_spec.md §8.1]）
-  }, [data, date, workData, prevDateRef]);
+
+    if (isDateChanged) {
+      // 日付変更: data が新しい日付に切り替わった後だけ取り込む
+      // （前日データで上書きしてしまうのを防ぐ）
+      if (data.dayNote.date === date) {
+        dispatch({ type: 'REPLACE_ALL', data: toWorkData(data) });
+        prevDataRef.current = data;
+        prevDateRef.current = date;
+      }
+      return;
+    }
+
+    // 同一日付内: data 参照が変わった（refetch 等）ときだけ取り込む。
+    // convert 成功後の refetch で新しい TODO を取り込むため。
+    if (isDataChanged) {
+      dispatch({ type: 'REPLACE_ALL', data: toWorkData(data) });
+      prevDataRef.current = data;
+    }
+  }, [data, date]);
 
   return { workData, dispatch };
 }

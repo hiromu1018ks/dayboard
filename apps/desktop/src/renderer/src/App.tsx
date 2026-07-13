@@ -216,6 +216,8 @@ export default function App() {
 
   // 起動時リカバリ: localStorage の未保存分を再送（§6.2、T-2-12）。
   // アプリマウント時に1回だけ実行（日付移動ごとに再実行しない）。
+  // リカバリでサーバーへ保存された内容を UI へ反映するため、完了後に refetch する。
+  // （recoverOnStartup 自体は Saver を呼ぶだけで React state を更新しないため）
   useEffect(() => {
     void recoverOnStartup((date, target) => {
       if (target.type === 'dayNote' && target.field === 'theme') {
@@ -240,7 +242,13 @@ export default function App() {
         return createBlockerSaver(target.id);
       }
       return null;
+    }).then((result) => {
+      // リカバリで1件でも成功した日付があれば、UI へ反映するため refetch
+      if (result.recoveredDates.length > 0) {
+        void refetch();
+      }
     });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // localStorage 書込失敗時の保留中操作（§9.3）。null=ダイアログ非表示。

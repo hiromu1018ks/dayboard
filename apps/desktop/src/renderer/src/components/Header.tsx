@@ -51,17 +51,37 @@ export function Header({
   const weekday = getWeekdayLabel(currentDate);
 
   // テーマ入力のローカルstate（楽観的更新、[autosave_spec.md §8.1]）。
-  // 日付（currentDate）が変わったら新たな DayNote のテーマで初期化する。
-  // 同一日付内の theme prop 変化（サーバー正規化の反映等）では上書きしない
-  // （ユーザー入力がサーバー保存結果で巻き戻るのを避けるため）。
+  //
+  // 同一日内の theme prop 変化（サーバー保存結果の反映・正規化）はユーザー入力を
+  // 巻き戻さないよう無視する。ただし以下の2ケースでは新値で上書きする:
+  //   (a) 初回マウント後に fetch 結果が到着した時（再起動後の復元）
+  //   (b) 日付切替後、新 DayNote の fetch が完了し theme が新日付の値に置き換わった時
+  //
+  // 「新日付の theme に置き換わった」の検知は、theme を data と一緒に見ている
+  // 呼び出し元（App.tsx）に依存する。App は data.date と currentDate が一致した
+  // 状態の data.dayNote.theme を本コンポーネントへ渡すため、theme 変化は
+  // 「新日付の fetch 完結」を意味する。そのため theme の変化だけを手掛かりにする。
+  //
+  // ただし「日付は変わったが fetch 未完（theme は前日値のまま）」の過渡期に
+  // 入力欄が前日値を表示し続けるのを避けるため、currentDate 変更直後は
+  // 一旦クリアして待機する。
   const [themeInput, setThemeInput] = useState(theme ?? '');
   const prevDateRef = useRef(currentDate);
+  const initializedRef = useRef(theme !== null && theme !== undefined);
 
-  // 日付切替時は新 DayNote のテーマで初期化
   useEffect(() => {
     if (prevDateRef.current !== currentDate) {
-      setThemeInput(theme ?? '');
+      // 日付切替直後: fetch 完結前に一旦空にする（前日値の残留を防ぐ）。
+      // 直後の theme 到着で新日付の値が反映される。
+      setThemeInput('');
       prevDateRef.current = currentDate;
+      initializedRef.current = false;
+      return;
+    }
+    // 同一日内で theme が到着・変化したとき、未初期化なら反映する。
+    if (!initializedRef.current && theme !== null && theme !== undefined) {
+      setThemeInput(theme);
+      initializedRef.current = true;
     }
   }, [currentDate, theme]);
 
