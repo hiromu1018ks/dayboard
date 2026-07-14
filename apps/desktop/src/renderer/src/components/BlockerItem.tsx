@@ -86,7 +86,11 @@ export function BlockerItem({
 
   return (
     <li
-      className={`group flex items-start gap-2 rounded px-1 py-1 transition-colors duration-700 ${highlight ? 'bg-warn/15' : ''}`}
+      className={`group relative flex items-start gap-2.5 rounded px-2 py-1.5 transition-colors duration-150 hover:bg-raised/30 ${
+        editing
+          ? 'before:absolute before:bottom-1.5 before:left-0.5 before:top-1.5 before:w-0.5 before:rounded before:bg-ink/70'
+          : ''
+      } ${highlight ? 'bg-warn/15' : ''}`}
     >
       <button
         type="button"
@@ -94,7 +98,11 @@ export function BlockerItem({
         aria-label={blocker.resolved ? '未解消に戻す' : '解消済みにする'}
         data-focus-item={blocker.id}
         tabIndex={0}
-        className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-line text-xs disabled:opacity-40 hover:border-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1"
+        className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border text-xs transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1 disabled:opacity-40 ${
+          blocker.resolved
+            ? 'border-ink bg-ink text-panel hover:border-ink'
+            : 'border-line text-transparent hover:border-ink/60'
+        }`}
         aria-pressed={blocker.resolved}
       >
         {blocker.resolved && <span aria-hidden="true">✓</span>}
@@ -118,7 +126,7 @@ export function BlockerItem({
               }
             }}
             maxLength={200}
-            className="w-full border-b border-line bg-transparent px-1 py-0.5 text-ink outline-none focus:border-accent"
+            className="w-full border-none bg-transparent px-1 py-0.5 text-ink outline-none"
           />
         ) : (
           <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
@@ -134,7 +142,7 @@ export function BlockerItem({
                 → {linkedTodo.title}
               </span>
             )}
-            {blocker.resolved && <span className="text-xs text-faint">解消済み</span>}
+            {blocker.resolved && <span className="text-xs text-faint">Resolved</span>}
             {/* 発生元ノート行スナップショット（Phase 5、AC-08、[note_conversion_spec.md §9.2]） */}
             {sourceNoteLineMeta && (
               <span className="relative">
@@ -152,7 +160,7 @@ export function BlockerItem({
           <select
             value={blocker.linkedTodoId ?? ''}
             onChange={(e) => onChangeLinkedTodo(e.target.value === '' ? null : e.target.value)}
-            className="mt-1 bg-transparent text-xs text-faint outline-none hover:text-sub"
+            className="mt-1 rounded bg-raised/40 px-1.5 py-0.5 text-xs text-faint outline-none hover:bg-raised/70 hover:text-sub"
             aria-label="紐づくTODO"
           >
             <option value="">（TODO紐付けなし）</option>

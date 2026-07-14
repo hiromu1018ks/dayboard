@@ -929,7 +929,7 @@ export default function App() {
 
   // 仕事整理モード（デフォルト）
   return (
-    <div className="min-h-screen bg-bg text-ink">
+    <div className="flex h-screen flex-col bg-bg text-ink">
       <Header
         currentDate={currentDate}
         theme={data?.dayNote.theme ?? null}
@@ -952,8 +952,8 @@ export default function App() {
       {/* Vim操作状態表示（右下、Phase 7 T-7-08、[要件 9.4]） */}
       <VimStateBadge keybindingMode={settings.keybindingMode} vimState={vimState} />
 
-      <main className="mx-auto max-w-6xl px-8 py-6">
-        {loading && <p className="text-sm text-sub">読み込み中…</p>}
+      <main className="flex min-h-0 flex-1 flex-col overflow-hidden px-10 py-6">
+        {loading && <p className="text-sm text-sub">Loading…</p>}
 
         {error && (
           <div className="rounded border border-danger/40 bg-danger/10 p-4 text-sm text-danger">

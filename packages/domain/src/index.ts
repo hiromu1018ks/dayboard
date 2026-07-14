@@ -30,8 +30,10 @@ export {
   todayLocal,
   isValidDateString,
   getWeekdayLabel,
+  getWeekdayLabelEn,
   formatMonthDay,
   WEEKDAY_LABELS_JA,
+  WEEKDAY_LABELS_EN,
   getSeason,
 } from './date.js';
 export type { Season } from './date.js';

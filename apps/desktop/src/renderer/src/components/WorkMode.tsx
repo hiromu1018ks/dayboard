@@ -51,9 +51,10 @@ export type WorkModeProps = {
 /**
  * 仕事整理モードの3カラムレイアウト。
  *
- * 各カラムは `rounded-lg border border-line bg-panel` のカード（墨と波テーマ。
- * 背景は CSS 変数で墨ダーク／和紙ライトを切替）で、紙ノート余白を表現するため
- * `p-5` のパディングを持つ（[要件 14.1]）。
+ * 「箱型カード3枚」ではなく、1枚の紙ノートを縦罫線で3区画に分ける構成。
+ * 各カラムは `rounded border border-line/60 bg-panel/30` の枠で、
+ * 和紙の繊維ノイズ（body の dot pattern）が透けて見えるように背景を薄くする。
+ * 余白は広め（p-7）で「ノートの書き込みスペース」を表現（[要件 14.1]）。
  */
 export function WorkMode({
   date,
@@ -66,7 +67,7 @@ export function WorkMode({
   highlightBlockerIds,
 }: WorkModeProps) {
   return (
-    <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+    <div className="grid min-h-0 flex-1 grid-cols-1 gap-6 md:grid-cols-3">
       <TodoColumn
         date={date}
         todos={todos}

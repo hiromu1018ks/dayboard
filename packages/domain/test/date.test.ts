@@ -11,6 +11,7 @@ import {
   formatMonthDay,
   getSeason,
   getWeekdayLabel,
+  getWeekdayLabelEn,
   isValidDateString,
   toLocalDateString,
   todayLocal,
@@ -177,6 +178,23 @@ describe('getWeekdayLabel', () => {
     // 2026-12-31 は木曜日、2027-01-01 は金曜日
     expect(getWeekdayLabel('2026-12-31')).toBe('木');
     expect(getWeekdayLabel('2027-01-01')).toBe('金');
+  });
+});
+
+describe('getWeekdayLabelEn', () => {
+  it('正しい英語曜日短縮形を返す（水曜日）', () => {
+    expect(getWeekdayLabelEn('2026-07-08')).toBe('Wed');
+  });
+
+  it('各曜日を正しく返す', () => {
+    // 2026-07-05(Sun)〜2026-07-11(Sat)
+    expect(getWeekdayLabelEn('2026-07-05')).toBe('Sun');
+    expect(getWeekdayLabelEn('2026-07-06')).toBe('Mon');
+    expect(getWeekdayLabelEn('2026-07-07')).toBe('Tue');
+    expect(getWeekdayLabelEn('2026-07-08')).toBe('Wed');
+    expect(getWeekdayLabelEn('2026-07-09')).toBe('Thu');
+    expect(getWeekdayLabelEn('2026-07-10')).toBe('Fri');
+    expect(getWeekdayLabelEn('2026-07-11')).toBe('Sat');
   });
 });
 

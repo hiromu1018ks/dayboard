@@ -3,6 +3,34 @@
 @tailwind utilities;
 
 /* ===========================================================================
+   入力欄コンポーネント（Day One / Bear 風「墨と波」）
+   枠線・下線を減らし、余白・陰・accent 縦バーで領域とフォーカスを表現する。
+   行系は直書きクラスで使用、textarea 系は .input-card を使う。
+   =========================================================================== */
+@layer components {
+  /* 紙カード textarea（振り返り）: 和紙の記入欄。
+     角丸を抑え（rounded = 4px）、上下に罫線を引いて「書き込む枠」を表す。
+     背景は panel を薄く透過させ、下の和紙の繊維ノイズを活かす。 */
+  .input-card {
+    @apply w-full resize-none rounded border-t border-b border-l-0 border-r-0 border-line
+      bg-panel/40 px-3 py-2 text-sm leading-relaxed text-ink outline-none
+      placeholder:text-faint transition-colors duration-150;
+  }
+  .input-card:focus {
+    @apply border-t-2 border-accent bg-panel/70;
+  }
+
+  /* テーマ入力ラッパ: 左に墨色の縦棒で「見出し」感を出す（和の縦書き柱） */
+  .theme-input-wrap {
+    @apply relative pl-3;
+  }
+  .theme-input-wrap::before {
+    content: '';
+    @apply absolute bottom-1 left-0 top-1 w-0.5 bg-ink/70;
+  }
+}
+
+/* ===========================================================================
    墨と波（Sumi to Nami）テーマ
    Kanagawa Wave（ダーク＝墨）/ Lotus 系（ライト＝和紙）の配色を CSS 変数で定義。
    季節アクセントは日付（月）から自動判定し data-season 属性で切り替える。

@@ -17,14 +17,31 @@
  */
 
 import { forwardRef } from 'react';
-import { getWeekdayLabel } from '@dayboard/domain';
+import { getWeekdayLabelEn } from '@dayboard/domain';
 import type { KeybindingMode, NoteLineMeta } from 'shared-types';
 import { NoteEditor, type NoteEditorHandle } from './NoteEditor.js';
 
-/** YYYY-MM-DD を「2026/07/08」形式に整形（Header.tsx と共通の表示形式） */
+/** 英語月名短縮形（Header.tsx と共通） */
+const MONTH_LABELS_EN = [
+  '',
+  'Jan',
+  'Feb',
+  'Mar',
+  'Apr',
+  'May',
+  'Jun',
+  'Jul',
+  'Aug',
+  'Sep',
+  'Oct',
+  'Nov',
+  'Dec',
+] as const;
+
+/** YYYY-MM-DD を「Jul 13, 2026」形式に整形（Header.tsx と共通の表示形式） */
 function formatDisplayDate(dateStr: string): string {
   const [y, m, d] = dateStr.split('-');
-  return `${y}/${m}/${d}`;
+  return `${MONTH_LABELS_EN[Number(m)] ?? ''} ${Number(d)}, ${y}`;
 }
 
 export type NoteModeProps = {
@@ -69,7 +86,7 @@ export const NoteMode = forwardRef<NoteEditorHandle, NoteModeProps>(function Not
   ref,
 ) {
   const displayDate = formatDisplayDate(currentDate);
-  const weekday = getWeekdayLabel(currentDate);
+  const weekday = getWeekdayLabelEn(currentDate);
 
   return (
     <div className="flex h-screen flex-col bg-bg text-ink">
@@ -81,7 +98,7 @@ export const NoteMode = forwardRef<NoteEditorHandle, NoteModeProps>(function Not
               <span className="mono">{displayDate}</span>
               <span className="ml-2 text-sub">{weekday}</span>
             </h1>
-            <span className="text-sm text-faint">会議・打ち合わせ・会話メモ</span>
+            <span className="text-sm text-faint">Meetings, talks &amp; notes</span>
           </div>
 
           {/* 戻る操作の案内（[要件 6.3]） */}
@@ -106,7 +123,7 @@ export const NoteMode = forwardRef<NoteEditorHandle, NoteModeProps>(function Not
       {/* CodeMirror 本文エリア（[要件 6.3]: 広いテキストエリアを主役に） */}
       <main className="mx-auto flex w-full max-w-5xl flex-1 flex-col px-8 py-4">
         {loading ? (
-          <p className="text-sm text-sub">読み込み中…</p>
+          <p className="text-sm text-sub">Loading…</p>
         ) : (
           <div className="flex-1 overflow-hidden rounded-lg border border-line bg-panel shadow-sm shadow-black/20">
             <NoteEditor

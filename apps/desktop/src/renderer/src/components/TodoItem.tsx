@@ -90,7 +90,11 @@ export function TodoItem({
 
   return (
     <li
-      className={`group flex items-start gap-2 rounded px-1 py-1 transition-colors duration-700 ${highlight ? 'bg-warn/15' : ''}`}
+      className={`group relative flex items-start gap-2.5 rounded px-2 py-1.5 transition-colors duration-150 hover:bg-raised/30 ${
+        editing
+          ? 'before:absolute before:bottom-1.5 before:left-0.5 before:top-1.5 before:w-0.5 before:rounded before:bg-ink/70'
+          : ''
+      } ${highlight ? 'bg-warn/15' : ''}`}
     >
       {/* 完了チェック（carried は操作不可）
           Phase 7: data-focus-item で Vim j/k（項目移動）・x（完了切替、AC-09）のターゲット */}
@@ -101,7 +105,11 @@ export function TodoItem({
         aria-label={isDone ? '未完了に戻す' : '完了にする'}
         data-focus-item={todo.id}
         tabIndex={0}
-        className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded border border-line text-xs disabled:opacity-40 hover:border-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1"
+        className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border text-xs transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1 disabled:opacity-40 ${
+          isDone
+            ? 'border-ink bg-ink text-panel hover:border-ink'
+            : 'border-line text-transparent hover:border-ink/60'
+        }`}
         aria-pressed={isDone}
       >
         {isDone && <span aria-hidden="true">✓</span>}
@@ -126,7 +134,7 @@ export function TodoItem({
               }
             }}
             maxLength={200}
-            className="w-full border-b border-line bg-transparent px-1 py-0.5 text-ink outline-none focus:border-accent"
+            className="w-full border-none bg-transparent px-1 py-0.5 text-ink outline-none"
           />
         ) : (
           <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
@@ -139,7 +147,7 @@ export function TodoItem({
             {/* carried ラベル（[要件 7.10]） */}
             {isCarried && (
               <span className="rounded bg-raised px-1.5 py-0.5 text-xs text-sub">
-                → 翌日へ持ち越し済み
+                → Carried to tomorrow
               </span>
             )}
             {/* 持ち越し元の日付表示（[要件 7.10] 表示例「7/8から持ち越し」） */}

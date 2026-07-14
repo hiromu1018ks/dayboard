@@ -84,15 +84,16 @@ export function TodoColumn({
 
   return (
     <section
-      className="flex flex-col rounded-lg border border-line bg-panel p-5"
+      className="flex min-h-0 flex-col overflow-hidden rounded border border-line/60 bg-panel/30 p-7"
       aria-label="TODO"
       data-focus-section="todo"
     >
-      <h2 className="head mb-3 text-sm text-sub">
-        <span className="mr-1 text-faint">①</span>TODO
+      <h2 className="head mb-5 flex items-center gap-2 text-lg text-ink">
+        <span className="inline-block h-4 w-0.5 bg-ink/70" aria-hidden="true" />
+        Today
       </h2>
 
-      <ul className="flex-1 space-y-0.5">
+      <ul className="min-h-0 flex-1 space-y-1 overflow-y-auto">
         {todos.map((todo, i) => (
           <TodoItem
             key={todo.id}
@@ -113,7 +114,7 @@ export function TodoColumn({
           />
         ))}
         {todos.length === 0 && (
-          <li className="py-4 text-center text-xs text-faint">TODOはありません</li>
+          <li className="py-4 text-center text-xs text-faint">No tasks yet</li>
         )}
       </ul>
 
@@ -159,7 +160,10 @@ export function TodoColumn({
 
       {/* 追加入力欄（[ui_interaction_spec.md §5.1]）
           Phase 7: data-focus-input で列フォーカス（⌘1, Vim h/l/Space 1, i）の対象 */}
-      <div className="mt-3 border-t border-linesoft pt-3">
+      <div className="mt-3 flex items-center gap-2 border-t border-linesoft pt-3">
+        <span className="select-none text-sm text-faint" aria-hidden="true">
+          ＋
+        </span>
         <input
           ref={inputRef}
           type="text"
@@ -174,7 +178,7 @@ export function TodoColumn({
           placeholder="TODOを追加して Enter"
           maxLength={200}
           data-focus-input
-          className="w-full border-b border-linesoft bg-transparent px-1 py-0.5 text-sm text-ink outline-none placeholder:text-faint focus:border-accent"
+          className="w-full border-none bg-transparent px-1 py-0.5 text-sm text-ink outline-none placeholder:text-faint"
           aria-label="新規TODO入力"
         />
       </div>

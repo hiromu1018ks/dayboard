@@ -76,15 +76,16 @@ export function BlockerColumn({
 
   return (
     <section
-      className="flex flex-col rounded-lg border border-line bg-panel p-5"
+      className="flex min-h-0 flex-col overflow-hidden rounded border border-line/60 bg-panel/30 p-7"
       aria-label="障害・詰まり"
       data-focus-section="blocker"
     >
-      <h2 className="head mb-3 text-sm text-sub">
-        <span className="mr-1 text-faint">②</span>障害・詰まり
+      <h2 className="head mb-5 flex items-center gap-2 text-lg text-ink">
+        <span className="inline-block h-4 w-0.5 bg-ink/70" aria-hidden="true" />
+        Stuck
       </h2>
 
-      <ul className="flex-1 space-y-0.5">
+      <ul className="min-h-0 flex-1 space-y-1 overflow-y-auto">
         {blockers.map((blocker, i) => (
           <BlockerItem
             key={blocker.id}
@@ -107,12 +108,15 @@ export function BlockerColumn({
           />
         ))}
         {blockers.length === 0 && (
-          <li className="py-4 text-center text-xs text-faint">障害はありません</li>
+          <li className="py-4 text-center text-xs text-faint">No blockers</li>
         )}
       </ul>
 
       {/* Phase 7: data-focus-input で列フォーカス（⌘2, Vim h/l/Space 2, i）の対象 */}
-      <div className="mt-3 border-t border-linesoft pt-3">
+      <div className="mt-3 flex items-center gap-2 border-t border-linesoft pt-3">
+        <span className="select-none text-sm text-faint" aria-hidden="true">
+          ＋
+        </span>
         <input
           ref={inputRef}
           type="text"
@@ -127,7 +131,7 @@ export function BlockerColumn({
           placeholder="障害を追加して Enter"
           maxLength={200}
           data-focus-input
-          className="w-full border-b border-linesoft bg-transparent px-1 py-0.5 text-sm text-ink outline-none placeholder:text-faint focus:border-accent"
+          className="w-full border-none bg-transparent px-1 py-0.5 text-sm text-ink outline-none placeholder:text-faint"
           aria-label="新規障害入力"
         />
       </div>

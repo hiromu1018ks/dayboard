@@ -10,12 +10,29 @@
  */
 
 import { useEffect, useRef, useState } from 'react';
-import { getWeekdayLabel } from '@dayboard/domain';
+import { getWeekdayLabelEn } from '@dayboard/domain';
 
-/** YYYY-MM-DD を「2026/07/08」形式に整形（表示用。曜日は getWeekdayLabel で別途取得） */
+/** 英語月名短縮形（1=Jan ... 12=Dec）。表示用フォーマットに用いる。 */
+const MONTH_LABELS_EN = [
+  '',
+  'Jan',
+  'Feb',
+  'Mar',
+  'Apr',
+  'May',
+  'Jun',
+  'Jul',
+  'Aug',
+  'Sep',
+  'Oct',
+  'Nov',
+  'Dec',
+] as const;
+
+/** YYYY-MM-DD を「Jul 13, 2026」形式に整形（表示用。曜日は getWeekdayLabelEn で別途取得） */
 function formatDisplayDate(dateStr: string): string {
   const [y, m, d] = dateStr.split('-');
-  return `${y}/${m}/${d}`;
+  return `${MONTH_LABELS_EN[Number(m)] ?? ''} ${Number(d)}, ${y}`;
 }
 
 export type HeaderProps = {
@@ -48,7 +65,7 @@ export function Header({
   onOpenSettings,
 }: HeaderProps) {
   const displayDate = formatDisplayDate(currentDate);
-  const weekday = getWeekdayLabel(currentDate);
+  const weekday = getWeekdayLabelEn(currentDate);
 
   // テーマ入力のローカルstate（楽観的更新、[autosave_spec.md §8.1]）。
   //
@@ -97,15 +114,15 @@ export function Header({
   };
 
   return (
-    <header className="border-b border-line bg-panel px-8 py-4">
-      <div className="flex items-center justify-between">
+    <header className="border-b border-line bg-panel/50 px-10 py-5">
+      <div className="flex items-end justify-between">
         {/* 日付・曜日 */}
-        <div className="flex items-baseline gap-3">
-          <h1 className="head text-2xl tracking-tight text-ink" data-testid="date-display">
+        <div className="flex items-baseline gap-4">
+          <h1 className="head text-3xl tracking-tight text-ink" data-testid="date-display">
             <span className="mono">{displayDate}</span>
-            <span className="ml-2 text-sub">{weekday}</span>
+            <span className="ml-3 text-xl text-sub">{weekday}</span>
           </h1>
-          <span className="text-sm text-faint">今日の仕事ノート</span>
+          <span className="text-sm text-faint">Daily Work Note</span>
         </div>
 
         {/* 日付移動ボタン（[要件 6.2]） */}
@@ -124,7 +141,7 @@ export function Header({
             disabled={isToday}
             className="rounded border border-line px-3 py-1 text-sm text-ink hover:bg-raised focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1 disabled:cursor-default disabled:opacity-40 disabled:hover:bg-transparent"
           >
-            今日
+            Today
           </button>
           <button
             type="button"
@@ -139,27 +156,30 @@ export function Header({
 
       {/* テーマ入力欄（[要件 7.2]: 未入力可。Phase 2 で自動保存接続、T-2-09）
           Phase 7: data-focus-section="theme" で列フォーカス（Vim h/l）対応。
-          コンテナ（この div）へ section、入力へ input を付与。 */}
-      <div className="mt-3 flex items-center gap-2" data-focus-section="theme">
-        <label htmlFor="theme-input" className="text-sm text-sub">
-          今日のテーマ：
-        </label>
-        <input
-          id="theme-input"
-          type="text"
-          value={themeInput}
-          onChange={(e) => handleThemeChange(e.target.value)}
-          placeholder="今日のテーマを入力"
-          maxLength={200}
-          data-focus-input
-          className="flex-1 border-b border-line bg-transparent px-1 py-0.5 text-ink outline-none placeholder:text-faint focus:border-accent"
-        />
+          コンテナ（この div）へ section、入力へ input を付与。
+          Day One 風: 左に小さな accent 縦バーで「見出し」感を出す。 */}
+      <div className="mt-4 flex items-center gap-2" data-focus-section="theme">
+        <div className="theme-input-wrap flex-1">
+          <label htmlFor="theme-input" className="mb-1 block text-xs tracking-wider text-faint">
+            Today&rsquo;s Theme
+          </label>
+          <input
+            id="theme-input"
+            type="text"
+            value={themeInput}
+            onChange={(e) => handleThemeChange(e.target.value)}
+            placeholder="What's your focus today?"
+            maxLength={200}
+            data-focus-input
+            className="head w-full border-none bg-transparent px-0 py-1 text-lg text-ink outline-none placeholder:text-faint/60 placeholder:italic"
+          />
+        </div>
         {/* 設定（歯車）アイコン（[ui_interaction_spec.md §8.1]、Phase 7 T-7-02） */}
         <button
           type="button"
           onClick={onOpenSettings}
           aria-label="設定を開く"
-          className="ml-2 rounded p-1 text-faint hover:bg-raised hover:text-sub focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1"
+          className="ml-2 self-end rounded p-1 text-faint hover:bg-raised hover:text-sub focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1"
         >
           {/* 歯車アイコン（SVG） */}
           <svg

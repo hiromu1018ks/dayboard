@@ -108,6 +108,11 @@ export function formatMonthDay(dateStr: string): string {
 export const WEEKDAY_LABELS_JA = ['日', '月', '火', '水', '木', '金', '土'] as const;
 
 /**
+ * 英語曜日の短縮形（0=Sun 〜 6=Sat）。`getWeekdayLabelEn` で用いる。
+ */
+export const WEEKDAY_LABELS_EN = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'] as const;
+
+/**
  * YYYY-MM-DD 文字列から日本語曜日（日/月/火/水/木/金/土）を返す。
  * Header 等の表示用。曜日計算はローカルタイムで行う（[database_schema.md §8]）。
  *
@@ -119,6 +124,20 @@ export function getWeekdayLabel(dateStr: string): string {
   const d = new Date(year, month - 1, day);
   d.setFullYear(year);
   return WEEKDAY_LABELS_JA[d.getDay()] ?? '';
+}
+
+/**
+ * YYYY-MM-DD 文字列から英語曜日短縮形（Sun/Mon/.../Sat）を返す。
+ * 表示用。曜日計算はローカルタイムで行う（[database_schema.md §8]）。
+ *
+ * 事前条件: `dateStr` は `isValidDateString` を満たす実在日付であること。
+ * 満たさない場合は挙動を保証しない（呼び出し元で検証済みを前提）。
+ */
+export function getWeekdayLabelEn(dateStr: string): string {
+  const { year, month, day } = parseYyyyMmDd(dateStr);
+  const d = new Date(year, month - 1, day);
+  d.setFullYear(year);
+  return WEEKDAY_LABELS_EN[d.getDay()] ?? '';
 }
 
 /**
