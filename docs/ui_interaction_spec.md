@@ -99,22 +99,44 @@ type UIState = {
 - `↑` / `↓`: 同じ列内のTODO間移動
 - `Enter`（TODO本文編集中）: 編集確定。空になったTODOは [edge_cases.md](edge_cases.md) の削除ルールへ
 
-### 3.4 Vimキーバインドのフォーカス移動（h/j/k/l）
+### 3.4 Vimキーバインドのフォーカス移動（selection model）
 
 要件 8.6「左、下、上、右の基本移動」。**`h/j/k/l` の優先ルール**（US-MVP-015 Open Questions）を以下で固定する。
 
-**基本原則:** `h/l` は列（section）間移動、`j/k` は列内項目移動。ただし **Insert状態では CodeMirror/入力欄のテキストカーソル移動** に取られる（入力を妨げない）。
+仕事整理モードでは **selection model**（[renderer/src/keybindings/selection.ts]）をアプリ層で管理する。DOM フォーカスに依存せず、React state として `selection: { section, itemIndex, field }`（2D カーソル）を持ち、純粋関数で次位置を計算して `setSelection` する。これにより「選択中かどうか」の視覚フィードバックと、`hjkl` の2Dグリッド整合性を保証する。
+
+**基本原則:** `h/l` は列（section）間移動、`j/k` は列内項目移動。ただし **Insert状態ではテキスト入力カーソル移動** に取られる（入力を妨げない、アプリ層は何も処理しない）。
 
 | キー | Normal状態の動作 | Insert状態の動作 |
 |------|------------------|------------------|
-| `h` | 左の列（`todo←blocker←reflection`、左端なら `theme`） | CodeMirror/入力欄のカーソル左 |
-| `l` | 右の列（`theme→todo→blocker→reflection`） | カーソル右 |
+| `h` | 左の列（`todo←blocker←reflection`、左端なら `theme`）。行位置を相対で維持 | 入力欄のカーソル左 |
+| `l` | 右の列（`theme→todo→blocker→reflection`）。行位置を相対で維持 | カーソル右 |
 | `j` | 同列の次項目（下） | カーソル下 |
 | `k` | 同列の前項目（上） | カーソル上 |
 
 **列の順序（左右）:** `theme` ↔ `todo` ↔ `blocker` ↔ `reflection`
 
-**列内の項目順（上下）:** 各列は上から追加入力欄→項目リスト（`order` 昇順）。`j/k` はこの順で移動。列の末尾で `j` を押すと止まる（循環しない）。先頭で `k` も止まる。
+**列内の項目順（上下）:** 各列は上から項目リスト（`order` 昇順）→追加入力欄（番兵行）。`j/k` はこの順で移動。列の末尾（追加入力欄）で `j` を押すと止まる（循環しない）。先頭で `k` も止まる。Reflection 列は3フィールド（doneText→stuckText→tomorrowActionText）を上下移動。
+
+**リスト操作コマンド（TUI的）:** selection で選択中の項目に対し、以下が動作する。
+
+| キー | 動作 |
+|------|------|
+| `i` / `Enter` | 選択中アイテムを編集（Insertへ）。追加入力欄選択時は新規追加モード |
+| `a` / `A` | 選択中アイテムの末尾から編集（Insertへ） |
+| `o` / `O` | 選択行の下 / 上に新規追加（Insertで追加入力欄） |
+| `x` | 選択アイテムの切替（todo=完了切替[AC-09]、blocker=解決切替） |
+| `dd` | 選択アイテム削除（確認ダイアログなし、`u` で復元可） |
+| `gg` / `G` | 列の先頭 / 末尾アイテム |
+| `{n}G` | n行目（1起き）へジャンプ |
+| `u` / `Ctrl+r` | undo / redo（全文編集含むフル対応、[autosave_spec.md] と協調） |
+| `数字前置 + jk/G` | カウント指定（`3j`=3行下、`2G`=2行目） |
+
+**視覚フィードバック（UX要）:**
+- 選択行: 行全体へ薄い背景色（`bg-accent/10`）＋左端 `▌` カーソルバー
+- 選択列: 枠線を `border-accent/50` へ強調
+- 選択中追加入力欄: `ring-1 ring-accent/40`
+- Insert 状態時: 選択行の背景色を `bg-accent/20` へ濃くし編集中を明示
 
 > **ノートモードでの h/j/k/l:** ノートモードは CodeMirror単体。Normal状態では CodeMirrorのVim拡張の `h/j/k/l`（テキスト内移動）をそのまま使う。列概念はない。Insert状態では通常のテキスト入力。
 
@@ -125,7 +147,7 @@ type UIState = {
 | コマンド | 動作 |
 |----------|------|
 | `Space n` | `viewMode` を切替（要件 8.6） |
-| `Space 1/2/3` | 対応列へフォーカス（[§3.2](#32-標準キーバインドのフォーカス移動) と同じ） |
+| `Space 1/2/3` | 対応列へ selection 移動＋フォーカス（[§3.2](#32-標準キーバインドのフォーカス移動) と同じ） |
 | `Space t` | ノートモードで選択行をTODO化（[§6.2](#62-todo化障害化のui挙動)） |
 | `Space b` | ノートモードで選択行を障害化 |
 
@@ -363,20 +385,31 @@ US-MVP-014 Open Questions「設定画面の開き方」を固定する。
 
 ### 11.4 Vim（要件 8.6、Normal状態）
 
+仕事整理モードは selection model ベース（[§3.4](#34-vimキーバインドのフォーカス移動selection-model)）。ノートモードは CodeMirror の Vim 拡張へ委譲。
+
 | キー | 動作 | 備考 |
 |------|------|------|
-| `h/j/k/l` | 移動 | [§3.4](#34-vimキーバインドのフォーカス移動 hjkl) |
-| `i` | Insertへ | AC-16 |
+| `h/j/k/l` | 移動（列間/列内） | [§3.4](#34-vimキーバインドのフォーカス移動selection-model) |
+| `gg` / `G` | 列先頭 / 末尾 | [§3.4](#34-vimキーバインドのフォーカス移動selection-model) |
+| `{n}G` | n行目へ | [§3.4](#34-vimキーバインドのフォーカス移動selection-model) |
+| `数字 + j/k` | カウント移動（`3j` 等） | [§3.4](#34-vimキーバインドのフォーカス移動selection-model) |
+| `i` / `Enter` | 選択アイテム編集（Insertへ） | AC-16 拡張 |
+| `a` / `A` | 末尾から編集（Insertへ） | [§3.4](#34-vimキーバインドのフォーカス移動selection-model) |
+| `o` / `O` | 下 / 上に新規追加（Insertへ） | [§3.4](#34-vimキーバインドのフォーカス移動selection-model) |
+| `x` | 選択アイテム切替（todo/blocker） | AC-09 拡張（blocker は解決切替） |
+| `dd` | 選択アイテム削除（即削除、`u` で復元） | [§3.4](#34-vimキーバインドのフォーカス移動selection-model) |
+| `u` / `Ctrl+r` | undo / redo（全文編集含む） | [§3.4](#34-vimキーバインドのフォーカス移動selection-model) |
 | `Esc` | Normalへ / モード戻り | [§9.2](#92-esc-の優先順位要件-86-注意点ac-19) |
-| `x` | TODO完了切替 | AC-09 |
 | `Space n` | モード切替 | [§3.5](#35-vimキーバインドの-space-系コマンド) |
-| `Space 1/2/3` | 列フォーカス | 同上 |
+| `Space 1/2/3` | 列フォーカス（selection 移動） | 同上 |
 | `Space t` | 選択行TODO化 | ノートモード |
 | `Space b` | 選択行障害化 | ノートモード |
 
 ### 11.5 Post-MVP（実装しない、AC-22）
 
-`⌘/Ctrl+K`（コマンドパレット）、`⌘/Ctrl+Shift+R`（振り返り送信）、`⌘/Ctrl+Shift+M`（時刻見出し）、Vim Normal の `gg`, `G`, `A`, `o`, `O`, `dd`, `u`, `Ctrl+r`, `/`, `n`, `N`, `Space r`, `Space k` は押しても何も起きない（ただし入力内容は破壊しない）。
+`⌘/Ctrl+K`（コマンドパレット）、`⌘/Ctrl+Shift+R`（振り返り送信）、Vim Normal の `dd` 系の複合（`d3j` 等）、`/`（検索）、`n`/`N`（次/前検索）、`Ctrl+r` 以外の Ex コマンド（`:` 系）、`Space r`、`Space k` は押しても何も起きない（ただし入力内容は破壊しない）。
+
+> **備考:** リスト操作の中核（`o`/`O`/`dd`/`gg`/`G`/`u`/`Ctrl+r`/数字前置）は Phase 7 拡張で MVP へ昇格した。Post-MVP に残るのは複合オペレータ（`d{motion}`）、検索系（`/`、`n`、`N`）、Ex コマンド（`:` 系）、未実装の Space 系（`r`、`k`）のみ。
 
 ---
 

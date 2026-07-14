@@ -309,7 +309,7 @@ const window = await app.firstWindow()
 
 - `packages/domain`: **90% 以上**（ピュア関数中心、高カバレッジが現実的）
 - `apps/api`: 80% 以上（Integrationで主要パス網羅）
-- `apps/desktop/renderer`: 60% 以上（UIはE2E中心、Unitはロジック抽出部分）
+- `apps/desktop/renderer`: 60% 以上（UIはE2E中心、Unitはロジック抽出部分）。対象は `keybindings/**/*.ts`（selection.ts / vim.ts / focus.ts / standard.ts / escPriority.ts を含む）。selection model と Vim コマンド解析はピュアTSのため高カバレッジを維持。
 - `packages/repository`: 70% 以上（IF実装、Integrationで補完）
 
 ### 8.2 品質ゲート（CI）

@@ -12,6 +12,8 @@
 import { useEffect, useRef, useState } from 'react';
 import type { NoteLineMeta, TodoItem as TodoItemType } from 'shared-types';
 import { TodoItem } from './TodoItem.js';
+import type { VimState } from './VimStateBadge.js';
+import type { WorkSelection } from '../keybindings/selection.js';
 
 export type TodoColumnProps = {
   date: string;
@@ -27,6 +29,12 @@ export type TodoColumnProps = {
   noteLineMetaMap?: Map<string, NoteLineMeta>;
   /** ハイライト対象のTODO id セット（Phase 5） */
   highlightIds?: Set<string>;
+  /** 現在の選択位置（Vim キーバインド時） */
+  selection: WorkSelection;
+  /** 選択ハイライトを表示するか（keybindingMode='vim'時のみ true） */
+  showSelection: boolean;
+  /** Vim操作状態（選択ハイライト強調用） */
+  vimState: VimState;
 };
 
 export function TodoColumn({
@@ -40,6 +48,9 @@ export function TodoColumn({
   onCarryOverTodos,
   noteLineMetaMap,
   highlightIds,
+  selection,
+  showSelection,
+  vimState,
 }: TodoColumnProps) {
   const [draft, setDraft] = useState('');
   const [confirmCarryOver, setConfirmCarryOver] = useState(false);
@@ -82,9 +93,19 @@ export function TodoColumn({
     onReorder(ids);
   };
 
+  // 選択中判定（Vim キーバインド時のみ）
+  const isThisColumnSelected = showSelection && selection.section === 'todo';
+  const selectedItemId =
+    isThisColumnSelected && selection.itemIndex !== null && selection.itemIndex < todos.length
+      ? (todos[selection.itemIndex]?.id ?? null)
+      : null;
+  const isAddInputSelected = isThisColumnSelected && selection.itemIndex === todos.length;
+
   return (
     <section
-      className="flex min-h-0 flex-col overflow-hidden rounded border border-line/60 bg-panel/30 p-7"
+      className={`flex min-h-0 flex-col overflow-hidden rounded border bg-panel/30 p-7 transition-colors ${
+        isThisColumnSelected ? 'border-accent/50' : 'border-line/60'
+      }`}
       aria-label="TODO"
       data-focus-section="todo"
     >
@@ -106,6 +127,9 @@ export function TodoColumn({
                 : null
             }
             highlight={highlightIds?.has(todo.id) ?? false}
+            isSelected={selectedItemId === todo.id}
+            showSelection={showSelection}
+            vimState={vimState}
             onToggle={() => onToggle(todo.id)}
             onEditTitle={(title) => onEditTitle(todo.id, title)}
             onDelete={() => onDelete(todo.id)}
@@ -178,7 +202,9 @@ export function TodoColumn({
           placeholder="TODOを追加して Enter"
           maxLength={200}
           data-focus-input
-          className="w-full border-none bg-transparent px-1 py-0.5 text-sm text-ink outline-none placeholder:text-faint"
+          className={`w-full border-none bg-transparent px-1 py-0.5 text-sm text-ink outline-none placeholder:text-faint ${
+            isAddInputSelected && vimState === 'normal' ? 'ring-1 ring-accent/40' : ''
+          }`}
           aria-label="新規TODO入力"
         />
       </div>

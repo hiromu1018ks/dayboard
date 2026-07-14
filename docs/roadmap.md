@@ -716,6 +716,42 @@
 - [x] IME中の `Esc` 優先順位（AC-19）
 - [x] Post-MVPショートカットが不発（AC-22）
 
+### Phase 7 拡張: TUI的リストVim（selection model）
+
+**動機:** Phase 7 の Vim 実装は DOM フォーカスで代用していたため、TODO/Stuck ページで hjkl による項目選択が機能せず、選択フィードバックも不在だった。仕事整理モードを selection model ベースの TUI 的リストナビゲーションへ再構築し、Vim ユーザーに自然な操作感を実現する。
+
+**出力:**
+- `apps/desktop/renderer/src/keybindings/selection.ts` — selection 型・2Dカーソル純粋関数（[architecture.md §4] 準拠、Hono/React/Node 非依存）
+- `apps/desktop/renderer/src/keybindings/vim.ts` — selection ベースの `handleVimWorkKey`（h/j/k/l/gg/G/i/a/o/O/x/dd/u/Ctrl+r/数字前置）
+- `apps/desktop/renderer/src/hooks/useWorkData.ts` — undo/redo（past/future + 全文編集履歴の結合）
+- 各コンポーネント（TodoColumn/BlockerColumn/ReflectionColumn/TodoItem/BlockerItem）の選択ハイライト
+
+**タスク:**
+
+- **T-7-EX-01** selection model 純粋関数層（[§3.4]）
+  - 完了条件: `selection.test.ts` が型・次位置計算・コマンド解析を網羅。カバレッジ閾値（60%）を満たす。
+  - 出力: `apps/desktop/renderer/src/keybindings/selection.ts`
+- **T-7-EX-02** useWorkData へ undo/redo 追加
+  - 完了条件: 全文編集を含む `u`/`Ctrl+r` が機能。連続テキスト編集は時刻窓で履歴結合（autosave と協調）。
+- **T-7-EX-03** vim.ts を selection ベースへ書換 + テスト
+  - 完了条件: `vim.test.ts` が全コマンドを検証。Post-MVP から `o/O/dd/gg/G/u/Ctrl+r/数字前置` を昇格。
+- **T-7-EX-04** App.tsx 結合（selection state, onKeyDown, toggleItemAt, WorkMode props）
+  - 完了条件: 仕事整理モードで Vim キーバインド時のみ selection が有効。標準キーバインドは従来通り。
+- **T-7-EX-05** 各コンポーネントの視覚・編集モード制御
+  - 完了条件: 選択行ハイライト（背景+カーソルバー）、列強調、Insert時の編集モード自動開始。
+- **T-7-EX-06** docs 更新
+  - 完了条件: `ui_interaction_spec.md §3.4/§3.5/§11.4/§11.5`、`test_strategy.md`、本 Phase 記述が実装と一致。
+
+### Phase 7 拡張のチェック基準
+
+- [x] selection model がピュアTS（[architecture.md §4] 違反なし）
+- [x] `selection.test.ts` / `vim.test.ts` / `focus.test.ts` が全通過（カバレッジ 60% 以上）
+- [x] TODO/Stuck/Reflection で hjkl による2Dグリッド移動が可能
+- [x] 選択中項目に視覚フィードバック（背景+カーソルバー）
+- [x] `i`/`Enter` で選択アイテム編集、`o`/`O` で新規追加、`x` で切替、`dd` で削除
+- [x] `u`/`Ctrl+r` で全文編集含む undo/redo
+- [x] Blocker で `x` が解決切替として動作（TODO の `x` と統一）
+
 ---
 
 ## Phase 8: 統合・E2E・リリース確認

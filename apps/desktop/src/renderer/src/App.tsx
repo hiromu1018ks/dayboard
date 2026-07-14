@@ -91,7 +91,16 @@ import {
 } from './keybindings/standard.js';
 import { handlePostMvpShortcut } from './keybindings/postMvp.js';
 import { handleSpaceLeader, handleVimWorkKey, SPACE_LEADER_TIMEOUT_MS } from './keybindings/vim.js';
-import { focusSectionInput, getFocusedItemId, getFocusedSection } from './keybindings/focus.js';
+import { focusSectionInput, focusElementAtSelection } from './keybindings/focus.js';
+import {
+  THEME_SELECTION,
+  initialSelection,
+  isOnAddInput,
+  selectedItemId,
+  clampSelection,
+  type WorkSelection,
+  type WorkLayout,
+} from './keybindings/selection.js';
 import type { Reflection } from 'shared-types';
 
 /** テーマ保存対象の識別子（T-2-09） */
@@ -118,6 +127,11 @@ export default function App() {
   const { theme, setTheme, resolvedMode } = useTheme(currentDate);
   // Vim操作状態（仕事整理モード用。ノートモードは CodeMirror 内部状態が権威）
   const [vimState, setVimState] = useState<VimState>('normal');
+  // 仕事整理モードの選択状態（2D カーソル、[selection.ts]）。Vim キーバインド時のみ有意。
+  // Normal 状態で hjkl/gg/G で移動、Insert 状態で編集中位置を指す。
+  const [selection, setSelectionState] = useState<WorkSelection>(THEME_SELECTION);
+  // Vim コマンドバッファ（g/d/数字のリーダー入力用。handleVimWorkKey が読み書き）
+  const [commandBuffer, setCommandBuffer] = useState('');
   // 設定モーダル（[ui_interaction_spec.md §8]）
   const [settingsOpen, setSettingsOpen] = useState(false);
   // サイドバー表示状態（Post-MVP: localStorage で永続化、既定 true）
@@ -653,19 +667,122 @@ export default function App() {
   // ============================================================================
 
   /**
-   * Vim の `x`（TODO完了切替、AC-09）用: 現在フォーカス中のTODOを切替。
-   * フォーカスがTODO項目上に無い場合は何もしない。
+   * 現在のレイアウト（各列のアイテム数）。selection の計算に使用。
+   * workData が未ロード時は空レイアウト。
    */
-  const toggleCurrentTodo = useCallback(() => {
-    const id = getFocusedItemId();
-    if (!id) return;
-    if (!workData) return;
-    const todo = workData.todos.find((t) => t.id === id);
-    if (!todo) return;
-    // carried は操作不可、done/todo を切替（[edge_cases.md §3.1]）
-    if (todo.status === 'carried') return;
-    handleToggleTodo(id);
-  }, [workData, handleToggleTodo]);
+  const layout: WorkLayout = useMemo(
+    () => ({
+      theme: { hasInput: true },
+      todo: { itemCount: workData?.todos.length ?? 0 },
+      blocker: { itemCount: workData?.blockers.length ?? 0 },
+      reflection: {},
+    }),
+    [workData?.todos.length, workData?.blockers.length],
+  );
+
+  /** selection を更新し、対応する DOM 要素へフォーカス（selection と DOM フォーカスの同期）。 */
+  const setSelection = useCallback(
+    (sel: WorkSelection) => {
+      const clamped = clampSelection(sel, layout);
+      setSelectionState(clamped);
+      // DOM フォーカスは次フレームで（React 描画後に要素が存在することを保証）
+      requestAnimationFrame(() => {
+        focusElementAtSelection(clamped, {
+          todo: workData?.todos ?? [],
+          blocker: workData?.blockers ?? [],
+        });
+      });
+    },
+    [layout, workData?.todos, workData?.blockers],
+  );
+
+  /**
+   * 選択中アイテムを編集モードへ（Vim `i`/`a`/`Enter`）。Insert 状態へ移行。
+   * theme/reflection/todo/blocker の全セクションで、selection が指す入力要素（アイテム編集 or
+   * 追加入力欄 or textarea）へフォーカスして Insert へ。セクションによる分岐は無く、
+   * `focusElementAtSelection` が各セクションの適切な要素へ解決する。
+   */
+  const editItemAt = useCallback(
+    (sel: WorkSelection) => {
+      focusElementAtSelection(sel, {
+        todo: workData?.todos ?? [],
+        blocker: workData?.blockers ?? [],
+      });
+      setVimState('insert');
+    },
+    [workData?.todos, workData?.blockers],
+  );
+
+  /**
+   * 選択行の下/上に新規追加（Vim `o`/`O`）。Insert 状態へ移行し追加入力欄へフォーカス。
+   * MVP では「選択中列の追加入力欄へフォーカス」で代用（厳密な挿入位置制御は Post-MVP）。
+   * theme/reflection は追加入力欄が無いため、`focusSectionInput` は最初のフォーカス可能要素へフォールバック。
+   */
+  const addItemAt = useCallback((sel: WorkSelection, _position: 'below' | 'above') => {
+    // 選択中列の追加入力欄へフォーカス（o/O で列は維持）
+    focusSectionInput(sel.section);
+    setVimState('insert');
+  }, []);
+
+  /**
+   * 選択中アイテムの完了/解決切替（Vim `x`、AC-09）。
+   * todo=done切替（carried は無効）、blocker=resolved切替。追加入力欄選択時は無反応。
+   */
+  const toggleItemAt = useCallback(
+    (sel: WorkSelection) => {
+      if (!workData) return;
+      if (sel.section === 'todo') {
+        if (isOnAddInput(sel, layout)) return;
+        const id = selectedItemId(sel, workData.todos);
+        if (!id) return;
+        const todo = workData.todos.find((t) => t.id === id);
+        if (!todo || todo.status === 'carried') return; // carried は操作不可
+        handleToggleTodo(id);
+      } else if (sel.section === 'blocker') {
+        if (isOnAddInput(sel, layout)) return;
+        const id = selectedItemId(sel, workData.blockers);
+        if (!id) return;
+        handleToggleBlockerResolved(id);
+      }
+      // theme/reflection は x で切替対象なし
+    },
+    [workData, layout, handleToggleTodo, handleToggleBlockerResolved],
+  );
+
+  /**
+   * 選択中アイテムを即削除（Vim `dd`、確認ダイアログなし。u で復元可）。
+   * 戻り値で「削除後の推奨 selection」を返す:
+   * - 末尾アイテム削除時は追加入力欄（= 新しい itemCount）へ
+   * - それ以外は同 index を維持（= 削除により繰り上がった次アイテムを指す）
+   * - theme/reflection は削除対象外（何もしない、戻り値 null）
+   */
+  const deleteItemAt = useCallback(
+    (sel: WorkSelection): WorkSelection | void => {
+      if (!workData) return;
+      if (sel.section === 'todo') {
+        const id = selectedItemId(sel, workData.todos);
+        if (!id) return;
+        handleDeleteTodo(id);
+        // 削除後の itemCount（= workData.todos.length - 1）を超える場合は追加入力欄へ
+        const newCount = workData.todos.length - 1;
+        const keepIdx = sel.itemIndex ?? 0;
+        return { section: 'todo', itemIndex: Math.min(keepIdx, newCount), field: null };
+      } else if (sel.section === 'blocker') {
+        const id = selectedItemId(sel, workData.blockers);
+        if (!id) return;
+        handleDeleteBlocker(id);
+        const newCount = workData.blockers.length - 1;
+        const keepIdx = sel.itemIndex ?? 0;
+        return { section: 'blocker', itemIndex: Math.min(keepIdx, newCount), field: null };
+      }
+      // theme/reflection は dd 対象外
+    },
+    [workData, handleDeleteTodo, handleDeleteBlocker],
+  );
+
+  /** undo / redo（[useWorkData] の past/future）。サーバー反映は autosave が追従。 */
+  const undo = useCallback(() => dispatch({ type: 'UNDO' }), [dispatch]);
+  const redo = useCallback(() => dispatch({ type: 'REDO' }), [dispatch]);
 
   // アンマウント時に Space リーダーのタイマーを確実にクリア（タイマー漏れ防止）
   useEffect(() => {
@@ -811,6 +928,10 @@ export default function App() {
                   requestAnimationFrame(() => noteEditorRef.current?.focus());
                 }
               });
+            } else if (result.requestSection) {
+              // Space 1/2/3: 列直接選択。selection 更新 + DOM フォーカス
+              setSelection(initialSelection(result.requestSection));
+              focusSectionInput(result.requestSection);
             }
           }
           return;
@@ -832,23 +953,24 @@ export default function App() {
           return;
         }
 
-        // i: Insert へ（AC-16）。現在セクションの入力要素へフォーカスして入力可能にする。
-        // フォーカスがどのセクションにも無い場合は todo 列へ（要件11.1 朝の利用フロー）。
-        if (e.key === 'i' && !e.metaKey && !e.ctrlKey && !e.altKey && vimState === 'normal') {
-          e.preventDefault();
-          const currentSection = getFocusedSection();
-          focusSectionInput(currentSection ?? 'todo');
-          setVimState('insert');
-          return;
-        }
-
-        // その他の Vim キー（h/j/k/l/x、[§3.4]、AC-09/AC-20）
+        // その他の Vim キー（h/j/k/l/gg/G/i/a/o/O/x/dd/u/Ctrl+r/数字前置、[§3.4/§3.5]）
+        // selection model ベース。handleVimWorkKey がコマンド解析＋副作用コールバック呼出。
         const result = handleVimWorkKey(e, {
           vimState,
           viewMode,
-          toggleCurrentTodo,
+          selection,
+          layout,
+          buffer: commandBuffer,
+          setSelection,
+          editItemAt,
+          addItemAt,
+          toggleItemAt,
+          deleteItemAt,
+          undo,
+          redo,
+          setBuffer: setCommandBuffer,
         });
-        if (result === 'handled') {
+        if (result === 'handled' || result === 'buffered') {
           e.preventDefault();
         }
         return;
@@ -867,7 +989,16 @@ export default function App() {
     goPrevDay,
     goNextDay,
     toggleSidebar,
-    toggleCurrentTodo,
+    selection,
+    commandBuffer,
+    layout,
+    setSelection,
+    editItemAt,
+    addItemAt,
+    toggleItemAt,
+    deleteItemAt,
+    undo,
+    redo,
     spaceLeaderPending,
   ]);
 
@@ -976,6 +1107,9 @@ export default function App() {
                 noteLineMetaMap={noteLineMetaMap}
                 highlightTodoIds={highlightTodoIds}
                 highlightBlockerIds={highlightBlockerIds}
+                selection={selection}
+                vimState={vimState}
+                keybindingMode={settings.keybindingMode}
               />
             )}
           </main>

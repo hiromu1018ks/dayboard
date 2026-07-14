@@ -12,6 +12,8 @@ import type {
   TodoItem as TodoItemType,
 } from 'shared-types';
 import { BlockerItem } from './BlockerItem.js';
+import type { VimState } from './VimStateBadge.js';
+import type { WorkSelection } from '../keybindings/selection.js';
 
 export type BlockerColumnProps = {
   date: string;
@@ -27,6 +29,12 @@ export type BlockerColumnProps = {
   noteLineMetaMap?: Map<string, NoteLineMeta>;
   /** ハイライト対象の障害 id セット（Phase 5） */
   highlightIds?: Set<string>;
+  /** 現在の選択位置（Vim キーバインド時） */
+  selection: WorkSelection;
+  /** 選択ハイライトを表示するか（keybindingMode='vim'時のみ true） */
+  showSelection: boolean;
+  /** Vim操作状態（選択ハイライト強調用） */
+  vimState: VimState;
 };
 
 export function BlockerColumn({
@@ -41,6 +49,9 @@ export function BlockerColumn({
   onReorder,
   noteLineMetaMap,
   highlightIds,
+  selection,
+  showSelection,
+  vimState,
 }: BlockerColumnProps) {
   const [draft, setDraft] = useState('');
   const inputRef = useRef<HTMLInputElement>(null);
@@ -74,9 +85,19 @@ export function BlockerColumn({
     onReorder(ids);
   };
 
+  // 選択中判定（Vim キーバインド時のみ）
+  const isThisColumnSelected = showSelection && selection.section === 'blocker';
+  const selectedItemId =
+    isThisColumnSelected && selection.itemIndex !== null && selection.itemIndex < blockers.length
+      ? (blockers[selection.itemIndex]?.id ?? null)
+      : null;
+  const isAddInputSelected = isThisColumnSelected && selection.itemIndex === blockers.length;
+
   return (
     <section
-      className="flex min-h-0 flex-col overflow-hidden rounded border border-line/60 bg-panel/30 p-7"
+      className={`flex min-h-0 flex-col overflow-hidden rounded border bg-panel/30 p-7 transition-colors ${
+        isThisColumnSelected ? 'border-accent/50' : 'border-line/60'
+      }`}
       aria-label="障害・詰まり"
       data-focus-section="blocker"
     >
@@ -99,6 +120,9 @@ export function BlockerColumn({
                 : null
             }
             highlight={highlightIds?.has(blocker.id) ?? false}
+            isSelected={selectedItemId === blocker.id}
+            showSelection={showSelection}
+            vimState={vimState}
             onToggleResolved={() => onToggleResolved(blocker.id)}
             onEditText={(text) => onEditText(blocker.id, text)}
             onChangeLinkedTodo={(linkedTodoId) => onChangeLinkedTodo(blocker.id, linkedTodoId)}
@@ -131,7 +155,9 @@ export function BlockerColumn({
           placeholder="障害を追加して Enter"
           maxLength={200}
           data-focus-input
-          className="w-full border-none bg-transparent px-1 py-0.5 text-sm text-ink outline-none placeholder:text-faint"
+          className={`w-full border-none bg-transparent px-1 py-0.5 text-sm text-ink outline-none placeholder:text-faint ${
+            isAddInputSelected && vimState === 'normal' ? 'ring-1 ring-accent/40' : ''
+          }`}
           aria-label="新規障害入力"
         />
       </div>
