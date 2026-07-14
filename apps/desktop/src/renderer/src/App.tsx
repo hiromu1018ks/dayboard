@@ -870,6 +870,27 @@ export default function App() {
         return;
       }
 
+      // ----- Ctrl+c: Vim Insert → Normal（Esc と同等、Vim 慣例） -----
+      //   Vim では Ctrl+c も Esc と同様に Insert → Normal へ戻る。ユーザー要望で追加。
+      if (
+        e.ctrlKey &&
+        !e.metaKey &&
+        !e.altKey &&
+        !e.shiftKey &&
+        e.key.toLowerCase() === 'c' &&
+        settings.keybindingMode === 'vim' &&
+        vimState === 'insert' &&
+        viewMode === 'work'
+      ) {
+        e.preventDefault();
+        setVimState('normal');
+        focusElementAtSelection(selection, {
+          todo: workData?.todos ?? [],
+          blocker: workData?.blockers ?? [],
+        });
+        return;
+      }
+
       // ----- Esc: 4段優先順位（T-4-07/T-7-09、[§9.2]） -----
       if (e.key === 'Escape') {
         const consumed = handleEsc({
@@ -877,6 +898,17 @@ export default function App() {
           vimState: settings.keybindingMode === 'vim' ? vimState : 'normal',
           settingsOpen,
           setVimState: settings.keybindingMode === 'vim' ? setVimState : undefined,
+          // Insert → Normal 復帰時、仕事整理モードなら選択要素（section/button）へフォーカスを戻す。
+          // 入力欄にフォーカスが残ると hjkl がスルー判定で効かないため。
+          refocusSelection:
+            settings.keybindingMode === 'vim' && viewMode === 'work'
+              ? () => {
+                  focusElementAtSelection(selection, {
+                    todo: workData?.todos ?? [],
+                    blocker: workData?.blockers ?? [],
+                  });
+                }
+              : undefined,
           closeSettings: () => setSettingsOpen(false),
           goToWork: () => {
             void setModeWithFlush('work');
@@ -996,6 +1028,8 @@ export default function App() {
     selection,
     commandBuffer,
     layout,
+    workData?.todos,
+    workData?.blockers,
     setSelection,
     editItemAt,
     addItemAt,
