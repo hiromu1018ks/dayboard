@@ -7,7 +7,7 @@
  * @replit/codemirror-vim 依存のため、ここでは実環境に近い形で最低限の呼出確認のみ。
  */
 
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, afterEach } from 'vitest';
 import {
   handleVimWorkKey,
   handleSpaceLeader,
@@ -87,6 +87,95 @@ function key(
 describe('SPACE_LEADER_TIMEOUT_MS', () => {
   it('200ms', () => {
     expect(SPACE_LEADER_TIMEOUT_MS).toBe(200);
+  });
+});
+
+describe('handleVimWorkKey: 入力要素フォーカス中のスルー（文字入力優先）', () => {
+  // Normal 状態でも input/textarea/contenteditable にフォーカス中は Vim コマンドを
+  // 処理せず文字入力へ貫通する（[§3.4]: ユーザーが普通にフォーカスして入力できる）。
+
+  function focusInput(): HTMLInputElement {
+    const input = document.createElement('input');
+    document.body.appendChild(input);
+    input.focus();
+    return input;
+  }
+
+  function focusTextarea(): HTMLTextAreaElement {
+    const ta = document.createElement('textarea');
+    document.body.appendChild(ta);
+    ta.focus();
+    return ta;
+  }
+
+  function focusContentEditable(): HTMLDivElement {
+    const div = document.createElement('div');
+    // jsdom では IDL プロパティ(contentEditable)の設定が属性へ反映されないため、
+    // 実環境の CodeMirror .cm-content と同様に setAttribute で contenteditable を付与。
+    div.setAttribute('contenteditable', 'true');
+    document.body.appendChild(div);
+    div.focus();
+    return div;
+  }
+
+  function focusButton(): HTMLButtonElement {
+    // button は入力要素ではない（カード選択）→ Vim コマンドが処理されるべき
+    const btn = document.createElement('button');
+    document.body.appendChild(btn);
+    btn.focus();
+    return btn;
+  }
+
+  afterEach(() => {
+    document.body.innerHTML = '';
+  });
+
+  it('input フォーカス中の j/k/h/l/x はスルー（none）', () => {
+    focusInput();
+    const ctx = makeCtx({ selection: { section: 'todo', itemIndex: 0, field: null } });
+    expect(handleVimWorkKey(key('j'), ctx)).toBe('none');
+    expect(handleVimWorkKey(key('k'), ctx)).toBe('none');
+    expect(handleVimWorkKey(key('h'), ctx)).toBe('none');
+    expect(handleVimWorkKey(key('l'), ctx)).toBe('none');
+    expect(handleVimWorkKey(key('x'), ctx)).toBe('none');
+    expect(ctx.setSelection).not.toHaveBeenCalled();
+  });
+
+  it('textarea フォーカス中もスルー（Reflection 入力欄相当）', () => {
+    focusTextarea();
+    const ctx = makeCtx({
+      selection: { section: 'reflection', itemIndex: null, field: 'doneText' },
+    });
+    expect(handleVimWorkKey(key('j'), ctx)).toBe('none');
+    expect(handleVimWorkKey(key('k'), ctx)).toBe('none');
+  });
+
+  it('contenteditable（CodeMirror .cm-content 相当）フォーカス中もスルー', () => {
+    focusContentEditable();
+    const ctx = makeCtx();
+    expect(handleVimWorkKey(key('j'), ctx)).toBe('none');
+  });
+
+  it('button フォーカス中は Vim コマンドが処理される（カード選択は維持）', () => {
+    focusButton();
+    const ctx = makeCtx({ selection: { section: 'todo', itemIndex: 0, field: null } });
+    expect(handleVimWorkKey(key('j'), ctx)).toBe('handled'); // button は入力要素ではない
+    expect(ctx.setSelection).toHaveBeenCalled();
+  });
+
+  it('フォーカスがない（body）場合は Vim コマンドが処理される', () => {
+    (document.activeElement as HTMLElement | null)?.blur?.();
+    const ctx = makeCtx({ selection: { section: 'todo', itemIndex: 0, field: null } });
+    expect(handleVimWorkKey(key('j'), ctx)).toBe('handled');
+  });
+
+  it('input フォーカス中は Ctrl+r もスルー（テキスト編集の redo として貫通）', () => {
+    // 入力欄内では Ctrl+r はブラウザ/エディタの redo（テキスト編集取り消し）として扱うべき。
+    // アプリ層の Vim redo は処理せず、文字入力系へ貫通する。
+    focusInput();
+    const ctx = makeCtx();
+    expect(handleVimWorkKey(key('r', { ctrl: true }), ctx)).toBe('none');
+    expect(ctx.redo).not.toHaveBeenCalled();
   });
 });
 

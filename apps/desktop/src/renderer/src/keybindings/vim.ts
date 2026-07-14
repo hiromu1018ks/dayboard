@@ -138,9 +138,36 @@ export const SPACE_LEADER_TIMEOUT_MS = 200;
  *
  * @returns 'handled' の場合、呼び出し元で preventDefault を呼ぶこと
  */
+/**
+ * 現在フォーカスされている要素が「テキスト入力要素」か判定する。
+ *
+ * - `<input>` / `<textarea>`: 通常の入力欄
+ * - `isContentEditable === true`: contenteditable 要素（CodeMirror の `.cm-content` 含む）
+ *
+ * Vim の原則（[§3.4]: Insert状態ではテキスト入力カーソル移動）に従い、
+ * これらの要素へフォーカス中は Normal 状態でも Vim コマンドを処理せず、
+ * 文字入力へ貫通させる（ユーザーが「普通にフォーカスして入力できる」体験）。
+ */
+function isTextInputElement(el: Element | null): boolean {
+  if (!el) return false;
+  if (el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement) return true;
+  // contenteditable（CodeMirror の .cm-content 等）。jsdom では isContentEditable が
+  // 反映されないことがあるため、属性値の直接チェックも併用する。
+  const htmlEl = el as HTMLElement;
+  if (htmlEl.isContentEditable) return true;
+  const attr = htmlEl.getAttribute('contenteditable');
+  if (attr === 'true' || attr === '') return true;
+  return false;
+}
+
 export function handleVimWorkKey(e: KeyboardEvent, ctx: VimWorkContext): VimHandleResult {
   // Insert状態ではコマンド処理しない
   if (ctx.vimState === 'insert') return 'none';
+
+  // 入力要素（input/textarea/contenteditable）へフォーカス中は Vim コマンドを処理せず、
+  // 文字入力へ貫通する（[§3.4]: ユーザーが普通にフォーカスして文字入力できるようにする）。
+  // `i` での明示的 Insert 移行とは別系統。カード選択（button[data-focus-item]）中は処理される。
+  if (isTextInputElement(document.activeElement)) return 'none';
 
   // Ctrl+r（redo）。修飾キー判定が必要なためここで特別扱い
   if (e.ctrlKey && !e.metaKey && !e.altKey && !e.shiftKey && e.key.toLowerCase() === 'r') {
