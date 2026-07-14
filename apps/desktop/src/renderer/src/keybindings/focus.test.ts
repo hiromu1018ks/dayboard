@@ -30,6 +30,7 @@ function setupDom(): void {
   // todo セクション: アイテム2件 + 追加入力欄
   const todo = document.createElement('section');
   todo.dataset.focusSection = 'todo';
+  todo.tabIndex = -1; // section 自体へフォーカス可能に（選択移動用）
   const todoUl = document.createElement('ul');
   for (const id of ['t1', 't2']) {
     const li = document.createElement('li');
@@ -48,6 +49,7 @@ function setupDom(): void {
   // blocker セクション: アイテム1件 + 追加入力欄
   const blocker = document.createElement('section');
   blocker.dataset.focusSection = 'blocker';
+  blocker.tabIndex = -1;
   const blockerUl = document.createElement('ul');
   const bli = document.createElement('li');
   const bbtn = document.createElement('button');
@@ -64,6 +66,7 @@ function setupDom(): void {
   // reflection セクション: 3 フィールド
   const reflection = document.createElement('section');
   reflection.dataset.focusSection = 'reflection';
+  reflection.tabIndex = -1;
   for (const field of ['doneText', 'stuckText', 'tomorrowActionText']) {
     const ta = document.createElement('textarea');
     ta.dataset.focusField = field;
@@ -74,6 +77,7 @@ function setupDom(): void {
   // theme セクション: 入力欄のみ
   const theme = document.createElement('section');
   theme.dataset.focusSection = 'theme';
+  theme.tabIndex = -1;
   const themeInput = document.createElement('input');
   themeInput.dataset.focusInput = '';
   theme.appendChild(themeInput);
@@ -125,26 +129,31 @@ describe('focusElementAtSelection', () => {
     expect(document.activeElement?.getAttribute('data-focus-item')).toBe('t1');
   });
 
-  it('todo の追加入力欄選択（itemIndex=2=番哨）時は data-focus-input へ', () => {
+  it('todo の追加入力欄選択（itemIndex=2=番哨）時は section コンテナへ（入力欄でない、hjkl有効）', () => {
     const items = { todo: [{ id: 't1' }, { id: 't2' }] };
     expect(focusElementAtSelection(sel('todo', 2), items)).toBe(true);
-    expect(document.activeElement?.hasAttribute('data-focus-input')).toBe(true);
+    // section コンテナ自身へフォーカス（data-focus-input でない）
+    expect(document.activeElement?.getAttribute('data-focus-section')).toBe('todo');
+    expect(document.activeElement?.hasAttribute('data-focus-input')).toBe(false);
   });
 
-  it('reflection の field 選択時は対応 textarea へ', () => {
+  it('reflection の field 選択時は section コンテナへ（textarea でない、hjkl有効）', () => {
     expect(focusElementAtSelection(sel('reflection', null, 'stuckText'), {})).toBe(true);
-    expect(document.activeElement?.getAttribute('data-focus-field')).toBe('stuckText');
+    expect(document.activeElement?.getAttribute('data-focus-section')).toBe('reflection');
+    expect(document.activeElement?.hasAttribute('data-focus-field')).toBe(false);
   });
 
-  it('theme 選択時は入力欄へ', () => {
+  it('theme 選択時は section コンテナへ（入力欄でない、hjkl有効）', () => {
     expect(focusElementAtSelection(sel('theme'), {})).toBe(true);
-    expect(document.activeElement?.hasAttribute('data-focus-input')).toBe(true);
+    expect(document.activeElement?.getAttribute('data-focus-section')).toBe('theme');
+    expect(document.activeElement?.hasAttribute('data-focus-input')).toBe(false);
   });
 
-  it('範囲外 itemIndex は追加入力欄へフォールバック', () => {
+  it('範囲外 itemIndex は section コンテナへフォールバック', () => {
     const items = { todo: [{ id: 't1' }] };
     expect(focusElementAtSelection(sel('todo', 99), items)).toBe(true);
-    expect(document.activeElement?.hasAttribute('data-focus-input')).toBe(true);
+    // 追加入力欄扱い = section コンテナへ
+    expect(document.activeElement?.getAttribute('data-focus-section')).toBe('todo');
   });
 
   it('セクション不在時は false', () => {

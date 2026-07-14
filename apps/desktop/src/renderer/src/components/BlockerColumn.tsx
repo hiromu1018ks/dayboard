@@ -95,11 +95,12 @@ export function BlockerColumn({
 
   return (
     <section
-      className={`flex min-h-0 flex-col overflow-hidden rounded border bg-panel/30 p-7 transition-colors ${
+      className={`flex min-h-0 flex-col overflow-hidden rounded border bg-panel/30 p-7 transition-colors focus:outline-none ${
         isThisColumnSelected ? 'border-accent/50' : 'border-line/60'
       }`}
       aria-label="障害・詰まり"
       data-focus-section="blocker"
+      tabIndex={-1}
     >
       <h2 className="head mb-5 flex items-center gap-2 text-lg text-ink">
         <span className="inline-block h-4 w-0.5 bg-ink/70" aria-hidden="true" />

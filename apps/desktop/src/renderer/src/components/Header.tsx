@@ -155,7 +155,11 @@ export function Header({
           Phase 7: data-focus-section="theme" で列フォーカス（Vim h/l）対応。
           コンテナ（この div）へ section、入力へ input を付与。
           Day One 風: 左に小さな accent 縦バーで「見出し」感を出す。 */}
-      <div className="mt-4 flex items-center gap-2" data-focus-section="theme">
+      <div
+        className="mt-4 flex items-center gap-2 focus:outline-none"
+        data-focus-section="theme"
+        tabIndex={-1}
+      >
         <div className="theme-input-wrap flex-1">
           <label htmlFor="theme-input" className="mb-1 block text-xs tracking-wider text-faint">
             Today&rsquo;s Theme

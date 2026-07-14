@@ -91,7 +91,11 @@ import {
 } from './keybindings/standard.js';
 import { handlePostMvpShortcut } from './keybindings/postMvp.js';
 import { handleSpaceLeader, handleVimWorkKey, SPACE_LEADER_TIMEOUT_MS } from './keybindings/vim.js';
-import { focusSectionInput, focusElementAtSelection } from './keybindings/focus.js';
+import {
+  focusSectionInput,
+  focusElementAtSelection,
+  focusInputAtSelection,
+} from './keybindings/focus.js';
 import {
   THEME_SELECTION,
   initialSelection,
@@ -698,13 +702,13 @@ export default function App() {
 
   /**
    * 選択中アイテムを編集モードへ（Vim `i`/`a`/`Enter`）。Insert 状態へ移行。
-   * theme/reflection/todo/blocker の全セクションで、selection が指す入力要素（アイテム編集 or
-   * 追加入力欄 or textarea）へフォーカスして Insert へ。セクションによる分岐は無く、
-   * `focusElementAtSelection` が各セクションの適切な要素へ解決する。
+   * `focusInputAtSelection` で実際の入力要素（input/textarea）へフォーカスする。
+   * （`focusElementAtSelection` は選択移動用・section コンテナへフォーカスするため、
+   *   入力開始時には入力欄へ直接フォーカスする本関数を使う）
    */
   const editItemAt = useCallback(
     (sel: WorkSelection) => {
-      focusElementAtSelection(sel, {
+      focusInputAtSelection(sel, {
         todo: workData?.todos ?? [],
         blocker: workData?.blockers ?? [],
       });

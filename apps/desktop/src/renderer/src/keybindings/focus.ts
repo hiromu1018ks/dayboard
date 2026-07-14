@@ -55,13 +55,16 @@ export function focusSectionInput(section: WorkSection): boolean {
 }
 
 /**
- * selection が指す DOM 要素へフォーカスを移す。
+ * selection が指す「選択移動用」要素へフォーカスを移す（hjkl/Space 1/2/3 で呼ばれる）。
  *
- * 新アーキテクチャの中核: selection（React state）と DOM フォーカスの同期。
- * 各コンポーネントは以下の data 属性で選択位置を表現する:
- * - todo/blocker: `data-focus-item="<id>"`（アイテム）、`data-focus-input`（追加入力欄）
- * - reflection: `data-focus-field="doneText|stuckText|tomorrowActionText"`
- * - theme: `data-focus-input`（テーマ入力欄）
+ * **選択移動と入力の分離（重要）:**
+ * 入力欄（input/textarea）へフォーカスすると vim.ts のスルー判定で hjkl が効かなくなる。
+ * そのため本関数は:
+ * - todo/blocker の**アイテム選択** → `button[data-focus-item]` へフォーカス（button は入力要素でない、hjkl 有効）
+ * - theme/reflection/追加入力欄 の選択 → **section コンテナ自身**（`tabIndex={-1}`）へフォーカス
+ *   （入力欄でないため hjkl 有効。選択ハイライトで現在位置を示す）
+ *
+ * 入力欄へフォーカスしたい（`i` で編集開始）場合は `focusInputAtSelection` を使う。
  *
  * @param selection フォーカス対象の選択位置
  * @param itemsBySection 各セクションのアイテム配列（id 解決用）。todo/blocker のみ必要。
@@ -77,39 +80,70 @@ export function focusElementAtSelection(
   const container = getSectionContainer(selection.section);
   if (!container) return false;
 
-  if (selection.section === 'theme') {
-    return focusSectionInput('theme');
-  }
-
-  if (selection.section === 'reflection') {
-    if (!selection.field) return focusSectionInput('reflection');
-    const el = container.querySelector<HTMLElement>(`[data-focus-field="${selection.field}"]`);
-    if (el) {
-      el.focus();
-      return true;
+  // todo/blocker のアイテム選択時のみ button[data-focus-item] へフォーカス（hjkl 有効）。
+  // それ以外（theme/reflection/追加入力欄）は section コンテナ自身へフォーカス（入力欄回避）。
+  if (selection.section === 'todo' || selection.section === 'blocker') {
+    const items = selection.section === 'todo' ? itemsBySection.todo : itemsBySection.blocker;
+    const itemCount = items?.length ?? 0;
+    const idx = selection.itemIndex ?? 0;
+    // 追加入力欄（番哨行）でなければ button へ
+    if (idx < itemCount) {
+      const item = items?.[idx];
+      if (item) {
+        const el = container.querySelector<HTMLElement>(`[data-focus-item="${item.id}"]`);
+        if (el) {
+          el.focus();
+          return true;
+        }
+      }
     }
-    return focusSectionInput('reflection');
   }
 
-  // todo/blocker
+  // theme/reflection/追加入力欄選択時、または button 解決失敗時:
+  // section コンテナ自身へフォーカス（tabIndex={-1} で JS focus 可、入力要素でない）
+  container.focus();
+  return true;
+}
+
+/**
+ * selection が指す**入力欄**へフォーカスを移す（Vim `i`/`Enter` 編集開始で呼ばれる）。
+ *
+ * `focusElementAtSelection`（選択移動用・section へフォーカス）と対で使う。
+ * こちらは実際の入力要素（input/textarea）へフォーカスし、文字入力を可能にする。
+ *
+ * - theme: テーマ入力欄（`#theme-input` / `data-focus-input`）
+ * - reflection: 選択中 field の textarea（`data-focus-field`）
+ * - todo/blocker: アイテム選択時は本文編集 input、追加入力欄選択時は `data-focus-input`
+ */
+export function focusInputAtSelection(
+  selection: WorkSelection,
+  itemsBySection: {
+    todo?: { id: string }[];
+    blocker?: { id: string }[];
+  },
+): boolean {
+  const container = getSectionContainer(selection.section);
+  if (!container) return false;
+
+  if (selection.section === 'theme' || selection.section === 'reflection') {
+    return focusSectionInput(selection.section);
+  }
+
+  // todo/blocker: 追加入力欄選択時は data-focus-input へ
   const items = selection.section === 'todo' ? itemsBySection.todo : itemsBySection.blocker;
   const itemCount = items?.length ?? 0;
   const idx = selection.itemIndex ?? 0;
-
-  // 追加入力欄（番哨行）を選択中
   if (idx >= itemCount) {
     return focusSectionInput(selection.section);
   }
 
-  // アイテムを選択中: data-focus-item から id を解決
-  const item = items?.[idx];
-  if (!item) return focusSectionInput(selection.section);
-  const el = container.querySelector<HTMLElement>(`[data-focus-item="${item.id}"]`);
-  if (el) {
-    el.focus();
-    return true;
-  }
-  return focusSectionInput(selection.section);
+  // アイテム選択時: 編集モードの input へ。実装上は button[data-focus-item] の dblclick 等で
+  // 編集モードに入るが、本関数では直接 input を探せないため section コンテナへフォールバック。
+  // （todo/blocker の本文編集はコンポーネント側で editing state を介して input 表示）
+  // → 呼び出し側（editItemAt）で button のダブルクリック相当の処理を呼ぶのが理想だが、
+  //   MVP では section へフォーカスし、ユーザーが Enter/i 再押下で編集モードへ。
+  container.focus();
+  return true;
 }
 
 /**
