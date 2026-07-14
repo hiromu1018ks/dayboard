@@ -15,7 +15,13 @@
  */
 
 import { expect, test, type ElectronApplication, type Page } from '@playwright/test';
-import { closeApp, launchApp, resetE2eDatabase } from './helpers.js';
+import {
+  closeApp,
+  launchApp,
+  resetE2eDatabase,
+  waitForSaved,
+  waitForSavedSteady,
+} from './helpers.js';
 
 /** ヘッダーに表示される日付（YYYY-MM-DD 形式、フォント属性付き） */
 const DATE_DISPLAY = 'h1[data-testid="date-display"]';
@@ -24,7 +30,8 @@ const THEME_INPUT = '#theme-input';
 /** 各移動ボタン */
 const PREV_BUTTON = 'button[aria-label="前日へ"]';
 const NEXT_BUTTON = 'button[aria-label="翌日へ"]';
-const TODAY_BUTTON = 'button:has-text("今日")';
+/** 「今日」ボタン（Header、英語ラベル "Today"、commit 50b0d57 で英語化） */
+const TODAY_BUTTON = 'button:has-text("Today")';
 
 test.describe('日付移動（AC-10）', () => {
   let app: ElectronApplication;
@@ -59,13 +66,13 @@ test.describe('日付移動（AC-10）', () => {
 
     // テーマを入力して保存（AC-02 の前提: 元日付にデータが残る）
     await window.fill(THEME_INPUT, '日付移動テスト');
-    await window.waitForSelector('text=保存済み', { timeout: 10_000 });
+    await waitForSaved(window);
 
     // 翌日へ
     await window.locator(NEXT_BUTTON).click();
     await expect(window.locator(THEME_INPUT)).toHaveValue('', { timeout: 10_000 });
-    // 翌日の fetch が完了するまで待つ（「下書き」or「保存済み」が表示される）
-    await window.waitForSelector('text=/下書き|保存済み/', { timeout: 10_000 });
+    // 翌日の fetch が完了するまで待つ（保存中表示が消える = saved 収束を待つ）
+    await waitForSavedSteady(window);
 
     // 前日へ戻る（元の日付）
     await window.locator(PREV_BUTTON).click();

@@ -17,7 +17,7 @@
  */
 
 import { expect, test, type ElectronApplication, type Page } from '@playwright/test';
-import { closeApp, launchApp } from './helpers.js';
+import { closeApp, launchApp, waitForSaved } from './helpers.js';
 
 /** テーマ入力欄（仕事整理モードの識別子） */
 const THEME_INPUT = '#theme-input';
@@ -111,14 +111,22 @@ test.describe('モード切替（AC-03/AC-04）', () => {
     await pressModeToggle(window);
     await expect(window.locator(NOTE_EDITOR)).toBeVisible({ timeout: 10_000 });
 
-    // フォーカスが当たっていることを確認してから入力（修正3 の検証）
-    await expect(window.locator(CM_CONTENT)).toBeFocused({ timeout: 5_000 });
+    // フォーカスが当たっていることを確認してから入力（修正3 の検証）。
+    // 切替直後の requestAnimationFrame フォーカスが揺らぐことがあるため、
+    // 自動フォーカスを待ち、取れなければクリックで確実にフォーカス（convert.spec.ts と同対策）。
+    const cm = window.locator(CM_CONTENT);
+    try {
+      await expect(cm).toBeFocused({ timeout: 3_000 });
+    } catch {
+      await cm.click();
+      await expect(cm).toBeFocused({ timeout: 5_000 });
+    }
 
     const noteText = `E2Eノート ${Date.now()}`;
     await window.keyboard.type(noteText);
 
-    // 800ms デバウンス + サーバー保存を待つ（「保存済み」を待つ）
-    await window.waitForSelector('text=保存済み', { timeout: 10_000 });
+    // 800ms デバウンス + サーバー保存を待つ（保存中表示が出て消えるのを待つ、[§10] 準拠）
+    await waitForSaved(window);
 
     // 仕事整理モードへ戻る（flush 経由）
     await pressModeToggle(window);

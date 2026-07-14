@@ -15,7 +15,7 @@
  */
 
 import { expect, test, type ElectronApplication, type Page } from '@playwright/test';
-import { closeApp, launchApp, resetE2eDatabase } from './helpers.js';
+import { closeApp, launchApp, resetE2eDatabase, waitForSavedSteady } from './helpers.js';
 
 const THEME_INPUT = '#theme-input';
 const NEW_TODO_INPUT = 'input[aria-label="新規TODO入力"]';
@@ -69,15 +69,15 @@ test.describe('未完了TODO持ち越し（AC-11/AC-12）', () => {
     // 確認ダイアログの「持ち越す」
     await window.click('button:has-text("持ち越す")');
 
-    // 当日側が carried になる（→ 翌日へ持ち越し済み ラベル）
-    await expect(window.locator('text=/翌日へ持ち越し済み/')).toBeVisible({ timeout: 10_000 });
+    // 当日側が carried になる（→ Carried to tomorrow ラベル、英語化: commit 50b0d57）
+    await expect(window.locator('text=/Carried to tomorrow/')).toBeVisible({ timeout: 10_000 });
 
     // 翌日へ移動して、持ち越しTODOが表示される
     await window.locator(NEXT_BUTTON).click();
     await expect(window.locator(THEME_INPUT)).toBeVisible({ timeout: 10_000 });
-    // 翌日の fetch 完了を待つ（「下書き」or「保存済み」が表示される）
-    await window.waitForSelector('text=/下書き|保存済み/', { timeout: 10_000 });
-    // 翌日にTODOが表示され、「から持ち越し」ラベルがある
+    // 翌日の fetch 完了を待つ（保存中表示が消える = saved 収束を待つ）
+    await waitForSavedSteady(window);
+    // 翌日にTODOが表示され、「から持ち越し」ラベルがある（※ この表示は日本語まま）
     await expect(window.getByText(todoTitle).first()).toBeVisible({ timeout: 15_000 });
     await expect(window.locator('text=/から持ち越し/')).toBeVisible({ timeout: 10_000 });
   });
@@ -92,7 +92,7 @@ test.describe('未完了TODO持ち越し（AC-11/AC-12）', () => {
     // 1回目の持ち越し
     await window.click('text=/未完了を翌日へ持ち越し/');
     await window.click('button:has-text("持ち越す")');
-    await expect(window.locator('text=/翌日へ持ち越し済み/')).toBeVisible({ timeout: 10_000 });
+    await expect(window.locator('text=/Carried to tomorrow/')).toBeVisible({ timeout: 10_000 });
 
     // carried になったTODOは「未完了」から除外されるため、持ち越しボタンが表示されないことを検証
     // （incompleteTodos.length === 0 なので「未完了を翌日へ持ち越し」は表示されない）

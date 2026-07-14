@@ -129,6 +129,75 @@ export async function closeApp(app: ElectronApplication): Promise<void> {
 }
 
 /**
+ * アプリ起動直後の「準備完了」を待つ共通ヘルパ。
+ *
+ * launchApp の domcontentloaded 待ちだけでは、Renderer の初回 fetch・keydown リスナ登録・
+ * React 初期描画が完了していないことがあり、直後のショートカット（⌘+J 等）が未到着になる
+ * レースが起きる。本関数で仕事整理モードの初期要素（テーマ入力欄）が表示されるのを待ち、
+ * モード切替等の操作を安全に実行できるようにする。
+ */
+export async function waitForAppReady(window: Page, timeoutMs = 15_000): Promise<void> {
+  await window.locator('#theme-input').waitFor({ state: 'visible', timeout: timeoutMs });
+}
+
+/**
+ * launchApp + waitForAppReady を組み合わせた便利ヘルパ。
+ * 起動直後にショートカット操作を行うテストで、レースを避けるために使う。
+ */
+export async function launchAppReady(options?: {
+  env?: Record<string, string>;
+  userDataDir?: string;
+}): Promise<{ app: ElectronApplication; window: Page }> {
+  const launched = await launchApp(options);
+  await waitForAppReady(launched.window);
+  return launched;
+}
+
+/**
+ * 自動保存の完了を待つ共通ヘルパ（[ui_interaction_spec.md §10] 準拠）。
+ *
+ * SaveStatus コンポーネントは:
+ * - `idle`/`saving` = 「保存中...」を表示
+ * - `saved` = **非表示**（表示が消えることで保存完了を伝える設計、§10）
+ *
+ * 従来の E2E は `text=保存済み` の出現を待っていたが、仕様上「保存済み」表示は存在しない
+ * ためタイムアウトしていた。本ヘルパは「保存中...」の出現→消失で保存完了を検知する。
+ *
+ * 使い分け:
+ * - `waitForSaved(window)`: 編集後に呼ぶ。「保存中...」が出て消えるのを待つ（保存完了）。
+ * - `waitForSavedSteady(window)`: アプリ起動直後など、初期状態が saved（=非表示）に
+ *   収束するのを待つ。編集前の初期安定待ちに使う。
+ *
+ * @param window Electron の Page
+ * @param timeoutMs タイムアウト（既定 10s）
+ */
+export async function waitForSaved(window: Page, timeoutMs = 10_000): Promise<void> {
+  // 保存中（idle/saving）の表示を待つ → 消える（= saved へ遷移）のを待つ
+  // ※ debounce 800ms + サーバー往復を想定。保存中が一瞬で抜ける場合もあるため、
+  //   最初から無い場合は即完了とみなす（waitForSelector のタイムアウトを短めに設定）。
+  const savingLocator = window.getByText('保存中...');
+  try {
+    await savingLocator.waitFor({ state: 'visible', timeout: 3_000 });
+  } catch {
+    // 保存中表示を捕捉できなかった場合は既に saved へ遷移したとみなす
+    return;
+  }
+  await savingLocator.waitFor({ state: 'detached', timeout: timeoutMs });
+}
+
+/**
+ * アプリ起動直後の初期状態（saved = 保存中表示なし）が安定するまで待つ。
+ * 初期 fetch や localStorage 復元の保存が落ち着くのを待つ用途。
+ */
+export async function waitForSavedSteady(window: Page, timeoutMs = 10_000): Promise<void> {
+  // 「保存中...」が表示されていれば消えるまで待つ。無ければ即完了。
+  const savingLocator = window.getByText('保存中...');
+  if (await savingLocator.isVisible().catch(() => false)) {
+    await savingLocator.waitFor({ state: 'detached', timeout: timeoutMs });
+  }
+}
+
+/**
  * E2E 用 DB のデータテーブルを TRUNCATE して隔離する（[test_strategy.md §4.1]）。
  *
  * すべての spec の beforeEach で呼び、前のテストの DayNote/TODO 等が残らないようにする。
