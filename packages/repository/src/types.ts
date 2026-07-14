@@ -13,6 +13,7 @@
 import type {
   BlockerItem,
   DayNote,
+  DayNoteSummary,
   KeybindingMode,
   NoteEntry,
   NoteLineMeta,
@@ -68,6 +69,8 @@ export interface DayNoteRepository {
   findByDate(date: string): Promise<DayNote | null>;
   findById(id: string): Promise<DayNote | null>;
   existsByDate(date: string): Promise<boolean>;
+  /** 日付範囲の DayNote サマリを取得（サイドバー用、date 降順） */
+  listByDateRange(from: string, to: string): Promise<DayNoteSummary[]>;
   create(id: string, date: string, tx?: Tx): Promise<DayNote>;
   update(id: string, input: DayNoteUpdateInput, tx?: Tx): Promise<DayNote | null>;
 }

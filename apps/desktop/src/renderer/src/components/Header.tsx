@@ -10,30 +10,9 @@
  */
 
 import { useEffect, useRef, useState } from 'react';
-import { getWeekdayLabelEn } from '@dayboard/domain';
-
-/** 英語月名短縮形（1=Jan ... 12=Dec）。表示用フォーマットに用いる。 */
-const MONTH_LABELS_EN = [
-  '',
-  'Jan',
-  'Feb',
-  'Mar',
-  'Apr',
-  'May',
-  'Jun',
-  'Jul',
-  'Aug',
-  'Sep',
-  'Oct',
-  'Nov',
-  'Dec',
-] as const;
-
-/** YYYY-MM-DD を「Jul 13, 2026」形式に整形（表示用。曜日は getWeekdayLabelEn で別途取得） */
-function formatDisplayDate(dateStr: string): string {
-  const [y, m, d] = dateStr.split('-');
-  return `${MONTH_LABELS_EN[Number(m)] ?? ''} ${Number(d)}, ${y}`;
-}
+import { formatDisplayDate, getWeekdayLabelEn } from '@dayboard/domain';
+import { fetchDayNoteMarkdown } from '../api/client.js';
+import type { ToastMessage } from './Toast.js';
 
 export type HeaderProps = {
   /** 表示中の日付（YYYY-MM-DD） */
@@ -52,6 +31,8 @@ export type HeaderProps = {
   onThemeEdit: (theme: string | null) => void;
   /** 設定モーダルを開く（Phase 7、[ui_interaction_spec.md §8.1]） */
   onOpenSettings: () => void;
+  /** Markdown をクリップボードへコピーした際のトースト通知 */
+  onToast: (message: ToastMessage) => void;
 };
 
 export function Header({
@@ -63,6 +44,7 @@ export function Header({
   isToday,
   onThemeEdit,
   onOpenSettings,
+  onToast,
 }: HeaderProps) {
   const displayDate = formatDisplayDate(currentDate);
   const weekday = getWeekdayLabelEn(currentDate);
@@ -111,6 +93,21 @@ export function Header({
     setThemeInput(value);
     // 空文字は null として扱う（API 側でも正規化されるが、クライアント側でも明示）
     onThemeEdit(value === '' ? null : value);
+  };
+
+  /**
+   * Markdown エクスポート（Post-MVP）。
+   * 1日分の Markdown 文字列を API から取得し、クリップボードへコピーする。
+   * 未存在日は空テンプレートが返るため、常に機能する。
+   */
+  const handleExportMarkdown = async () => {
+    try {
+      const markdown = await fetchDayNoteMarkdown(currentDate);
+      await navigator.clipboard.writeText(markdown);
+      onToast({ kind: 'success', text: 'Copied to clipboard' });
+    } catch {
+      onToast({ kind: 'error', text: 'コピーに失敗しました' });
+    }
   };
 
   return (
@@ -174,12 +171,36 @@ export function Header({
             className="head w-full border-none bg-transparent px-0 py-1 text-lg text-ink outline-none placeholder:text-faint/60 placeholder:italic"
           />
         </div>
+        {/* Markdown エクスポートボタン（Post-MVP: クリップボードへコピー） */}
+        <button
+          type="button"
+          onClick={handleExportMarkdown}
+          aria-label="Markdownとしてコピー"
+          className="ml-1 self-end rounded p-1 text-faint hover:bg-raised hover:text-sub focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1"
+        >
+          {/* コピーアイコン（SVG） */}
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            width="18"
+            height="18"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden="true"
+          >
+            <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
+            <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+          </svg>
+        </button>
         {/* 設定（歯車）アイコン（[ui_interaction_spec.md §8.1]、Phase 7 T-7-02） */}
         <button
           type="button"
           onClick={onOpenSettings}
           aria-label="設定を開く"
-          className="ml-2 self-end rounded p-1 text-faint hover:bg-raised hover:text-sub focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1"
+          className="ml-1 self-end rounded p-1 text-faint hover:bg-raised hover:text-sub focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1"
         >
           {/* 歯車アイコン（SVG） */}
           <svg

@@ -158,3 +158,68 @@ export function getSeason(dateStr: string): Season {
   if (month >= 9 && month <= 11) return 'autumn';
   return 'winter';
 }
+
+/**
+ * 英語月名短縮形（1=Jan ... 12=Dec）。0番目は空文字（インデックス=月番号で直接参照するため）。
+ * Header / NoteMode / Sidebar 等の表示用フォーマットに用いる。旧 Renderer 側重複定義を解消し
+ * ドメイン層へ昇格（単一の真実源）。
+ */
+export const MONTH_LABELS_EN = [
+  '',
+  'Jan',
+  'Feb',
+  'Mar',
+  'Apr',
+  'May',
+  'Jun',
+  'Jul',
+  'Aug',
+  'Sep',
+  'Oct',
+  'Nov',
+  'Dec',
+] as const;
+
+/**
+ * YYYY-MM-DD を「Jul 13, 2026」形式に整形（表示用。曜日は `getWeekdayLabelEn` で別途取得）。
+ * 旧 Header.tsx / NoteMode.tsx の重複定義を解消しドメイン層へ昇格。
+ */
+export function formatDisplayDate(dateStr: string): string {
+  const [y, m, d] = dateStr.split('-');
+  return `${MONTH_LABELS_EN[Number(m)] ?? ''} ${Number(d)}, ${y}`;
+}
+
+/**
+ * YYYY-MM 文字列の形式を検証する。
+ * `getMonthRange` の入力検証で用いる。
+ */
+export function isValidYearMonthString(yearMonth: string): boolean {
+  if (!/^\d{4}-\d{2}$/.test(yearMonth)) return false;
+  const year = Number(yearMonth.slice(0, 4));
+  const month = Number(yearMonth.slice(5, 7));
+  if (month < 1 || month > 12) return false;
+  // year 0-99 の JS 仕様対策は不要（検証のみで Date 生成しない）
+  return year >= 1;
+}
+
+/**
+ * YYYY-MM 文字列からその月の月初・月末の YYYY-MM-DD 文字列を返す。
+ *
+ * サイドバーのカレンダー表示で「表示月の1日〜月末」を API の `from`/`to` に渡すために用いる。
+ * 月末は翌月0日 = 当月最終日で算出（うるう年の 2/29 も正しく処理される）。
+ *
+ * @param yearMonth YYYY-MM 形式（`isValidYearMonthString` を満たすこと）
+ * @returns `{ from: 'YYYY-MM-01', to: 'YYYY-MM-DD' }`（月末の日付）
+ */
+export function getMonthRange(yearMonth: string): { from: string; to: string } {
+  if (!isValidYearMonthString(yearMonth)) {
+    throw new RangeError(`Invalid year-month string: ${yearMonth} (expected YYYY-MM)`);
+  }
+  const year = Number(yearMonth.slice(0, 4));
+  const month = Number(yearMonth.slice(5, 7));
+  const from = `${yearMonth}-01`;
+  // 翌月0日 = 当月最終日。month は 0 始まりのため、month（1-12）をそのまま渡すと翌月になる。
+  const lastDay = new Date(year, month, 0).getDate();
+  const to = `${yearMonth}-${String(lastDay).padStart(2, '0')}`;
+  return { from, to };
+}

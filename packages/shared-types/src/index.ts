@@ -222,3 +222,45 @@ export type ApiError = {
       | Record<string, unknown>;
   };
 };
+
+// ----- サイドバー・検索API（Post-MVP） -----
+
+/**
+ * GET /api/day-notes?from&to のリスト要素（サイドバーの月別カレンダー用）。
+ * DayNote のサマリ情報のみ（todos/blockers 等は含まない）。
+ */
+export type DayNoteSummary = {
+  /** YYYY-MM-DD */
+  date: string;
+  /** 未入力は null */
+  theme: string | null;
+  lastOpenedMode: ViewMode;
+};
+
+/** 全文検索のヒット元リソース種別 */
+export type SearchResourceType = 'todo' | 'blocker' | 'note' | 'reflection' | 'theme';
+
+/** 振り返りセクションの識別子（reflection ヒット時のみ設定） */
+export type ReflectionSection = 'done' | 'stuck' | 'tomorrow';
+
+/**
+ * 全文検索の1ヒット。`GET /api/search?q=...` のレスポンス要素。
+ * スニペットはヒット箇所の前後N文字（前後30文字目安）。`…` は呼出元で装飾済み。
+ */
+export type SearchHit = {
+  /** 該当日（YYYY-MM-DD） */
+  date: string;
+  resourceType: SearchResourceType;
+  resourceId: string;
+  /** ヒット箇所の前後スニペット（`…` 装飾済み） */
+  snippet: string;
+  /** reflection のみ: ヒットしたセクション */
+  section?: ReflectionSection;
+};
+
+/** 全文検索レスポンス（`GET /api/search?q=...`） */
+export type SearchResponse = {
+  hits: SearchHit[];
+  /** ヒット総数（LIMIT 適用前） */
+  total: number;
+};

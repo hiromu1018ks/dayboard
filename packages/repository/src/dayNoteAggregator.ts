@@ -160,6 +160,10 @@ async function createFullInTx(date: string, tx: Tx): Promise<DayNoteFull> {
 /**
  * date から既存の `DayNoteFull` を編成。各リポジトリ関数で取得する。
  *
+ * 副作用なしの読み取り専用取得。Markdown 出力（GET /api/day-notes/:date/markdown）等、
+ * 自動生成を伴わない取得で利用する。`getOrCreateFull` は本関数を内包し、未存在時に
+ * 自動生成を追加で行う。
+ *
  * データ不整合時の挙動: DayNote/Reflection/NoteEntry のいずれかが欠けている場合
  * （通常の運用では起こり得ないが、外部要因で部分削除された場合等）は `null` を返す。
  * `getOrCreateFull` はこの場合 `createFullInTransaction` を呼ぶが、DayNote 行が
@@ -168,7 +172,7 @@ async function createFullInTx(date: string, tx: Tx): Promise<DayNoteFull> {
  *
  * Phase 5: noteLineMetas を NoteEntry のID経由で取得し、変換済みマーク表示に供する。
  */
-async function findFullByDate(date: string): Promise<DayNoteFull | null> {
+export async function findFullByDate(date: string): Promise<DayNoteFull | null> {
   const dayNote = await dayNoteRepository.findByDate(date);
   if (!dayNote) return null;
 

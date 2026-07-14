@@ -47,7 +47,15 @@ export * as noteLineMetaRepository from './noteLineMetaRepository.js';
 // リポジトリ実装（Phase 7: ユーザー設定）
 export * as userSettingsRepository from './userSettingsRepository.js';
 
+// リポジトリ実装（Post-MVP: 全文検索）
+export * as searchRepository from './searchRepository.js';
+
 // DayNote aggregator（AC-01: 自動生成 + DayNoteFull 編成）
-export { getOrCreateFull, patchDayNote, dayNoteExists } from './dayNoteAggregator.js';
+export {
+  getOrCreateFull,
+  patchDayNote,
+  dayNoteExists,
+  findFullByDate,
+} from './dayNoteAggregator.js';
 // Phase 6: 持ち越しAPI用（既存トランザクション内で翌日DayNoteを取得/生成）
 export { getOrCreateDayNoteIdInTx } from './dayNoteAggregator.js';

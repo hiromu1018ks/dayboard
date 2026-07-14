@@ -17,6 +17,7 @@ import {
   isGoPrevDayShortcut,
   isGoNextDayShortcut,
   isPostMvpShortcut,
+  isToggleSidebarShortcut,
   matchColumnFocusShortcut,
   isAddTodoShortcut,
 } from './standard.js';
@@ -156,8 +157,8 @@ describe('Post-MVP ショートカットの無効化（[§11.5]、AC-22）', () 
     it('⌘+Shift+R（振り返り送信）で true', () => {
       expect(isPostMvpShortcut(keyEvent({ metaKey: true, shiftKey: true, key: 'r' }))).toBe(true);
     });
-    it('⌘+Shift+M（時刻見出し）で true', () => {
-      expect(isPostMvpShortcut(keyEvent({ metaKey: true, shiftKey: true, key: 'm' }))).toBe(true);
+    it('⌘+Shift+M（時刻見出し）は false（実装済み機能へ昇格、NoteEditor で消費）', () => {
+      expect(isPostMvpShortcut(keyEvent({ metaKey: true, shiftKey: true, key: 'm' }))).toBe(false);
     });
     it('⌘+R（Shift 無し）は false（リロードは別物）', () => {
       expect(isPostMvpShortcut(keyEvent({ metaKey: true, key: 'r' }))).toBe(false);
@@ -167,6 +168,25 @@ describe('Post-MVP ショートカットの無効化（[§11.5]、AC-22）', () 
     });
     it('Shift 無し ⌘+M は false', () => {
       expect(isPostMvpShortcut(keyEvent({ metaKey: true, key: 'm' }))).toBe(false);
+    });
+  });
+});
+
+describe('サイドバー切替ショートカット（Post-MVP）', () => {
+  describe('isToggleSidebarShortcut', () => {
+    it('⌘+\\ で true（Mac）', () => {
+      expect(isToggleSidebarShortcut(keyEvent({ metaKey: true, key: '\\' }))).toBe(true);
+    });
+    it('Ctrl+\\ で true（Win/Linux）', () => {
+      expect(isToggleSidebarShortcut(keyEvent({ ctrlKey: true, key: '\\' }))).toBe(true);
+    });
+    it('Shift+⌘+\\ は false', () => {
+      expect(isToggleSidebarShortcut(keyEvent({ metaKey: true, shiftKey: true, key: '\\' }))).toBe(
+        false,
+      );
+    });
+    it('\\ 単独は false', () => {
+      expect(isToggleSidebarShortcut(keyEvent({ key: '\\' }))).toBe(false);
     });
   });
 });

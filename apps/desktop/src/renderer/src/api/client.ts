@@ -14,10 +14,12 @@ import type {
   CarryOverResult,
   DayNote,
   DayNoteFull,
+  DayNoteSummary,
   KeybindingMode,
   NoteEntry,
   NoteLineMeta,
   Reflection,
+  SearchResponse,
   TodoItem,
   UserSettings,
   ViewMode,
@@ -378,4 +380,41 @@ export async function patchSettings(patch: {
   });
   await assertOk(res);
   return (await res.json()) as UserSettings;
+}
+
+// ============================================================================
+// Post-MVP: サイドバー・検索・Markdown出力
+// ============================================================================
+
+/**
+ * GET /api/day-notes?from&to — 日付範囲の DayNote サマリ一覧を取得（サイドバー用）。
+ * レスポンスは date 降順。
+ */
+export async function fetchDayNoteSummaries(from: string, to: string): Promise<DayNoteSummary[]> {
+  const res = await fetch(
+    `${getApiBaseUrl()}/day-notes?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`,
+  );
+  await assertOk(res);
+  return (await res.json()) as DayNoteSummary[];
+}
+
+/**
+ * GET /api/day-notes/:date/markdown — 1日分の Markdown 文字列を取得。
+ * 未存在日は空テンプレートが返る（404 ではない）。
+ */
+export async function fetchDayNoteMarkdown(date: string): Promise<string> {
+  const res = await fetch(`${getApiBaseUrl()}/day-notes/${encodeURIComponent(date)}/markdown`);
+  await assertOk(res);
+  return await res.text();
+}
+
+/**
+ * GET /api/search?q=... — 全文検索を実行し、ヒットスニペット付きの結果を返す。
+ */
+export async function searchAll(query: string, limit: number = 50): Promise<SearchResponse> {
+  const res = await fetch(
+    `${getApiBaseUrl()}/search?q=${encodeURIComponent(query)}&limit=${limit}`,
+  );
+  await assertOk(res);
+  return (await res.json()) as SearchResponse;
 }

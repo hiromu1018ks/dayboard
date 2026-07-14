@@ -263,4 +263,135 @@ describe('DayNote API (Integration)', () => {
       expect(result.rows[0].count).toBe(1);
     });
   });
+
+  describe('GET /api/day-notes?from&to（日付範囲サマリ一覧、サイドバー用）', () => {
+    it('from/to 指定で DayNote サマリ一覧を返す（date 降順）', async () => {
+      // 3日分の DayNote を生成（theme を設定）
+      // まず /full で DayNote を自動生成してから PATCH で theme を設定
+      await app.request('/api/day-notes/2026-07-08/full');
+      await app.request('/api/day-notes/2026-07-08', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ theme: 'テーマA' }),
+      });
+      await app.request('/api/day-notes/2026-07-10/full');
+      await app.request('/api/day-notes/2026-07-10', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ theme: 'テーマB' }),
+      });
+      await app.request('/api/day-notes/2026-07-12/full');
+
+      const res = await app.request('/api/day-notes?from=2026-07-01&to=2026-07-31');
+      expect(res.status).toBe(200);
+      const summaries = (await res.json()) as Array<{
+        date: string;
+        theme: string | null;
+        lastOpenedMode: string;
+      }>;
+      expect(summaries).toHaveLength(3);
+      // date 降順
+      expect(summaries[0].date).toBe('2026-07-12');
+      expect(summaries[1].date).toBe('2026-07-10');
+      expect(summaries[2].date).toBe('2026-07-08');
+      // theme と lastOpenedMode
+      expect(summaries[0].theme).toBeNull();
+      expect(summaries[1].theme).toBe('テーマB');
+      expect(summaries[2].theme).toBe('テーマA');
+      expect(summaries.every((s) => s.lastOpenedMode === 'work')).toBe(true);
+    });
+
+    it('lastOpenedMode=note で更新した日がリストで正しく返る（M-3）', async () => {
+      // DayNote を生成し、lastOpenedMode を note に更新
+      await app.request('/api/day-notes/2026-07-08/full');
+      await app.request('/api/day-notes/2026-07-08', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ lastOpenedMode: 'note' }),
+      });
+
+      const res = await app.request('/api/day-notes?from=2026-07-01&to=2026-07-31');
+      expect(res.status).toBe(200);
+      const summaries = (await res.json()) as Array<{
+        date: string;
+        theme: string | null;
+        lastOpenedMode: string;
+      }>;
+      const target = summaries.find((s) => s.date === '2026-07-08');
+      expect(target).toBeDefined();
+      expect(target!.lastOpenedMode).toBe('note');
+    });
+
+    it('from === to の同一日指定で1件返る', async () => {
+      await app.request('/api/day-notes/2026-07-08/full');
+      const res = await app.request('/api/day-notes?from=2026-07-08&to=2026-07-08');
+      expect(res.status).toBe(200);
+      const summaries = await res.json();
+      expect(summaries).toHaveLength(1);
+      expect(summaries[0].date).toBe('2026-07-08');
+    });
+
+    it('該当なしの場合は空配列', async () => {
+      const res = await app.request('/api/day-notes?from=2026-01-01&to=2026-01-31');
+      expect(res.status).toBe(200);
+      const summaries = await res.json();
+      expect(summaries).toEqual([]);
+    });
+
+    it('from/to なしは 400', async () => {
+      const res = await app.request('/api/day-notes');
+      expect(res.status).toBe(400);
+    });
+
+    it('無効な日付形式は 400', async () => {
+      const res = await app.request('/api/day-notes?from=invalid&to=2026-07-31');
+      expect(res.status).toBe(400);
+    });
+
+    it('from > to は 400', async () => {
+      const res = await app.request('/api/day-notes?from=2026-07-31&to=2026-07-01');
+      expect(res.status).toBe(400);
+    });
+  });
+
+  describe('GET /api/day-notes/:date/markdown', () => {
+    it('存在する DayNote を Markdown 文字列で返す', async () => {
+      // データ準備: まず /full で自動生成してから theme と TODO を設定
+      await app.request('/api/day-notes/2026-07-13/full');
+      await app.request('/api/day-notes/2026-07-13', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ theme: '顧客デモ' }),
+      });
+      await app.request('/api/day-notes/2026-07-13/todos', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ title: '朝会で進捗共有' }),
+      });
+
+      const res = await app.request('/api/day-notes/2026-07-13/markdown');
+      expect(res.status).toBe(200);
+      expect(res.headers.get('content-type')).toBe('text/markdown; charset=utf-8');
+      const md = await res.text();
+      expect(md).toContain('# Jul 13, 2026');
+      expect(md).toContain("## Today's Theme");
+      expect(md).toContain('顧客デモ');
+      expect(md).toContain('## Today');
+      expect(md).toContain('- [ ] 朝会で進捗共有');
+    });
+
+    it('未存在日は空テンプレートを返す（404 ではなく）', async () => {
+      const res = await app.request('/api/day-notes/2026-08-01/markdown');
+      expect(res.status).toBe(200);
+      expect(res.headers.get('content-type')).toBe('text/markdown; charset=utf-8');
+      const md = await res.text();
+      expect(md).toContain('# Aug 1, 2026');
+      expect(md).toContain('（no content）');
+    });
+
+    it('無効な日付形式は 400', async () => {
+      const res = await app.request('/api/day-notes/invalid/markdown');
+      expect(res.status).toBe(400);
+    });
+  });
 });

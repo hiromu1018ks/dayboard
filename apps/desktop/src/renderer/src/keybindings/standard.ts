@@ -67,11 +67,22 @@ export function isGoNextDayShortcut(e: KeyboardEvent): boolean {
 }
 
 /**
- * Post-MVP ショートカット（`⌘/Ctrl+K`, `⌘/Ctrl+Shift+R`, `⌘/Ctrl+Shift+M`）の一致判定
+ * サイドバー表示切替（`⌘/Ctrl+\`）のキー一致判定（Post-MVP: サイドバー機能）。
+ * サイドバーの表示/非表示をトグルする。標準/Vim両方で有効。
+ */
+export function isToggleSidebarShortcut(e: KeyboardEvent): boolean {
+  return isCmdOrCtrl(e) && !e.shiftKey && !e.altKey && keyOf(e) === '\\';
+}
+
+/**
+ * Post-MVP ショートカット（`⌘/Ctrl+K`, `⌘/Ctrl+Shift+R`）の一致判定
  * （[要件 8.6]、[ui_interaction_spec.md §11.5]、AC-22）。
  *
  * これらは実装しない（不発）が、入力内容を破壊しないよう preventDefault で握り潰す。
  * 詳細は postMvp.ts の handlePostMvpShortcut を参照。
+ *
+ * 注意: `⌘/Ctrl+Shift+M`（時刻見出し）は Post-MVP から実装済み機能へ昇格したため、
+ * 本判定からは除外されている。NoteEditor の CodeMirror keymap で消費される。
  */
 export function isPostMvpShortcut(e: KeyboardEvent): boolean {
   if (!isCmdOrCtrl(e)) return false;
@@ -80,8 +91,6 @@ export function isPostMvpShortcut(e: KeyboardEvent): boolean {
   if (!e.shiftKey && k === 'k') return true;
   // ⌘Shift+R（振り返り送信）
   if (e.shiftKey && k === 'r') return true;
-  // ⌘Shift+M（時刻見出し）
-  if (e.shiftKey && k === 'm') return true;
   return false;
 }
 

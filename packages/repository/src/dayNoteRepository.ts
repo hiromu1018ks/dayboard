@@ -9,7 +9,7 @@
  * 単一化する（[api_contract.md §4]）。
  */
 
-import { eq } from 'drizzle-orm';
+import { and, desc, eq, gte, lte } from 'drizzle-orm';
 import { normalizeTheme } from '@dayboard/domain';
 import { getDb } from './db.js';
 import { mapDayNote } from './mappers.js';
@@ -39,6 +39,31 @@ export const existsByDate: IDayNoteRepository['existsByDate'] = async (date) => 
     .where(eq(dayNotes.date, date))
     .limit(1);
   return rows.length > 0;
+};
+
+/**
+ * 日付範囲（from〜to）の DayNote サマリを取得する（サイドバーの月別カレンダー用）。
+ *
+ * @param from YYYY-MM-DD（含む）
+ * @param to   YYYY-MM-DD（含む）
+ * @returns DayNoteSummary の配列（date 降順）。存在しない場合は空配列。
+ */
+export const listByDateRange: IDayNoteRepository['listByDateRange'] = async (from, to) => {
+  const db = getDb();
+  const rows = await db
+    .select({
+      date: dayNotes.date,
+      theme: dayNotes.theme,
+      lastOpenedMode: dayNotes.lastOpenedMode,
+    })
+    .from(dayNotes)
+    .where(and(gte(dayNotes.date, from), lte(dayNotes.date, to)))
+    .orderBy(desc(dayNotes.date));
+  return rows.map((row) => ({
+    date: row.date,
+    theme: row.theme,
+    lastOpenedMode: row.lastOpenedMode as 'work' | 'note',
+  }));
 };
 
 /**
@@ -98,6 +123,7 @@ export const _implements: IDayNoteRepository = {
   findByDate,
   findById,
   existsByDate,
+  listByDateRange,
   create,
   update,
 };

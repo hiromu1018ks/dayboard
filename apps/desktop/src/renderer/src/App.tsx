@@ -45,6 +45,7 @@ import { NoteMode } from './components/NoteMode.js';
 import type { NoteEditorHandle } from './components/NoteEditor.js';
 import { SaveStatus } from './components/SaveStatus.js';
 import { SettingsModal } from './components/SettingsModal.js';
+import { Sidebar } from './components/Sidebar.js';
 import { Toast, type ToastMessage } from './components/Toast.js';
 import { VimStateBadge, type VimState } from './components/VimStateBadge.js';
 import { WorkMode } from './components/WorkMode.js';
@@ -85,6 +86,7 @@ import {
   isGoPrevDayShortcut,
   isGoTodayShortcut,
   isToggleModeShortcut,
+  isToggleSidebarShortcut,
   matchColumnFocusShortcut,
 } from './keybindings/standard.js';
 import { handlePostMvpShortcut } from './keybindings/postMvp.js';
@@ -118,6 +120,21 @@ export default function App() {
   const [vimState, setVimState] = useState<VimState>('normal');
   // 設定モーダル（[ui_interaction_spec.md §8]）
   const [settingsOpen, setSettingsOpen] = useState(false);
+  // サイドバー表示状態（Post-MVP: localStorage で永続化、既定 true）
+  const [sidebarVisible, setSidebarVisible] = useState(() => {
+    if (typeof window === 'undefined') return true;
+    const stored = window.localStorage.getItem('dayborad:sidebar');
+    return stored !== 'false';
+  });
+  const toggleSidebar = useCallback(() => {
+    setSidebarVisible((prev) => {
+      const next = !prev;
+      if (typeof window !== 'undefined') {
+        window.localStorage.setItem('dayborad:sidebar', String(next));
+      }
+      return next;
+    });
+  }, []);
   // 設定ロード完了後、vimDefaultState に従い初期化（normal/insert）
   const settingsInitializedRef = useRef(false);
   useEffect(() => {
@@ -725,6 +742,13 @@ export default function App() {
         return;
       }
 
+      // ⌘/Ctrl+\: サイドバー表示切替（Post-MVP）
+      if (isToggleSidebarShortcut(e)) {
+        e.preventDefault();
+        toggleSidebar();
+        return;
+      }
+
       // ----- Esc: 4段優先順位（T-4-07/T-7-09、[§9.2]） -----
       if (e.key === 'Escape') {
         const consumed = handleEsc({
@@ -842,104 +866,121 @@ export default function App() {
     goToday,
     goPrevDay,
     goNextDay,
+    toggleSidebar,
     toggleCurrentTodo,
     spaceLeaderPending,
   ]);
 
   // ============================================================================
   // レンダリング（Phase 4: viewMode で work/note を切替、[要件 7.7]）
+  // Post-MVP: work/note 両モードを共通親でラップし、左に Sidebar を配置。
   // ============================================================================
 
-  // ノートモード: CodeMirror 本文を画面いっぱいに表示（[要件 6.3]、[§9.1 ④非同時表示]）
-  if (viewMode === 'note') {
-    return (
-      <div className="min-h-screen bg-bg text-ink">
-        <NoteMode
-          ref={noteEditorRef}
-          currentDate={currentDate}
-          body={noteBody}
-          onBodyChange={handleEditNoteBody}
-          loading={loading || !data}
-          noteEntryId={data?.noteEntry.id}
-          noteLineMetas={data?.noteLineMetas}
-          onConvertTodo={handleConvertTodo}
-          onConvertBlocker={handleConvertBlocker}
-          keybindingMode={settings.keybindingMode}
-          onVimModeChange={setVimState}
-          resolvedMode={resolvedMode}
-        />
-
-        {/* 変換成功・エラーのトースト通知（Phase 5、[§6.2]） */}
-        <Toast message={toast} onClose={() => setToast(null)} />
-
-        {/* 保存状態表示（右下、ノートモードでも共通）。
-            右上は Header の日付ナビと重なるため右下に配置。Vim バッジの上に積む。
-            ラッパは pointer-events-none で下の UI のクリックを透過し、
-            error 時の再試行ボタンのみ SaveStatus 側で pointer-events-auto を持つ。 */}
-        <div className="pointer-events-none fixed bottom-10 right-4 z-40">
-          <SaveStatus status={saveStatus} onRetry={retryAll} />
-        </div>
-
-        {/* Vim操作状態表示（右下、Phase 7 T-7-08、[要件 9.4]） */}
-        <VimStateBadge keybindingMode={settings.keybindingMode} vimState={vimState} />
-
-        {/* 設定モーダル（Phase 7 T-7-02、[ui_interaction_spec.md §8]） */}
-        <SettingsModal
-          open={settingsOpen}
-          settings={settings}
-          onChangeKeybindingMode={(mode) => {
-            void updateKeybindingMode(mode);
-          }}
-          onChangeVimDefaultState={(state) => {
-            void updateVimDefaultState(state);
-          }}
-          theme={theme}
-          onChangeTheme={setTheme}
-          onClose={() => setSettingsOpen(false)}
-        />
-
-        {/* 重複変換確認ダイアログ（Phase 5、[§7]） */}
-        <DuplicateConversionDialog
-          open={duplicateDialog !== null}
-          target={duplicateDialog?.target ?? 'todo'}
-          existingTitle={duplicateDialog?.existingTitle}
-          onForce={() => {
-            const d = duplicateDialog;
-            setDuplicateDialog(null);
-            if (d) void d.retry();
-          }}
-          onCancel={() => setDuplicateDialog(null)}
-        />
-
-        {/* localStorage 書込失敗時の確認ダイアログ（§9.3、モード切替兼用） */}
-        <FlushFailDialog
-          open={pendingAction !== null}
-          onProceed={() => {
-            if (pendingAction) {
-              // ユーザー明示で操作を実行（localStorage 保護なし、§9.3「移動する」）
-              runPendingAction(pendingAction);
-            }
-            setPendingAction(null);
-          }}
-          onCancel={() => setPendingAction(null)}
-        />
-      </div>
-    );
-  }
-
-  // 仕事整理モード（デフォルト）
   return (
-    <div className="flex h-screen flex-col bg-bg text-ink">
-      <Header
-        currentDate={currentDate}
-        theme={data?.dayNote.theme ?? null}
-        onPrevDay={goPrevDay}
-        onNextDay={goNextDay}
-        onToday={goToday}
-        isToday={isToday}
-        onThemeEdit={(theme) => edit(THEME_TARGET, theme)}
-        onOpenSettings={() => setSettingsOpen(true)}
-      />
+    <div className="flex h-screen bg-bg text-ink">
+      {/* サイドバー（Post-MVP: カレンダー + 検索） */}
+      {sidebarVisible && <Sidebar currentDate={currentDate} onSelectDate={navigateWithFlush} />}
+
+      {/* サイドバー折りたたみボタン（常に表示。非表示時は開く、表示時は閉じる） */}
+      <button
+        type="button"
+        onClick={toggleSidebar}
+        aria-label={sidebarVisible ? 'サイドバーを閉じる' : 'サイドバーを開く'}
+        aria-expanded={sidebarVisible}
+        className="z-30 flex w-5 shrink-0 cursor-pointer items-center justify-center self-stretch text-faint hover:bg-raised hover:text-sub focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1"
+      >
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          width="14"
+          height="14"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          aria-hidden="true"
+          className={sidebarVisible ? '' : 'rotate-180'}
+        >
+          <path d="M15 18l-6-6 6-6" />
+        </svg>
+      </button>
+
+      {/* メインエリア（work / note で内容を切替） */}
+      {viewMode === 'note' ? (
+        <div className="flex min-w-0 flex-1 flex-col">
+          <NoteMode
+            ref={noteEditorRef}
+            currentDate={currentDate}
+            body={noteBody}
+            onBodyChange={handleEditNoteBody}
+            loading={loading || !data}
+            noteEntryId={data?.noteEntry.id}
+            noteLineMetas={data?.noteLineMetas}
+            onConvertTodo={handleConvertTodo}
+            onConvertBlocker={handleConvertBlocker}
+            keybindingMode={settings.keybindingMode}
+            onVimModeChange={setVimState}
+            resolvedMode={resolvedMode}
+          />
+        </div>
+      ) : (
+        <div className="flex min-w-0 flex-1 flex-col">
+          <Header
+            currentDate={currentDate}
+            theme={data?.dayNote.theme ?? null}
+            onPrevDay={goPrevDay}
+            onNextDay={goNextDay}
+            onToday={goToday}
+            isToday={isToday}
+            onThemeEdit={(theme) => edit(THEME_TARGET, theme)}
+            onOpenSettings={() => setSettingsOpen(true)}
+            onToast={setToast}
+          />
+
+          <main className="flex min-h-0 flex-1 flex-col overflow-hidden px-10 py-6">
+            {loading && <p className="text-sm text-sub">Loading…</p>}
+
+            {error && (
+              <div className="rounded border border-danger/40 bg-danger/10 p-4 text-sm text-danger">
+                <p className="head font-semibold">データの取得に失敗しました。</p>
+                <p className="mt-1">{error.message}</p>
+                <p className="mt-2 text-xs opacity-80">
+                  dayborad_dev への PostgreSQL 接続とマイグレーションを確認してください。
+                </p>
+              </div>
+            )}
+
+            {workData && !loading && (
+              <WorkMode
+                date={currentDate}
+                todos={workData.todos}
+                blockers={workData.blockers}
+                reflection={workData.reflection}
+                dispatch={dispatch}
+                handlers={{
+                  onAddTodo: handleAddTodo,
+                  onToggleTodo: handleToggleTodo,
+                  onEditTodoTitle: handleEditTodoTitle,
+                  onDeleteTodo: handleDeleteTodo,
+                  onReorderTodos: handleReorderTodos,
+                  onCarryOverTodos: handleCarryOverTodos,
+                  onAddBlocker: handleAddBlocker,
+                  onToggleBlockerResolved: handleToggleBlockerResolved,
+                  onEditBlockerText: handleEditBlockerText,
+                  onChangeBlockerLinkedTodo: handleChangeBlockerLinkedTodo,
+                  onDeleteBlocker: handleDeleteBlocker,
+                  onReorderBlockers: handleReorderBlockers,
+                  onEditReflection: handleEditReflection,
+                }}
+                noteLineMetaMap={noteLineMetaMap}
+                highlightTodoIds={highlightTodoIds}
+                highlightBlockerIds={highlightBlockerIds}
+              />
+            )}
+          </main>
+        </div>
+      )}
 
       {/* 保存状態表示（右下、[ui_interaction_spec.md §10]）。
           右上は Header の日付ナビと重なるため右下に配置。Vim バッジの上に積む。
@@ -951,48 +992,6 @@ export default function App() {
 
       {/* Vim操作状態表示（右下、Phase 7 T-7-08、[要件 9.4]） */}
       <VimStateBadge keybindingMode={settings.keybindingMode} vimState={vimState} />
-
-      <main className="flex min-h-0 flex-1 flex-col overflow-hidden px-10 py-6">
-        {loading && <p className="text-sm text-sub">Loading…</p>}
-
-        {error && (
-          <div className="rounded border border-danger/40 bg-danger/10 p-4 text-sm text-danger">
-            <p className="head font-semibold">データの取得に失敗しました。</p>
-            <p className="mt-1">{error.message}</p>
-            <p className="mt-2 text-xs opacity-80">
-              dayborad_dev への PostgreSQL 接続とマイグレーションを確認してください。
-            </p>
-          </div>
-        )}
-
-        {workData && !loading && (
-          <WorkMode
-            date={currentDate}
-            todos={workData.todos}
-            blockers={workData.blockers}
-            reflection={workData.reflection}
-            dispatch={dispatch}
-            handlers={{
-              onAddTodo: handleAddTodo,
-              onToggleTodo: handleToggleTodo,
-              onEditTodoTitle: handleEditTodoTitle,
-              onDeleteTodo: handleDeleteTodo,
-              onReorderTodos: handleReorderTodos,
-              onCarryOverTodos: handleCarryOverTodos,
-              onAddBlocker: handleAddBlocker,
-              onToggleBlockerResolved: handleToggleBlockerResolved,
-              onEditBlockerText: handleEditBlockerText,
-              onChangeBlockerLinkedTodo: handleChangeBlockerLinkedTodo,
-              onDeleteBlocker: handleDeleteBlocker,
-              onReorderBlockers: handleReorderBlockers,
-              onEditReflection: handleEditReflection,
-            }}
-            noteLineMetaMap={noteLineMetaMap}
-            highlightTodoIds={highlightTodoIds}
-            highlightBlockerIds={highlightBlockerIds}
-          />
-        )}
-      </main>
 
       {/* 変換成功・エラーのトースト通知（Phase 5、[§6.2]） */}
       <Toast message={toast} onClose={() => setToast(null)} />
@@ -1010,6 +1009,19 @@ export default function App() {
         theme={theme}
         onChangeTheme={setTheme}
         onClose={() => setSettingsOpen(false)}
+      />
+
+      {/* 重複変換確認ダイアログ（Phase 5、[§7]） */}
+      <DuplicateConversionDialog
+        open={duplicateDialog !== null}
+        target={duplicateDialog?.target ?? 'todo'}
+        existingTitle={duplicateDialog?.existingTitle}
+        onForce={() => {
+          const d = duplicateDialog;
+          setDuplicateDialog(null);
+          if (d) void d.retry();
+        }}
+        onCancel={() => setDuplicateDialog(null)}
       />
 
       {/* localStorage 書込失敗時の確認ダイアログ（§9.3、モード切替兼用） */}

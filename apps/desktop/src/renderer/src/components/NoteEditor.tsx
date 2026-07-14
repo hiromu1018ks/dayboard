@@ -399,10 +399,20 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(function
               preventDefault: true,
               run: () => true,
             },
+            // 時刻つきメモ追加（`⌘/Ctrl+Shift+M`）: 現在時刻の `### HH:mm` 見出しを挿入。
+            // Post-MVP から実装済み機能へ昇格。挿入後は updateListener 経由で onChange が発火し、
+            // 自動保存へ接続される。
             {
               key: 'Mod-Shift-m',
               preventDefault: true,
-              run: () => true,
+              run: (view) => {
+                const now = new Date();
+                const hh = String(now.getHours()).padStart(2, '0');
+                const mm = String(now.getMinutes()).padStart(2, '0');
+                view.dispatch(view.state.replaceSelection(`\n### ${hh}:${mm}\n`));
+                view.focus();
+                return true;
+              },
             },
           ]),
         ),

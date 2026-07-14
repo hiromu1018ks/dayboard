@@ -29,11 +29,15 @@ export {
   addDays,
   todayLocal,
   isValidDateString,
+  isValidYearMonthString,
   getWeekdayLabel,
   getWeekdayLabelEn,
   formatMonthDay,
+  formatDisplayDate,
+  getMonthRange,
   WEEKDAY_LABELS_JA,
   WEEKDAY_LABELS_EN,
+  MONTH_LABELS_EN,
   getSeason,
 } from './date.js';
 export type { Season } from './date.js';
@@ -98,3 +102,10 @@ export {
 export { normalizeLineText } from './conversion/normalize.js';
 export { extractTitle, TITLE_MAX_LENGTH } from './conversion/extractTitle.js';
 export { computeLineHash } from './conversion/lineHash.js';
+
+// 検索ヘルパー（ピュア関数、Post-MVP: サイドバー全文検索）
+export { escapeForIlike, decorateSnippet, highlightSnippet } from './search.js';
+export type { SnippetSegment } from './search.js';
+
+// Markdown 出力（ピュア関数、Post-MVP: 1日分のMarkdownエクスポート）
+export { exportDayNoteToMarkdown, buildEmptyDayNoteMarkdown } from './markdownExport.js';

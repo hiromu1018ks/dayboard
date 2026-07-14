@@ -1,8 +1,10 @@
 /**
  * DayNote 系エンドポイント（[roadmap.md T-1-08/09/10, T-3-04/06/07]）
  *
+ * - GET   /api/day-notes?from&to                 — 日付範囲の DayNote サマリ一覧（サイドバー用）
  * - GET   /api/day-notes/today/full              — 今日の /full（[api_contract.md §3]）
  * - GET   /api/day-notes/:date/full              — 指定日の /full、未生成は自動生成（AC-01）
+ * - GET   /api/day-notes/:date/markdown          — 1日分の Markdown 文字列（Post-MVP）
  * - PATCH /api/day-notes/:date                   — theme/lastOpenedMode 部分更新（[api_contract.md §4]）
  * - POST  /api/day-notes/:date/todos             — TODO 追加（[api_contract.md §5]）
  * - POST  /api/day-notes/:date/todos/reorder     — TODO 並替（[api_contract.md §5]）
@@ -17,10 +19,17 @@
 
 import { Hono } from 'hono';
 import { z } from 'zod';
-import { createId, isValidDateString, todayLocal } from '@dayboard/domain';
+import {
+  buildEmptyDayNoteMarkdown,
+  createId,
+  exportDayNoteToMarkdown,
+  isValidDateString,
+  todayLocal,
+} from '@dayboard/domain';
 import {
   blockerRepository,
   dayNoteRepository,
+  findFullByDate,
   getOrCreateFull,
   noteEntryRepository,
   patchDayNote,
@@ -36,6 +45,36 @@ export const dayNoteRoutes = new Hono();
 // （[autosave_spec.md §8.2]、自動保存リトライの二重作成防止）
 dayNoteRoutes.use('/*/todos', idempotencyMiddleware);
 dayNoteRoutes.use('/*/blockers', idempotencyMiddleware);
+
+/**
+ * GET /api/day-notes?from=YYYY-MM-DD&to=YYYY-MM-DD
+ *
+ * 日付範囲の DayNote サマリ一覧を返す（サイドバーの月別カレンダー用）。
+ * `from`/`to` はクエリパラメータ必須（無ければ400）。`/:date/*` と衝突しないよう、
+ * ルート定義順で `GET /` を先に置き、クエリパラメータ必須で区別する。
+ * レスポンスは date 降順。
+ */
+dayNoteRoutes.get('/', async (c) => {
+  const from = c.req.query('from');
+  const to = c.req.query('to');
+  if (!from || !to) {
+    throw ApiHttpError.validation([
+      { field: 'query', message: 'from と to クエリパラメータは必須です。' },
+    ]);
+  }
+  if (!isValidDateString(from) || !isValidDateString(to)) {
+    throw ApiHttpError.validation([
+      { field: 'query', message: 'from と to は YYYY-MM-DD 形式で指定してください。' },
+    ]);
+  }
+  if (from > to) {
+    throw ApiHttpError.validation([
+      { field: 'query', message: 'from は to 以前の日付を指定してください。' },
+    ]);
+  }
+  const summaries = await dayNoteRepository.listByDateRange(from, to);
+  return c.json(summaries);
+});
 
 /**
  * GET /api/day-notes/today/full
@@ -64,6 +103,29 @@ dayNoteRoutes.get('/:date/full', async (c) => {
   }
   const full = await getOrCreateFull(date);
   return c.json(full);
+});
+
+/**
+ * GET /api/day-notes/:date/markdown
+ *
+ * 1日分の DayNoteFull を Markdown 文字列に変換して返す（Post-MVP）。
+ * 未存在日は 404 ではなく空テンプレート（`# <date>\n\n（no content）`）を返す
+ * （Export ボタンが常に機能し、UX を一貫させる）。
+ * Content-Type: text/markdown; charset=utf-8
+ */
+dayNoteRoutes.get('/:date/markdown', async (c) => {
+  const date = c.req.param('date');
+  if (!isValidDateString(date)) {
+    throw ApiHttpError.validation([
+      { field: 'date', message: '日付は YYYY-MM-DD 形式で指定してください。' },
+    ]);
+  }
+  const full = await findFullByDate(date);
+  const markdown = full ? exportDayNoteToMarkdown(full) : buildEmptyDayNoteMarkdown(date);
+  return new Response(markdown, {
+    status: 200,
+    headers: { 'Content-Type': 'text/markdown; charset=utf-8' },
+  });
 });
 
 /** PATCH /api/day-notes/:date のボディスキーマ（両方任意、部分更新） */

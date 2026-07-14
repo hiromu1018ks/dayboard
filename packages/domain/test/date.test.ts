@@ -8,11 +8,15 @@
 import { describe, expect, it } from 'vitest';
 import {
   addDays,
+  formatDisplayDate,
   formatMonthDay,
+  getMonthRange,
   getSeason,
   getWeekdayLabel,
   getWeekdayLabelEn,
   isValidDateString,
+  isValidYearMonthString,
+  MONTH_LABELS_EN,
   toLocalDateString,
   todayLocal,
 } from '../src/date.js';
@@ -245,5 +249,83 @@ describe('getSeason', () => {
     expect(getSeason('2026-12-31')).toBe('winter');
     expect(getSeason('2026-01-01')).toBe('winter');
     expect(getSeason('2026-02-28')).toBe('winter');
+  });
+});
+
+describe('MONTH_LABELS_EN', () => {
+  it('1=Jan ... 12=Dec（0番目は空文字）', () => {
+    expect(MONTH_LABELS_EN[0]).toBe('');
+    expect(MONTH_LABELS_EN[1]).toBe('Jan');
+    expect(MONTH_LABELS_EN[7]).toBe('Jul');
+    expect(MONTH_LABELS_EN[12]).toBe('Dec');
+  });
+});
+
+describe('formatDisplayDate', () => {
+  it('YYYY-MM-DD を「Jul 13, 2026」形式で返す', () => {
+    expect(formatDisplayDate('2026-07-13')).toBe('Jul 13, 2026');
+    expect(formatDisplayDate('2026-01-05')).toBe('Jan 5, 2026');
+    expect(formatDisplayDate('2026-12-31')).toBe('Dec 31, 2026');
+  });
+});
+
+describe('isValidYearMonthString', () => {
+  it('有効な YYYY-MM を受け入れる', () => {
+    expect(isValidYearMonthString('2026-01')).toBe(true);
+    expect(isValidYearMonthString('2026-07')).toBe(true);
+    expect(isValidYearMonthString('2026-12')).toBe(true);
+    expect(isValidYearMonthString('2024-02')).toBe(true);
+  });
+
+  it('月が 1-12 の範囲外なら拒否', () => {
+    expect(isValidYearMonthString('2026-00')).toBe(false);
+    expect(isValidYearMonthString('2026-13')).toBe(false);
+  });
+
+  it('形式不正を拒否', () => {
+    expect(isValidYearMonthString('2026-7')).toBe(false);
+    expect(isValidYearMonthString('2026/07')).toBe(false);
+    expect(isValidYearMonthString('')).toBe(false);
+    expect(isValidYearMonthString('invalid')).toBe(false);
+  });
+
+  it('year=0（0000-07）は拒否（year >= 1 の境界、L-5）', () => {
+    expect(isValidYearMonthString('0000-07')).toBe(false);
+  });
+
+  it('year=1（0001-07）は許容（最小有効年、L-5）', () => {
+    expect(isValidYearMonthString('0001-07')).toBe(true);
+  });
+});
+
+describe('getMonthRange', () => {
+  it('通常月の月初・月末を返す（2026-07 → 01〜31）', () => {
+    expect(getMonthRange('2026-07')).toEqual({ from: '2026-07-01', to: '2026-07-31' });
+  });
+
+  it('30日月（2026-04 → 01〜30）', () => {
+    expect(getMonthRange('2026-04')).toEqual({ from: '2026-04-01', to: '2026-04-30' });
+  });
+
+  it('28日月（平年の2月: 2026-02 → 01〜28）', () => {
+    expect(getMonthRange('2026-02')).toEqual({ from: '2026-02-01', to: '2026-02-28' });
+  });
+
+  it('閏年の2月（2024-02 → 01〜29）', () => {
+    expect(getMonthRange('2024-02')).toEqual({ from: '2024-02-01', to: '2024-02-29' });
+  });
+
+  it('年跨ぎの12月（2026-12 → 01〜31）', () => {
+    expect(getMonthRange('2026-12')).toEqual({ from: '2026-12-01', to: '2026-12-31' });
+  });
+
+  it('年跨ぎの1月（2026-01 → 01〜31）', () => {
+    expect(getMonthRange('2026-01')).toEqual({ from: '2026-01-01', to: '2026-01-31' });
+  });
+
+  it('形式不正で RangeError', () => {
+    expect(() => getMonthRange('2026-13')).toThrow(RangeError);
+    expect(() => getMonthRange('2026-7')).toThrow(RangeError);
+    expect(() => getMonthRange('invalid')).toThrow(RangeError);
   });
 });

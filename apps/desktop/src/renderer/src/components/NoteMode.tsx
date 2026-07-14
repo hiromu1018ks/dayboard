@@ -17,32 +17,9 @@
  */
 
 import { forwardRef } from 'react';
-import { getWeekdayLabelEn } from '@dayboard/domain';
+import { formatDisplayDate, getWeekdayLabelEn } from '@dayboard/domain';
 import type { KeybindingMode, NoteLineMeta } from 'shared-types';
 import { NoteEditor, type NoteEditorHandle } from './NoteEditor.js';
-
-/** 英語月名短縮形（Header.tsx と共通） */
-const MONTH_LABELS_EN = [
-  '',
-  'Jan',
-  'Feb',
-  'Mar',
-  'Apr',
-  'May',
-  'Jun',
-  'Jul',
-  'Aug',
-  'Sep',
-  'Oct',
-  'Nov',
-  'Dec',
-] as const;
-
-/** YYYY-MM-DD を「Jul 13, 2026」形式に整形（Header.tsx と共通の表示形式） */
-function formatDisplayDate(dateStr: string): string {
-  const [y, m, d] = dateStr.split('-');
-  return `${MONTH_LABELS_EN[Number(m)] ?? ''} ${Number(d)}, ${y}`;
-}
 
 export type NoteModeProps = {
   /** 表示中の日付（YYYY-MM-DD） */
@@ -89,7 +66,7 @@ export const NoteMode = forwardRef<NoteEditorHandle, NoteModeProps>(function Not
   const weekday = getWeekdayLabelEn(currentDate);
 
   return (
-    <div className="flex h-screen flex-col bg-bg text-ink">
+    <div className="flex h-full flex-col bg-bg text-ink">
       <header className="border-b border-line bg-panel px-8 py-4">
         <div className="flex items-center justify-between">
           {/* 日付・曜日・モード名 */}
