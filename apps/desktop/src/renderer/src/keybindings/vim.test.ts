@@ -221,12 +221,13 @@ describe('handleVimWorkKey: 単キー移動', () => {
       field: null,
     });
   });
-  it('h で左列へ（todo→theme）', () => {
+  it('h で左列へ（todo から左は停止、同じ位置で setSelection 呼出）', () => {
     const ctx = makeCtx({ selection: { section: 'todo', itemIndex: 0, field: null } });
+    // todo から左は停止（theme は j/k で遷移、h/l は列間のみ）。moveHorizontal は同じ位置を返す。
     handleVimWorkKey(key('h'), ctx);
     expect(ctx.setSelection).toHaveBeenLastCalledWith({
-      section: 'theme',
-      itemIndex: null,
+      section: 'todo',
+      itemIndex: 0,
       field: null,
     });
   });
@@ -406,17 +407,26 @@ describe('handleVimWorkKey: dd 後の selection 更新（#1 回帰）', () => {
 });
 
 describe('handleVimWorkKey: theme / reflection の no-op（エッジケース）', () => {
-  it('theme で j/k は selection を維持（移動不可）', () => {
+  it('theme で j は TODO 先頭へ、k は theme を維持（停止）', () => {
     const ctx = makeCtx({
       selection: { section: 'theme', itemIndex: null, field: null },
     });
     expect(handleVimWorkKey(key('j'), ctx)).toBe('handled');
     expect(ctx.setSelection).toHaveBeenLastCalledWith({
+      section: 'todo',
+      itemIndex: 0,
+      field: null,
+    });
+    // k は theme で停止（同じ位置で setSelection 呼出）
+    const ctx2 = makeCtx({
+      selection: { section: 'theme', itemIndex: null, field: null },
+    });
+    handleVimWorkKey(key('k'), ctx2);
+    expect(ctx2.setSelection).toHaveBeenLastCalledWith({
       section: 'theme',
       itemIndex: null,
       field: null,
     });
-    expect(handleVimWorkKey(key('k'), ctx)).toBe('handled');
   });
   it('theme で gg は theme を維持', () => {
     const ctx = makeCtx({

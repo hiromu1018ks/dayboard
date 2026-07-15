@@ -170,11 +170,12 @@ describe('moveVertical (j/k)', () => {
       s = todo(3);
       expect(moveVertical(s, 'down', LAYOUT)).toEqual(todo(3)); // 末尾で停止
     });
-    it('up で前項目へ（追加入力欄3→2→1→0 で停止）', () => {
+    it('up で前項目へ（追加入力欄3→2→1→0）、先頭で k は theme へ', () => {
       let s = todo(3);
       expect(moveVertical(s, 'up', LAYOUT)).toEqual(todo(2));
       s = todo(0);
-      expect(moveVertical(s, 'up', LAYOUT)).toEqual(todo(0)); // 先頭で停止
+      // 先頭(0)で k → theme へ（列内停止ではなく上位の theme へ遷移）
+      expect(moveVertical(s, 'up', LAYOUT)).toEqual(THEME_SELECTION);
     });
     it('未選択(null) から down は先頭(0)へ', () => {
       expect(moveVertical(todo(null), 'down', LAYOUT)).toEqual(todo(0));
@@ -199,35 +200,37 @@ describe('moveVertical (j/k)', () => {
       s = reflection('tomorrowActionText');
       expect(moveVertical(s, 'down', LAYOUT)).toEqual(reflection('tomorrowActionText')); // 停止
     });
-    it('up で tomorrowActionText→stuckText→doneText で停止', () => {
+    it('up で tomorrowActionText→stuckText→doneText、doneText で k は theme へ', () => {
       let s = reflection('tomorrowActionText');
       expect(moveVertical(s, 'up', LAYOUT)).toEqual(reflection('stuckText'));
       s = reflection('doneText');
-      expect(moveVertical(s, 'up', LAYOUT)).toEqual(reflection('doneText')); // 停止
+      // doneText で k → theme へ（上位遷移）
+      expect(moveVertical(s, 'up', LAYOUT)).toEqual(THEME_SELECTION);
     });
   });
 
   describe('theme', () => {
-    it('theme は上下移動不可（そのまま）', () => {
-      expect(moveVertical(THEME_SELECTION, 'down', LAYOUT)).toEqual(THEME_SELECTION);
+    it('theme で j は TODO 先頭へ、k は停止（そのまま）', () => {
+      expect(moveVertical(THEME_SELECTION, 'down', LAYOUT)).toEqual(todo(0));
       expect(moveVertical(THEME_SELECTION, 'up', LAYOUT)).toEqual(THEME_SELECTION);
     });
   });
 });
 
 describe('moveHorizontal (h/l)', () => {
-  it('右へ theme→todo→blocker→reflection', () => {
-    expect(moveHorizontal(THEME_SELECTION, 'right', LAYOUT).section).toBe('todo');
+  it('右へ todo→blocker→reflection（theme は対象外）', () => {
     expect(moveHorizontal(todo(1), 'right', LAYOUT).section).toBe('blocker');
     expect(moveHorizontal(blocker(0), 'right', LAYOUT).section).toBe('reflection');
   });
-  it('左へ reflection→blocker→todo→theme', () => {
+  it('左へ reflection→blocker→todo（todo から左は停止、theme は j/k で遷移）', () => {
     expect(moveHorizontal(reflection('doneText'), 'left', LAYOUT).section).toBe('blocker');
     expect(moveHorizontal(blocker(0), 'left', LAYOUT).section).toBe('todo');
-    expect(moveHorizontal(todo(0), 'left', LAYOUT).section).toBe('theme');
+    // todo から左は停止（theme は h/l 対象外、j/k で遷移）
+    expect(moveHorizontal(todo(0), 'left', LAYOUT)).toEqual(todo(0));
   });
-  it('theme から左、reflection から右は停止（元と同じ）', () => {
+  it('theme で h/l は無反応（j/k で列へ遷移）、reflection から右は停止', () => {
     expect(moveHorizontal(THEME_SELECTION, 'left', LAYOUT)).toEqual(THEME_SELECTION);
+    expect(moveHorizontal(THEME_SELECTION, 'right', LAYOUT)).toEqual(THEME_SELECTION);
     expect(moveHorizontal(reflection('doneText'), 'right', LAYOUT)).toEqual(reflection('doneText'));
   });
   it('行位置を相対で維持（todo の中間→blocker の中間）', () => {

@@ -100,11 +100,12 @@ export function TodoItem({
 
   // 選択中の視覚（Vim キーバインド時）: 行全体の薄い背景 + 左端カーソルバー。
   // Insert 状態時は背景をやや濃くして「編集中」を明示。
+  // light/dark でコントラストを調整（light は濃いめ・太めで視認性を確保）。
   const selectionClass =
     showSelection && isSelected
       ? vimState === 'insert'
-        ? 'bg-accent/20 before:absolute before:bottom-1.5 before:left-0.5 before:top-1.5 before:w-0.5 before:rounded before:bg-accent'
-        : 'bg-accent/10 before:absolute before:bottom-1.5 before:left-0.5 before:top-1.5 before:w-0.5 before:rounded before:bg-accent'
+        ? 'bg-accent/30 dark:bg-accent/20 before:absolute before:bottom-1.5 before:left-0.5 before:top-1.5 before:w-1 dark:before:w-0.5 before:rounded before:bg-accent'
+        : 'bg-accent/25 dark:bg-accent/10 before:absolute before:bottom-1.5 before:left-0.5 before:top-1.5 before:w-1 dark:before:w-0.5 before:rounded before:bg-accent'
       : '';
 
   return (

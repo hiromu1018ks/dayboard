@@ -80,7 +80,7 @@ export function ReflectionColumn({
   return (
     <section
       className={`flex min-h-0 flex-col overflow-hidden rounded border bg-panel/30 p-7 transition-colors focus:outline-none ${
-        isThisColumnSelected ? 'border-accent/50' : 'border-line/60'
+        isThisColumnSelected ? 'border-accent dark:border-accent/50' : 'border-line/60'
       }`}
       aria-label="振り返り"
       data-focus-section="reflection"
@@ -108,7 +108,7 @@ export function ReflectionColumn({
                 rows={4}
                 data-focus-field={section.key}
                 {...(i === 0 ? { 'data-focus-input': true } : {})}
-                className={`input-card ${isFieldSelected ? 'ring-2 ring-accent/40' : ''}`}
+                className={`input-card ${isFieldSelected ? 'ring-2 ring-accent dark:ring-accent/40' : ''}`}
                 aria-label={section.label}
               />
             </div>

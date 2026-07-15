@@ -96,7 +96,7 @@ export function BlockerColumn({
   return (
     <section
       className={`flex min-h-0 flex-col overflow-hidden rounded border bg-panel/30 p-7 transition-colors focus:outline-none ${
-        isThisColumnSelected ? 'border-accent/50' : 'border-line/60'
+        isThisColumnSelected ? 'border-accent dark:border-accent/50' : 'border-line/60'
       }`}
       aria-label="障害・詰まり"
       data-focus-section="blocker"
@@ -157,7 +157,9 @@ export function BlockerColumn({
           maxLength={200}
           data-focus-input
           className={`w-full border-none bg-transparent px-1 py-0.5 text-sm text-ink outline-none placeholder:text-faint ${
-            isAddInputSelected && vimState === 'normal' ? 'ring-1 ring-accent/40' : ''
+            isAddInputSelected && vimState === 'normal'
+              ? 'ring-2 ring-accent dark:ring-accent/40'
+              : ''
           }`}
           aria-label="新規障害入力"
         />

@@ -253,6 +253,22 @@ export default function App() {
   flushRef.current = flush;
   useFlushOnQuit(() => flushRef.current);
 
+  // 仕事整理モード + Vim キーバインド時、selection に応じた要素へフォーカスを当てる。
+  // 起動直後・日付移動後・モード切替で work へ戻った際に、選択要素（theme の div や
+  // カード button）へフォーカスし、hjkl が即座に効くようにする。
+  useEffect(() => {
+    if (viewMode !== 'work' || !workData || settings.keybindingMode !== 'vim') return;
+    // 次フレームで（DOM に要素が描画されていることを保証してから）フォーカス
+    requestAnimationFrame(() => {
+      focusElementAtSelection(selection, {
+        todo: workData.todos,
+        blocker: workData.blockers,
+      });
+    });
+    // workData ロード時・日付移動時・selection 復元時に再フォーカス
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [viewMode, workData, settings.keybindingMode]);
+
   // 起動時リカバリ: localStorage の未保存分を再送（§6.2、T-2-12）。
   // アプリマウント時に1回だけ実行（日付移動ごとに再実行しない）。
   // リカバリでサーバーへ保存された内容を UI へ反映するため、完了後に refetch する。

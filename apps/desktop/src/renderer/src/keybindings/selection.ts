@@ -24,6 +24,12 @@ export type ReflectionField = 'doneText' | 'stuckText' | 'tomorrowActionText';
 /** 列の左右順序（[§3.4]: theme ↔ todo ↔ blocker ↔ reflection）。 */
 export const SECTION_ORDER: readonly WorkSection[] = ['theme', 'todo', 'blocker', 'reflection'];
 
+/**
+ * h/l（左右移動）で巡回する列の順序。**theme は除外**（theme は上下で列へ遷移するため）。
+ * todo ↔ blocker ↔ reflection のみ左右移動可能。
+ */
+const COLUMN_ORDER: readonly WorkSection[] = ['todo', 'blocker', 'reflection'];
+
 /** Reflection のフィールド順（j/k の移動順）。 */
 export const REFLECTION_FIELDS: readonly ReflectionField[] = [
   'doneText',
@@ -154,7 +160,27 @@ export function moveVertical(
   layout: WorkLayout,
   count = 1,
 ): WorkSelection {
-  if (sel.section === 'theme') return sel;
+  // theme ↔ 列 の上下移動（視覚的に theme は最上段、列はその下）。
+  // - theme で j → TODO 列の先頭アイテム（itemIndex=0）
+  // - 列の先頭（todo/blocker の itemIndex=0、reflection の doneText）で k → theme
+  // - theme で k → 停止（最上段）
+  if (sel.section === 'theme') {
+    if (dir === 'down') {
+      // TODO 列へ（先頭アイテム、アイテムが無ければ追加入力欄=0）
+      return { section: 'todo', itemIndex: 0, field: null };
+    }
+    return sel; // theme で k は停止
+  }
+
+  // 列の先頭で k → theme へ戻る（列内移動の「先頭で停止」を廃止）。
+  // ただし todo/blocker の未選択（itemIndex===null）は「先頭」とは見なさず、下記の未選択着地処理へ流す。
+  if (dir === 'up') {
+    const atTop =
+      (sel.section === 'todo' || sel.section === 'blocker') && sel.itemIndex !== null
+        ? sel.itemIndex <= 0
+        : sel.section === 'reflection' && (!sel.field || sel.field === 'doneText');
+    if (atTop) return { ...THEME_SELECTION };
+  }
 
   if (sel.section === 'reflection') {
     const fields = REFLECTION_FIELDS;
@@ -191,11 +217,13 @@ export function moveHorizontal(
   dir: 'left' | 'right',
   layout: WorkLayout,
 ): WorkSelection {
-  const idx = SECTION_ORDER.indexOf(sel.section);
+  // theme は h/l の対象外（j/k で列へ遷移する）。theme で h/l は無反応。
+  if (sel.section === 'theme') return sel;
+  const idx = COLUMN_ORDER.indexOf(sel.section);
   if (idx < 0) return sel;
   const nextIdx = dir === 'left' ? idx - 1 : idx + 1;
-  if (nextIdx < 0 || nextIdx >= SECTION_ORDER.length) return sel; // 末端で止まる
-  const nextSection = SECTION_ORDER[nextIdx]!;
+  if (nextIdx < 0 || nextIdx >= COLUMN_ORDER.length) return sel; // 末端で止まる
+  const nextSection = COLUMN_ORDER[nextIdx]!;
 
   return transferPosition(sel, nextSection, layout);
 }
