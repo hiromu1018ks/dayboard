@@ -166,7 +166,9 @@ export function moveVertical(
   // - theme で k → 停止（最上段）
   if (sel.section === 'theme') {
     if (dir === 'down') {
-      // TODO 列へ（先頭アイテム、アイテムが無ければ追加入力欄=0）
+      // TODO 列へ（先頭アイテム、アイテムが無ければ追加入力欄=0）。
+      // MVP 仕様: theme→j は常に TODO へ（Reflection から戻って j でも TODO）。
+      // 「直前の列へ戻る」方が自然だが、記憶領域が必要になるため MVP では固定。
       return { section: 'todo', itemIndex: 0, field: null };
     }
     return sel; // theme で k は停止

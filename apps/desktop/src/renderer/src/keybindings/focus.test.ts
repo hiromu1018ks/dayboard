@@ -7,7 +7,12 @@
  */
 
 import { describe, it, expect, beforeEach } from 'vitest';
-import { focusSectionInput, focusElementAtSelection, focusItemById } from './focus.js';
+import {
+  focusSectionInput,
+  focusElementAtSelection,
+  focusInputAtSelection,
+  focusItemById,
+} from './focus.js';
 import { SECTION_ORDER, type WorkSelection } from './selection.js';
 
 /**
@@ -159,6 +164,39 @@ describe('focusElementAtSelection', () => {
   it('セクション不在時は false', () => {
     document.body.innerHTML = '';
     expect(focusElementAtSelection(sel('todo', 0), { todo: [{ id: 't1' }] })).toBe(false);
+  });
+});
+
+describe('focusInputAtSelection', () => {
+  beforeEach(setupDom);
+
+  it('theme 選択時は入力欄（data-focus-input）へフォーカス', () => {
+    expect(focusInputAtSelection(sel('theme'), {})).toBe(true);
+    expect(document.activeElement?.hasAttribute('data-focus-input')).toBe(true);
+  });
+
+  it('reflection 選択時は入力欄（最初のフォーカス可能要素）へフォーカス', () => {
+    expect(focusInputAtSelection(sel('reflection', null, 'stuckText'), {})).toBe(true);
+    // focusSectionInput 経由で最初のフォーカス可能要素（doneText の textarea）へ
+    expect(document.activeElement?.getAttribute('data-focus-field')).toBe('doneText');
+  });
+
+  it('todo の追加入力欄選択（itemIndex=2=番哨）時は data-focus-input へ', () => {
+    const items = { todo: [{ id: 't1' }, { id: 't2' }] };
+    expect(focusInputAtSelection(sel('todo', 2), items)).toBe(true);
+    expect(document.activeElement?.hasAttribute('data-focus-input')).toBe(true);
+  });
+
+  it('todo のアイテム選択時は section コンテナへフォールバック（編集モード未連動）', () => {
+    const items = { todo: [{ id: 't1' }, { id: 't2' }] };
+    expect(focusInputAtSelection(sel('todo', 0), items)).toBe(true);
+    // アイテム選択時は直接編集 input へ解決できないため section コンテナへ
+    expect(document.activeElement?.getAttribute('data-focus-section')).toBe('todo');
+  });
+
+  it('セクション不在時は false', () => {
+    document.body.innerHTML = '';
+    expect(focusInputAtSelection(sel('theme'), {})).toBe(false);
   });
 });
 

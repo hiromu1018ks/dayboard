@@ -123,9 +123,12 @@ export const SPACE_LEADER_TIMEOUT_MS = 200;
  *
  * [ui_interaction_spec.md §3.4/§3.5]、[要件 8.6]:
  * - Insert状態では全コマンドを処理しない（テキスト入力に専念）
+ * - 入力要素（input/textarea/contenteditable）へフォーカス中も Vim コマンドを処理せず、
+ *   文字入力へ貫通する（ユーザーが普通にフォーカスして入力できるようにする）
  * - Normal状態:
- *   - `h/l`: 列移動（theme↔todo↔blocker↔reflection、行位置維持）
- *   - `j/k`: 同列の項目移動（下/上、末尾で停止）
+ *   - `j/k`: theme↔列 の上下移動、および列内項目移動（下/上）。
+ *     theme で j → TODO 先頭、列の先頭で k → theme。
+ *   - `h/l`: 列間移動（todo↔blocker↔reflection）。**theme は h/l 対象外**（j/k で遷移）。
  *   - `gg`/`G`: 列先頭/末尾
  *   - `{n}G`: n行目へ
  *   - `i`/`Enter`: 選択中アイテムを編集（Insertへ）

@@ -134,6 +134,11 @@ export default function App() {
   // 仕事整理モードの選択状態（2D カーソル、[selection.ts]）。Vim キーバインド時のみ有意。
   // Normal 状態で hjkl/gg/G で移動、Insert 状態で編集中位置を指す。
   const [selection, setSelectionState] = useState<WorkSelection>(THEME_SELECTION);
+  // 最新の selection を Ref 経由で参照（起動時フォーカス同期 useEffect が古い闭包を
+  // 捕捉しないように。依存配列に selection を含めると hjkl 移動ごとに再フォーカスが
+  // 走り setSelection 内のフォーカスと二重制御になるため、Ref で最新値だけ読む）。
+  const selectionRef = useRef(selection);
+  selectionRef.current = selection;
   // Vim コマンドバッファ（g/d/数字のリーダー入力用。handleVimWorkKey が読み書き）
   const [commandBuffer, setCommandBuffer] = useState('');
   // 設定モーダル（[ui_interaction_spec.md §8]）
@@ -256,17 +261,20 @@ export default function App() {
   // 仕事整理モード + Vim キーバインド時、selection に応じた要素へフォーカスを当てる。
   // 起動直後・日付移動後・モード切替で work へ戻った際に、選択要素（theme の div や
   // カード button）へフォーカスし、hjkl が即座に効くようにする。
+  //
+  // **依存配列に selection を含めない（意図的）**: selection を含めると hjkl 移動のたびに
+  // 本 useEffect が再実行され、setSelection 内の focusElementAtSelection と二重フォーカス
+  // 制御になる。そのため selectionRef（常に最新値を参照）を使い、本 useEffect は
+  // 「マウント・workData ロード・モード切替」の初期化タイミングのみ発火させる。
   useEffect(() => {
     if (viewMode !== 'work' || !workData || settings.keybindingMode !== 'vim') return;
     // 次フレームで（DOM に要素が描画されていることを保証してから）フォーカス
     requestAnimationFrame(() => {
-      focusElementAtSelection(selection, {
+      focusElementAtSelection(selectionRef.current, {
         todo: workData.todos,
         blocker: workData.blockers,
       });
     });
-    // workData ロード時・日付移動時・selection 復元時に再フォーカス
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [viewMode, workData, settings.keybindingMode]);
 
   // 起動時リカバリ: localStorage の未保存分を再送（§6.2、T-2-12）。
@@ -339,6 +347,9 @@ export default function App() {
       const { localStorageOk } = await flush();
       if (localStorageOk) {
         goTo(targetDate);
+        // 日付移動後は selection を theme へリセット（[§7]: workFocus 初期化）。
+        // 旧日付の selection（無効な itemIndex 等）が残ると焦点がずれるため。
+        setSelectionState(THEME_SELECTION);
       } else {
         // localStorage 書込失敗: 遷移を保留して確認（§9.3）
         setPendingAction({ kind: 'navigate', targetDate });
@@ -362,6 +373,9 @@ export default function App() {
       const { localStorageOk } = await flush();
       if (localStorageOk) {
         setMode(mode);
+        // work へ戻る際は selection を theme へリセット（[§4.1]: workFocus 復元だが
+        // Vim では前回位置に依らず theme から再開が自然）。
+        if (mode === 'work') setSelectionState(THEME_SELECTION);
       } else {
         setPendingAction({ kind: 'setMode', mode });
       }
@@ -886,29 +900,18 @@ export default function App() {
         return;
       }
 
-      // ----- Ctrl+c: Vim Insert → Normal（Esc と同等、Vim 慣例） -----
-      //   Vim では Ctrl+c も Esc と同様に Insert → Normal へ戻る。ユーザー要望で追加。
-      if (
-        e.ctrlKey &&
-        !e.metaKey &&
-        !e.altKey &&
-        !e.shiftKey &&
-        e.key.toLowerCase() === 'c' &&
-        settings.keybindingMode === 'vim' &&
-        vimState === 'insert' &&
-        viewMode === 'work'
-      ) {
-        e.preventDefault();
-        setVimState('normal');
-        focusElementAtSelection(selection, {
-          todo: workData?.todos ?? [],
-          blocker: workData?.blockers ?? [],
-        });
-        return;
-      }
-
-      // ----- Esc: 4段優先順位（T-4-07/T-7-09、[§9.2]） -----
-      if (e.key === 'Escape') {
+      // ----- Ctrl+c / Esc: Vim Insert → Normal（4段優先順位、[§9.2]） -----
+      //   Vim では Ctrl+c も Esc と同様に Insert → Normal へ戻る。両者を handleEsc 経由で
+      //   統一処理する（段2: refocusSelection で入力欄から選択要素へフォーカスを戻す）。
+      const isEscOrCtrlC =
+        e.key === 'Escape' ||
+        (e.ctrlKey &&
+          !e.metaKey &&
+          !e.altKey &&
+          !e.shiftKey &&
+          e.key.toLowerCase() === 'c' &&
+          settings.keybindingMode === 'vim');
+      if (isEscOrCtrlC) {
         const consumed = handleEsc({
           viewMode,
           vimState: settings.keybindingMode === 'vim' ? vimState : 'normal',

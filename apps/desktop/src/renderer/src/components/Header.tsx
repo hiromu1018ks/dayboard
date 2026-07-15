@@ -163,8 +163,8 @@ export function Header({
       </div>
 
       {/* テーマ入力欄（[要件 7.2]: 未入力可。Phase 2 で自動保存接続、T-2-09）
-          Phase 7: data-focus-section="theme" で列フォーカス（Vim h/l）対応。
-          コンテナ（この div）へ section、入力へ input を付与。
+          Phase 7: data-focus-section="theme" で Vim j/k（theme↔列の上下移動）対応。
+          ※ h/l は theme を対象外（j/k で遷移）。コンテナ（この div）へ section、入力へ input を付与。
           Day One 風: 左に小さな accent 縦バーで「見出し」感を出す。
           Vim 選択中（showSelection && selection.section==='theme'）は他カードと同一の
           背景+カーソルバーでハイライト（light/dark でコントラスト調整）。 */}
