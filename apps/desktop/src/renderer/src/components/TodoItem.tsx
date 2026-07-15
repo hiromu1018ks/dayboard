@@ -15,6 +15,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { formatMonthDay } from '@dayboard/domain';
 import type { NoteLineMeta, TodoItem as TodoItemType } from 'shared-types';
+import type { VimState } from './VimStateBadge.js';
 
 export type TodoItemProps = {
   todo: TodoItemType;
@@ -29,6 +30,12 @@ export type TodoItemProps = {
   sourceNoteLineMeta?: NoteLineMeta | null;
   /** 変換成功後の一時ハイライト（Phase 5、[§4.3] 1.2s） */
   highlight?: boolean;
+  /** 選択中か（Vim キーバインド時の selection カーソル、[selection.ts]） */
+  isSelected?: boolean;
+  /** 選択ハイライトを表示するか（keybindingMode='vim'時のみ true） */
+  showSelection?: boolean;
+  /** Vim操作状態（Insert 時は選択ハイライトを強調） */
+  vimState?: VimState;
   onToggle: () => void;
   onEditTitle: (title: string) => void;
   onDelete: () => void;
@@ -42,6 +49,9 @@ export function TodoItem({
   isLast,
   sourceNoteLineMeta,
   highlight = false,
+  isSelected = false,
+  showSelection = false,
+  vimState = 'normal',
   onToggle,
   onEditTitle,
   onDelete,
@@ -88,13 +98,23 @@ export function TodoItem({
   const isDone = todo.status === 'done';
   const isCarried = todo.status === 'carried';
 
+  // 選択中の視覚（Vim キーバインド時）: 行全体の薄い背景 + 左端カーソルバー。
+  // Insert 状態時は背景をやや濃くして「編集中」を明示。
+  // light/dark でコントラストを調整（light は濃いめ・太めで視認性を確保）。
+  const selectionClass =
+    showSelection && isSelected
+      ? vimState === 'insert'
+        ? 'bg-accent/30 dark:bg-accent/20 before:absolute before:bottom-1.5 before:left-0.5 before:top-1.5 before:w-1 dark:before:w-0.5 before:rounded before:bg-accent'
+        : 'bg-accent/25 dark:bg-accent/10 before:absolute before:bottom-1.5 before:left-0.5 before:top-1.5 before:w-1 dark:before:w-0.5 before:rounded before:bg-accent'
+      : '';
+
   return (
     <li
       className={`group relative flex items-start gap-2.5 rounded px-2 py-1.5 transition-colors duration-150 hover:bg-raised/30 ${
         editing
           ? 'before:absolute before:bottom-1.5 before:left-0.5 before:top-1.5 before:w-0.5 before:rounded before:bg-ink/70'
           : ''
-      } ${highlight ? 'bg-warn/15' : ''}`}
+      } ${highlight ? 'bg-warn/15' : ''} ${selectionClass}`}
     >
       {/* 完了チェック（carried は操作不可）
           Phase 7: data-focus-item で Vim j/k（項目移動）・x（完了切替、AC-09）のターゲット */}

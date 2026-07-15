@@ -23,22 +23,24 @@ import {
   launchApp,
   removeTempUserDataDir,
   resetE2eDatabase,
+  waitForSaved,
+  waitForSavedSteady,
 } from './helpers.js';
 
 /**
  * テーマ入力欄のセレクタ。
  */
 const THEME_INPUT = '#theme-input';
-/** 保存状態表示のテキスト（保存済み）を待つセレクタ。role=status を利用。 */
-const SAVED_STATUS = 'text=保存済み';
 
 /**
- * テーマ入力 → 800msデバウンス保存 → 「保存済み」表示を待つ共通ステップ（AC-13）。
+ * テーマ入力 → 800msデバウンス保存 → 保存完了を待つ共通ステップ（AC-13）。
+ *
+ * [ui_interaction_spec.md §10] 準拠: saved 状態は「表示が消えることで完了を伝える」設計のため、
+ * 「保存中...」の出現→消失で保存完了を検知する（従来の「保存済み」表示待ちではなく）。
  */
 async function typeThemeAndWaitSaved(window: Page, text: string): Promise<void> {
   await window.fill(THEME_INPUT, text);
-  // デバウンス800ms + サーバー保存ラウンドトリップ + 余裕を見て5s待機
-  await window.waitForSelector(SAVED_STATUS, { timeout: 10_000 });
+  await waitForSaved(window);
 }
 
 test.describe('自動保存: テーマ編集（AC-13）', () => {
@@ -59,11 +61,12 @@ test.describe('自動保存: テーマ編集（AC-13）', () => {
     // 初期状態: テーマ未入力
     await expect(window.locator(THEME_INPUT)).toHaveValue('');
 
-    // テーマ入力 → 保存済みへ（AC-13）
+    // テーマ入力 → 保存完了（AC-13）
     await typeThemeAndWaitSaved(window, 'E2Eテスト: 自動保存確認');
 
-    // 保存状態表示が「保存済み」であることを検証
-    await expect(window.getByText('保存済み')).toBeVisible();
+    // [ui_interaction_spec.md §10] 準拠: saved 状態は「保存中表示が消える」ことで完了を示す。
+    // 「保存済み」表示は存在しないため、保存中表示が非表示（= saved）であることを検証。
+    await expect(window.getByText('保存中...')).not.toBeVisible();
   });
 });
 
@@ -82,10 +85,8 @@ test.describe('自動保存: 再起動後の保持（AC-13/AC-02）', () => {
     // 2回目: 再起動して同じテーマが表示されるか検証
     launched = await launchApp();
     // 初回fetch完了後、テーマ入力欄に前回の値が入る。
-    // 「保存済み」表示が再び現れるまで待ち（fetch + 初期化完了の確実な目安）
-    await launched.window.waitForSelector('text=下書き', { timeout: 15_000 }).catch(() => {
-      /* idle 状態で「下書き」が出ない場合もあるため無視 */
-    });
+    // 保存中表示が消える（= saved へ収束）のを待ち、fetch + 初期化完了の目安とする。
+    await waitForSavedSteady(launched.window, 15_000);
     await expect(launched.window.locator(THEME_INPUT)).toHaveValue(theme, { timeout: 15_000 });
     await closeApp(launched.app);
   });

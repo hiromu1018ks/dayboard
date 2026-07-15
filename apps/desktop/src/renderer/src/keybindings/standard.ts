@@ -11,7 +11,7 @@
  * これら共通系は standard.ts / vim.ts 双方から参照されるよう、共通系として個別関数化している。
  */
 
-import type { WorkSection } from './focus.js';
+import type { WorkSection } from './selection.js';
 
 /**
  * `⌘/Ctrl` 修飾キーが押されているか（Mac: metaKey、Win/Linux: ctrlKey）。

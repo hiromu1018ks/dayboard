@@ -16,7 +16,7 @@
  */
 
 import { expect, test, type ElectronApplication, type Page } from '@playwright/test';
-import { closeApp, launchApp, resetE2eDatabase } from './helpers.js';
+import { closeApp, launchAppReady, resetE2eDatabase } from './helpers.js';
 
 /** NoteEditor のホスト要素（ノートモードの識別子） */
 const NOTE_EDITOR = '[data-testid="note-editor"]';
@@ -84,7 +84,7 @@ test.describe('ノート行変換（AC-05/AC-06/AC-07/AC-08）', () => {
   });
 
   test('選択行をTODO化（AC-05）: マーク + 通知 + ノートモードに留まる', async () => {
-    ({ app, window } = await launchApp());
+    ({ app, window } = await launchAppReady());
 
     // ノートモードへ切替
     await pressModeToggle(window);
@@ -114,7 +114,7 @@ test.describe('ノート行変換（AC-05/AC-06/AC-07/AC-08）', () => {
   });
 
   test('選択行を障害化（AC-07）: マーク + 通知', async () => {
-    ({ app, window } = await launchApp());
+    ({ app, window } = await launchAppReady());
 
     await pressModeToggle(window);
     await expect(window.locator(NOTE_EDITOR)).toBeVisible();
@@ -134,7 +134,7 @@ test.describe('ノート行変換（AC-05/AC-06/AC-07/AC-08）', () => {
   });
 
   test('重複TODO化で確認ダイアログ（AC-06）: キャンセルで作成しない', async () => {
-    ({ app, window } = await launchApp());
+    ({ app, window } = await launchAppReady());
 
     await pressModeToggle(window);
     await expect(window.locator(NOTE_EDITOR)).toBeVisible();
@@ -164,7 +164,7 @@ test.describe('ノート行変換（AC-05/AC-06/AC-07/AC-08）', () => {
   });
 
   test('仕事整理モード復帰後、TODOに発生元が確認できる（AC-08）', async () => {
-    ({ app, window } = await launchApp());
+    ({ app, window } = await launchAppReady());
 
     // ノートモードでTODO化
     await pressModeToggle(window);

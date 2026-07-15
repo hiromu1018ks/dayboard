@@ -7,6 +7,9 @@
 
 import type { Dispatch } from 'react';
 import type { DayNoteFull, NoteLineMeta, TodoItem, BlockerItem, Reflection } from 'shared-types';
+import type { KeybindingMode } from 'shared-types';
+import type { VimState } from './VimStateBadge.js';
+import type { WorkSelection } from '../keybindings/selection.js';
 import { BlockerColumn } from './BlockerColumn.js';
 import { ReflectionColumn } from './ReflectionColumn.js';
 import { TodoColumn } from './TodoColumn.js';
@@ -46,6 +49,12 @@ export type WorkModeProps = {
   highlightTodoIds?: Set<string>;
   /** ハイライト対象の障害 id セット（Phase 5） */
   highlightBlockerIds?: Set<string>;
+  /** 現在の選択位置（Vim キーバインド時の2D カーソル、[selection.ts]） */
+  selection: WorkSelection;
+  /** Vim操作状態（normal/insert）。選択ハイライトの強調表示に使用 */
+  vimState: VimState;
+  /** キーバインドモード。standard の時は選択ハイライトを表示しない */
+  keybindingMode: KeybindingMode;
 };
 
 /**
@@ -65,7 +74,12 @@ export function WorkMode({
   noteLineMetaMap,
   highlightTodoIds,
   highlightBlockerIds,
+  selection,
+  vimState,
+  keybindingMode,
 }: WorkModeProps) {
+  // Vim キーバインド時のみ選択ハイライトを有効化
+  const showSelection = keybindingMode === 'vim';
   return (
     <div className="grid min-h-0 flex-1 grid-cols-1 gap-6 md:grid-cols-3">
       <TodoColumn
@@ -79,6 +93,9 @@ export function WorkMode({
         onCarryOverTodos={handlers.onCarryOverTodos}
         noteLineMetaMap={noteLineMetaMap}
         highlightIds={highlightTodoIds}
+        selection={selection}
+        showSelection={showSelection}
+        vimState={vimState}
       />
       <BlockerColumn
         date={date}
@@ -92,8 +109,17 @@ export function WorkMode({
         onReorder={handlers.onReorderBlockers}
         noteLineMetaMap={noteLineMetaMap}
         highlightIds={highlightBlockerIds}
+        selection={selection}
+        showSelection={showSelection}
+        vimState={vimState}
       />
-      <ReflectionColumn reflection={reflection} onEdit={handlers.onEditReflection} />
+      <ReflectionColumn
+        reflection={reflection}
+        onEdit={handlers.onEditReflection}
+        selection={selection}
+        showSelection={showSelection}
+        vimState={vimState}
+      />
     </div>
   );
 }

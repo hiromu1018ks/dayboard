@@ -20,6 +20,7 @@ function ctx(props: Partial<EscContext>): EscContext {
     vimState: 'normal',
     settingsOpen: false,
     setVimState: vi.fn(),
+    refocusSelection: vi.fn(),
     closeSettings: vi.fn(),
     goToWork: vi.fn(),
     ...props,
@@ -44,6 +45,19 @@ describe('Esc 4段優先順位（[§9.2]）', () => {
       expect(c.setVimState).toHaveBeenCalledWith('normal');
       // モーダル閉じるは呼ばれない（段2が優先）
       expect(c.closeSettings).not.toHaveBeenCalled();
+    });
+
+    it('Insert → Normal 復帰時に refocusSelection が呼ばれる（入力欄からフォーカスを戻す）', () => {
+      const c = ctx({ viewMode: 'work', vimState: 'insert' });
+      handleEsc(c);
+      expect(c.refocusSelection).toHaveBeenCalledOnce();
+    });
+
+    it('refocusSelection が未指定でも Insert→Normal 自体は動く（ノートモード等）', () => {
+      const c = ctx({ viewMode: 'note', vimState: 'insert', refocusSelection: undefined });
+      const result = handleEsc(c);
+      expect(result).toBe(true);
+      expect(c.setVimState).toHaveBeenCalledWith('normal');
     });
   });
 

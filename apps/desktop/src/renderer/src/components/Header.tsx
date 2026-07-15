@@ -13,6 +13,8 @@ import { useEffect, useRef, useState } from 'react';
 import { formatDisplayDate, getWeekdayLabelEn } from '@dayboard/domain';
 import { fetchDayNoteMarkdown } from '../api/client.js';
 import type { ToastMessage } from './Toast.js';
+import type { VimState } from './VimStateBadge.js';
+import type { WorkSelection } from '../keybindings/selection.js';
 
 export type HeaderProps = {
   /** 表示中の日付（YYYY-MM-DD） */
@@ -33,6 +35,12 @@ export type HeaderProps = {
   onOpenSettings: () => void;
   /** Markdown をクリップボードへコピーした際のトースト通知 */
   onToast: (message: ToastMessage) => void;
+  /** 現在の選択位置（Vim キーバインド時）。theme 選択中のハイライト判定に使用 */
+  selection?: WorkSelection;
+  /** 選択ハイライトを表示するか（keybindingMode='vim' 時のみ true） */
+  showSelection?: boolean;
+  /** Vim操作状態（Insert 時は選択ハイライトを強調） */
+  vimState?: VimState;
 };
 
 export function Header({
@@ -45,6 +53,9 @@ export function Header({
   onThemeEdit,
   onOpenSettings,
   onToast,
+  selection,
+  showSelection = false,
+  vimState = 'normal',
 }: HeaderProps) {
   const displayDate = formatDisplayDate(currentDate);
   const weekday = getWeekdayLabelEn(currentDate);
@@ -152,10 +163,22 @@ export function Header({
       </div>
 
       {/* テーマ入力欄（[要件 7.2]: 未入力可。Phase 2 で自動保存接続、T-2-09）
-          Phase 7: data-focus-section="theme" で列フォーカス（Vim h/l）対応。
-          コンテナ（この div）へ section、入力へ input を付与。
-          Day One 風: 左に小さな accent 縦バーで「見出し」感を出す。 */}
-      <div className="mt-4 flex items-center gap-2" data-focus-section="theme">
+          Phase 7: data-focus-section="theme" で Vim j/k（theme↔列の上下移動）対応。
+          ※ h/l は theme を対象外（j/k で遷移）。コンテナ（この div）へ section、入力へ input を付与。
+          Day One 風: 左に小さな accent 縦バーで「見出し」感を出す。
+          Vim 選択中（showSelection && selection.section==='theme'）は他カードと同一の
+          背景+カーソルバーでハイライト（light/dark でコントラスト調整）。 */}
+      <div
+        className={`group relative mt-4 flex items-center gap-2 focus:outline-none ${
+          showSelection && selection?.section === 'theme'
+            ? vimState === 'insert'
+              ? 'rounded bg-accent/30 dark:bg-accent/20 before:absolute before:bottom-1.5 before:left-0.5 before:top-1.5 before:w-1 dark:before:w-0.5 before:rounded before:bg-accent'
+              : 'rounded bg-accent/25 dark:bg-accent/10 before:absolute before:bottom-1.5 before:left-0.5 before:top-1.5 before:w-1 dark:before:w-0.5 before:rounded before:bg-accent'
+            : ''
+        }`}
+        data-focus-section="theme"
+        tabIndex={-1}
+      >
         <div className="theme-input-wrap flex-1">
           <label htmlFor="theme-input" className="mb-1 block text-xs tracking-wider text-faint">
             Today&rsquo;s Theme

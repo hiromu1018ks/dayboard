@@ -24,6 +24,12 @@ export type EscContext = {
   settingsOpen: boolean;
   /** Vim操作状態を変更する（Insert→Normal）。undefined の場合は変更不要 */
   setVimState?: (state: VimState) => void;
+  /**
+   * Insert → Normal 復帰時に、選択要素（section/button）へフォーカスを戻す。
+   * 入力欄からフォーカスを外さないと hjkl がスルー判定で効かないため必須。
+   * 仕事整理モード（viewMode='work'）でのみ有意。
+   */
+  refocusSelection?: () => void;
   /** 設定モーダルを閉じる */
   closeSettings?: () => void;
   /** 表示モードを work へ戻す */
@@ -42,10 +48,13 @@ export function handleEsc(ctx: EscContext): boolean {
   // 段1: IME 変換中は本関数呼出前にガード済み（guardIme.isComposing）。
 
   // 段2: Vim Insert → Normal（AC-17）。
-  //   Vimキーバインドの Insert 状態で Esc を押した場合は Normal へ戻るのみ。
-  //   ノートモードであっても離脱しない（[要件 8.6]、AC-17）。
+  //   Vimキーバインドの Insert 状態で Esc を押した場合は Normal へ戻る。
+  //   仕事整理モードでは入力欄からフォーカスを外し、選択要素（section/button）へ戻す。
+  //   （入力欄にフォーカスが残ると hjkl がスルー判定で効かなくなるため）
+  //   ノートモードでは CodeMirror 側へ Esc を渡す（離脱しない、[要件 8.6]、AC-17）。
   if (ctx.vimState === 'insert') {
     ctx.setVimState?.('normal');
+    ctx.refocusSelection?.();
     return true;
   }
 
