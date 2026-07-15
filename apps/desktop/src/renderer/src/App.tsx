@@ -1121,6 +1121,9 @@ export default function App() {
             onThemeEdit={(theme) => edit(THEME_TARGET, theme)}
             onOpenSettings={() => setSettingsOpen(true)}
             onToast={setToast}
+            selection={selection}
+            showSelection={settings.keybindingMode === 'vim'}
+            vimState={vimState}
           />
 
           <main className="flex min-h-0 flex-1 flex-col overflow-hidden px-10 py-6">
