@@ -35,6 +35,19 @@ export type BlockerColumnProps = {
   showSelection: boolean;
   /** Vim操作状態（選択ハイライト強調用） */
   vimState: VimState;
+  /**
+   * 現在編集中のアイテム id（Vim `i`/`Enter`/`a` で外部制御、[§3.4]）。
+   * null = 編集中なし。未指定時は各アイテムのローカル制御。
+   */
+  editingItemId?: string | null;
+  /** 編集モードの開始/終了を親へ通知（id または null） */
+  onEditingChange?: (id: string | null) => void;
+  /**
+   * 追加入力欄で Enter 確定した際のコールバック（Vim 時のみ指定、[§5.1]）。
+   * App 側で vimState を Normal へ戻し、選択要素へフォーカスを戻す。
+   * 未指定（標準キーバインド）時は連続追加（フォーカス維持）の現状挙動。
+   */
+  onCommitAddInput?: () => void;
 };
 
 export function BlockerColumn({
@@ -52,6 +65,9 @@ export function BlockerColumn({
   selection,
   showSelection,
   vimState,
+  editingItemId,
+  onEditingChange,
+  onCommitAddInput,
 }: BlockerColumnProps) {
   const [draft, setDraft] = useState('');
   const inputRef = useRef<HTMLInputElement>(null);
@@ -64,11 +80,19 @@ export function BlockerColumn({
     const trimmed = draft.trim();
     if (trimmed.length === 0) {
       setDraft('');
+      // Vim 時は空確定でも Normal 戻り（追加入力欄から抜ける）
+      onCommitAddInput?.();
       return;
     }
     onAdd(trimmed, null);
     setDraft('');
-    requestAnimationFrame(() => inputRef.current?.focus());
+    if (onCommitAddInput) {
+      // Vim 時: Normal 戻り + 選択要素へフォーカス（連続追加しない）
+      onCommitAddInput();
+    } else {
+      // 標準時: フォーカス維持（連続追加、[ui_interaction_spec.md §5.1]）
+      requestAnimationFrame(() => inputRef.current?.focus());
+    }
   };
 
   const moveUp = (index: number) => {
@@ -124,6 +148,8 @@ export function BlockerColumn({
             isSelected={selectedItemId === blocker.id}
             showSelection={showSelection}
             vimState={vimState}
+            isEditing={editingItemId === blocker.id}
+            onEditingChange={(e) => onEditingChange?.(e ? blocker.id : null)}
             onToggleResolved={() => onToggleResolved(blocker.id)}
             onEditText={(text) => onEditText(blocker.id, text)}
             onChangeLinkedTodo={(linkedTodoId) => onChangeLinkedTodo(blocker.id, linkedTodoId)}

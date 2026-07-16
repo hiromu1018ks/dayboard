@@ -1,11 +1,11 @@
 /**
- * Esc キーの優先順位処理（[roadmap.md T-4-07/T-7-09]、[ui_interaction_spec.md §9.2]）
+ * Esc キーの優先順位処理（[roadmap.md T-4-07/T-7-09/T-7-G-02]、[ui_interaction_spec.md §9.2]）
  *
  * Esc は以下の4段の固定優先順位で処理される。上位が消費したら下位へは渡さない。
  *
  *   1. IME 変換中        → 変換キャンセル/確定のみ（本モジュール到達前にガード済み）
  *   2. Vim Insert 状態    → Normal 状態へ戻るのみ（AC-17）
- *   3. 設定モーダル open  → モーダルを閉じるのみ
+ *   3. モーダル open（設定 / キーバインドガイド） → 開いているモーダルを閉じるのみ（AC-23）
  *   4. ノートモード時     → 仕事整理モードへ戻る（AC-04、AC-18）
  *
  * Phase 4 で実装したのは段4。Phase 7 で段2・段3 を差し込む。
@@ -22,6 +22,8 @@ export type EscContext = {
   vimState: VimState;
   /** 設定モーダルが開いているか */
   settingsOpen: boolean;
+  /** キーバインドガイドが開いているか（[§10.5]、AC-23） */
+  helpOpen: boolean;
   /** Vim操作状態を変更する（Insert→Normal）。undefined の場合は変更不要 */
   setVimState?: (state: VimState) => void;
   /**
@@ -32,6 +34,8 @@ export type EscContext = {
   refocusSelection?: () => void;
   /** 設定モーダルを閉じる */
   closeSettings?: () => void;
+  /** キーバインドガイドを閉じる（[§10.5]、AC-23） */
+  closeHelp?: () => void;
   /** 表示モードを work へ戻す */
   goToWork: () => void;
 };
@@ -58,9 +62,14 @@ export function handleEsc(ctx: EscContext): boolean {
     return true;
   }
 
-  // 段3: 設定モーダル open → モーダル閉じる（[§9.2]）。
+  // 段3: モーダル open（設定 / キーバインドガイド）→ 開いているモーダルを閉じる（[§9.2]、AC-23）。
+  //   両方が同時に開くことはないが、念のため開いている方を閉じる。
   if (ctx.settingsOpen) {
     ctx.closeSettings?.();
+    return true;
+  }
+  if (ctx.helpOpen) {
+    ctx.closeHelp?.();
     return true;
   }
 

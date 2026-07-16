@@ -28,6 +28,29 @@ function getSectionContainer(section: WorkSection): HTMLElement | null {
 }
 
 /**
+ * 現在フォーカスされている要素が「テキスト入力要素」か判定する。
+ *
+ * - `<input>` / `<textarea>`: 通常の入力欄
+ * - `isContentEditable === true`: contenteditable 要素（CodeMirror の `.cm-content` 含む）
+ *
+ * Vim の Normal 操作（`vim.ts`）やキーバインドガイド起動（`?`、`help.ts`）は、
+ * これらの要素へフォーカス中は処理せず文字入力へ貫通させる
+ * （[ui_interaction_spec.md §3.4 / §10.5]: ユーザーが「普通にフォーカスして入力できる」体験）。
+ *
+ * jsdom では `isContentEditable` が反映されないことがあるため、
+ * `contenteditable` 属性値の直接チェックも併用する。
+ */
+export function isTextInputElement(el: Element | null): boolean {
+  if (!el) return false;
+  if (el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement) return true;
+  const htmlEl = el as HTMLElement;
+  if (htmlEl.isContentEditable) return true;
+  const attr = htmlEl.getAttribute('contenteditable');
+  if (attr === 'true' || attr === '') return true;
+  return false;
+}
+
+/**
  * 指定セクションの**入力要素**（`data-focus-input`）へフォーカスを移す（[§3.2]）。
  *
  * `⌘1/2/3`、Vim `Space 1/2/3` で使う。selection の更新は呼び出し側（App.tsx）で行い、

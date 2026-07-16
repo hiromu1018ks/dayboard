@@ -36,6 +36,14 @@ export type TodoItemProps = {
   showSelection?: boolean;
   /** Vim操作状態（Insert 時は選択ハイライトを強調） */
   vimState?: VimState;
+  /**
+   * 外部からの編集モード指定（Vim `i`/`Enter`/`a` で親が制御、[§3.4]）。
+   * 未指定（undefined）時は従来通りローカル制御（ダブルクリック/✎ボタン）。
+   * true が来たら input へフォーカスし編集モードへ入る。
+   */
+  isEditing?: boolean;
+  /** 編集モードの開始/終了を親へ通知（Vim の Insert→Normal 連動用） */
+  onEditingChange?: (editing: boolean) => void;
   onToggle: () => void;
   onEditTitle: (title: string) => void;
   onDelete: () => void;
@@ -52,18 +60,23 @@ export function TodoItem({
   isSelected = false,
   showSelection = false,
   vimState = 'normal',
+  isEditing,
+  onEditingChange,
   onToggle,
   onEditTitle,
   onDelete,
   onMoveUp,
   onMoveDown,
 }: TodoItemProps) {
-  const [editing, setEditing] = useState(false);
+  // 外部制御（Vim の i/Enter）とローカル制御（ダブルクリック/✎）の合成。
+  // isEditing が undefined の時は従来通りローカル state が真実源。
+  const [internalEditing, setInternalEditing] = useState(false);
+  const editing = isEditing ?? internalEditing;
   const [draft, setDraft] = useState(todo.title);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  // 編集モード開始時にフォーカス
+  // 編集モード開始時にフォーカス（外部制御・ローカル制御どちらも対象）
   useEffect(() => {
     if (editing && inputRef.current) {
       inputRef.current.focus();
@@ -73,7 +86,8 @@ export function TodoItem({
 
   const startEdit = () => {
     setDraft(todo.title);
-    setEditing(true);
+    setInternalEditing(true);
+    onEditingChange?.(true);
   };
 
   const commitEdit = () => {
@@ -81,18 +95,21 @@ export function TodoItem({
     if (trimmed.length === 0) {
       // 空確定 → 削除確認ダイアログ（[edge_cases.md §2.1]）
       setConfirmDelete(true);
-      setEditing(false);
+      setInternalEditing(false);
+      onEditingChange?.(false);
       return;
     }
     if (trimmed !== todo.title) {
       onEditTitle(trimmed);
     }
-    setEditing(false);
+    setInternalEditing(false);
+    onEditingChange?.(false);
   };
 
   const cancelEdit = () => {
     setDraft(todo.title);
-    setEditing(false);
+    setInternalEditing(false);
+    onEditingChange?.(false);
   };
 
   const isDone = todo.status === 'done';

@@ -12,6 +12,7 @@ import {
   focusElementAtSelection,
   focusInputAtSelection,
   focusItemById,
+  isTextInputElement,
 } from './focus.js';
 import { SECTION_ORDER, type WorkSelection } from './selection.js';
 
@@ -210,5 +211,49 @@ describe('focusItemById', () => {
 
   it('存在しない id は false', () => {
     expect(focusItemById('todo', 'nope')).toBe(false);
+  });
+});
+
+describe('isTextInputElement（[§3.4/§10.5]: Vim/ガイドの入力要素貫通判定）', () => {
+  // 本関数は Vim の Normal 操作（vim.ts）とキーバインドガイド起動（?）の両方で
+  // 「入力要素へフォーカス中は処理せず文字入力へ貫通」の判定に使う。そのため直接テストする。
+
+  it('null は false', () => {
+    expect(isTextInputElement(null)).toBe(false);
+  });
+
+  it('button は false（Vim hjkl 有効・ガイド開く）', () => {
+    document.body.innerHTML = '<button id="b"></button>';
+    expect(isTextInputElement(document.getElementById('b'))).toBe(false);
+  });
+
+  it('section は false', () => {
+    document.body.innerHTML = '<section id="s"></section>';
+    expect(isTextInputElement(document.getElementById('s'))).toBe(false);
+  });
+
+  it('input は true', () => {
+    document.body.innerHTML = '<input id="i" />';
+    expect(isTextInputElement(document.getElementById('i'))).toBe(true);
+  });
+
+  it('textarea は true', () => {
+    document.body.innerHTML = '<textarea id="t"></textarea>';
+    expect(isTextInputElement(document.getElementById('t'))).toBe(true);
+  });
+
+  it('contenteditable="true" は true（CodeMirror の .cm-content 相当）', () => {
+    document.body.innerHTML = '<div id="ce" contenteditable="true"></div>';
+    expect(isTextInputElement(document.getElementById('ce'))).toBe(true);
+  });
+
+  it('contenteditable="" （空文字）は true', () => {
+    document.body.innerHTML = '<div id="ce2" contenteditable=""></div>';
+    expect(isTextInputElement(document.getElementById('ce2'))).toBe(true);
+  });
+
+  it('contenteditable="false" は false', () => {
+    document.body.innerHTML = '<div id="cef" contenteditable="false"></div>';
+    expect(isTextInputElement(document.getElementById('cef'))).toBe(false);
   });
 });

@@ -32,6 +32,13 @@ export type BlockerItemProps = {
   showSelection?: boolean;
   /** Vim操作状態（Insert 時は選択ハイライトを強調） */
   vimState?: VimState;
+  /**
+   * 外部からの編集モード指定（Vim `i`/`Enter`/`a` で親が制御、[§3.4]）。
+   * 未指定（undefined）時は従来通りローカル制御（ダブルクリック/✎ボタン）。
+   */
+  isEditing?: boolean;
+  /** 編集モードの開始/終了を親へ通知（Vim の Insert→Normal 連動用） */
+  onEditingChange?: (editing: boolean) => void;
   onToggleResolved: () => void;
   onEditText: (text: string) => void;
   onChangeLinkedTodo: (linkedTodoId: string | null) => void;
@@ -50,6 +57,8 @@ export function BlockerItem({
   isSelected = false,
   showSelection = false,
   vimState = 'normal',
+  isEditing,
+  onEditingChange,
   onToggleResolved,
   onEditText,
   onChangeLinkedTodo,
@@ -57,7 +66,10 @@ export function BlockerItem({
   onMoveUp,
   onMoveDown,
 }: BlockerItemProps) {
-  const [editing, setEditing] = useState(false);
+  // 外部制御（Vim の i/Enter）とローカル制御（ダブルクリック/✎）の合成。
+  // isEditing が undefined の時は従来通りローカル state が真実源。
+  const [internalEditing, setInternalEditing] = useState(false);
+  const editing = isEditing ?? internalEditing;
   const [draft, setDraft] = useState(blocker.text);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -71,25 +83,29 @@ export function BlockerItem({
 
   const startEdit = () => {
     setDraft(blocker.text);
-    setEditing(true);
+    setInternalEditing(true);
+    onEditingChange?.(true);
   };
 
   const commitEdit = () => {
     const trimmed = draft.trim();
     if (trimmed.length === 0) {
       setConfirmDelete(true);
-      setEditing(false);
+      setInternalEditing(false);
+      onEditingChange?.(false);
       return;
     }
     if (trimmed !== blocker.text) {
       onEditText(trimmed);
     }
-    setEditing(false);
+    setInternalEditing(false);
+    onEditingChange?.(false);
   };
 
   const cancelEdit = () => {
     setDraft(blocker.text);
-    setEditing(false);
+    setInternalEditing(false);
+    onEditingChange?.(false);
   };
 
   const linkedTodo = blocker.linkedTodoId ? todos.find((t) => t.id === blocker.linkedTodoId) : null;

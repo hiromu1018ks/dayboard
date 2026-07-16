@@ -41,6 +41,7 @@ import { addDays, todayLocal, toggleDone, type SaveTarget } from '@dayboard/doma
 import { DuplicateConversionDialog } from './components/DuplicateConversionDialog.js';
 import { FlushFailDialog } from './components/FlushFailDialog.js';
 import { Header } from './components/Header.js';
+import { KeybindingGuide } from './components/KeybindingGuide.js';
 import { NoteMode } from './components/NoteMode.js';
 import type { NoteEditorHandle } from './components/NoteEditor.js';
 import { SaveStatus } from './components/SaveStatus.js';
@@ -80,6 +81,7 @@ import { useWorkData } from './hooks/useWorkData.js';
 import { useViewMode } from './state/viewMode.js';
 import { isComposing } from './keybindings/guardIme.js';
 import { handleEsc } from './keybindings/escPriority.js';
+import { isHelpShortcut } from './keybindings/help.js';
 import {
   isAddTodoShortcut,
   isGoNextDayShortcut,
@@ -95,6 +97,7 @@ import {
   focusSectionInput,
   focusElementAtSelection,
   focusInputAtSelection,
+  isTextInputElement,
 } from './keybindings/focus.js';
 import {
   THEME_SELECTION,
@@ -143,6 +146,11 @@ export default function App() {
   const [commandBuffer, setCommandBuffer] = useState('');
   // 設定モーダル（[ui_interaction_spec.md §8]）
   const [settingsOpen, setSettingsOpen] = useState(false);
+  // キーバインドガイド（[ui_interaction_spec.md §10.5]、AC-23）
+  const [helpOpen, setHelpOpen] = useState(false);
+  // 現在編集中の todo/blocker id（Vim `i`/`Enter`/`a` でアイテム編集モードを外部制御、[§3.4]）。
+  // null = 編集中なし。Vim キーバインド時のみ使用。
+  const [editingItemId, setEditingItemId] = useState<string | null>(null);
   // サイドバー表示状態（Post-MVP: localStorage で永続化、既定 true）
   const [sidebarVisible, setSidebarVisible] = useState(() => {
     if (typeof window === 'undefined') return true;
@@ -738,6 +746,25 @@ export default function App() {
    */
   const editItemAt = useCallback(
     (sel: WorkSelection) => {
+      // todo/blocker のアイテム選択時: editingItemId をセットし、TodoItem/BlockerItem の
+      // isEditing を通じて編集モードを開始（[§3.4]: i/Enter/a で選択アイテム編集）。
+      // フォーカスは編集モード開始時の useEffect で input へ当たる。
+      if (sel.section === 'todo' || sel.section === 'blocker') {
+        const items = sel.section === 'todo' ? (workData?.todos ?? []) : (workData?.blockers ?? []);
+        const idx = sel.itemIndex ?? 0;
+        // 追加入力欄（番哨行）選択時は編集モードでなく追加入力欄へフォーカス
+        if (idx >= items.length) {
+          focusSectionInput(sel.section);
+        } else {
+          const id = items[idx]?.id;
+          if (id) {
+            setEditingItemId(id);
+            setVimState('insert');
+            return;
+          }
+        }
+      }
+      // theme/reflection、または番哨行: 従来通り入力欄へフォーカス
       focusInputAtSelection(sel, {
         todo: workData?.todos ?? [],
         blocker: workData?.blockers ?? [],
@@ -757,6 +784,39 @@ export default function App() {
     focusSectionInput(sel.section);
     setVimState('insert');
   }, []);
+
+  /**
+   * Vim 編集モードの開始/終了を TodoItem/BlockerItem から受ける（[§3.4]）。
+   * 編集終了（Enter 確定 / Esc キャンセル）時に vimState を Normal へ戻し、
+   * 選択要素（button）へフォーカスを戻す（hjkl が即座に使えるように）。
+   */
+  const handleEditingChange = useCallback(
+    (id: string | null) => {
+      setEditingItemId(id);
+      if (id === null) {
+        setVimState('normal');
+        // 編集終了後、選択中アイテムの button へフォーカスを戻す（hjkl 有効化）
+        focusElementAtSelection(selection, {
+          todo: workData?.todos ?? [],
+          blocker: workData?.blockers ?? [],
+        });
+      }
+    },
+    [selection, workData?.todos, workData?.blockers],
+  );
+
+  /**
+   * Vim 時の追加入力欄 Enter 確定コールバック（[§5.1]）。
+   * vimState を Normal へ戻し、選択要素（追加入力欄 or 新規アイテム）へフォーカスを戻す。
+   * 標準キーバインド時は未指定（連続追加の現状維持）。
+   */
+  const handleCommitAddInput = useCallback(() => {
+    setVimState('normal');
+    focusElementAtSelection(selection, {
+      todo: workData?.todos ?? [],
+      blocker: workData?.blockers ?? [],
+    });
+  }, [selection, workData?.todos, workData?.blockers]);
 
   /**
    * 選択中アイテムの完了/解決切替（Vim `x`、AC-09）。
@@ -851,6 +911,16 @@ export default function App() {
       // 標準/Vim両方で無効化。入力内容は破壊しない。
       if (handlePostMvpShortcut(e)) return;
 
+      // ----- キーバインドガイド（`?`、[§10.5]、AC-23） -----
+      //   入力要素（input/textarea/contenteditable）へフォーカス中は `?` を文字入力として
+      //   扱いガイドを開かない（[§10.5]: ユーザーが普通に入力できる体験）。
+      //   トグル動作: 閉じていれば開く、開いていれば閉じる。
+      if (isHelpShortcut(e) && !isTextInputElement(document.activeElement)) {
+        e.preventDefault();
+        setHelpOpen((prev) => !prev);
+        return;
+      }
+
       // ----- 共通ショートカット（標準/Vim両方で有効、[要件 8.6]） -----
 
       // ⌘/Ctrl+J: モード切替（AC-03/04）
@@ -916,12 +986,16 @@ export default function App() {
           viewMode,
           vimState: settings.keybindingMode === 'vim' ? vimState : 'normal',
           settingsOpen,
+          helpOpen,
           setVimState: settings.keybindingMode === 'vim' ? setVimState : undefined,
-          // Insert → Normal 復帰時、仕事整理モードなら選択要素（section/button）へフォーカスを戻す。
-          // 入力欄にフォーカスが残ると hjkl がスルー判定で効かないため。
+          // Insert → Normal 復帰時、仕事整理モードなら編集モードを終了し選択要素
+          // （section/button）へフォーカスを戻す。入力欄にフォーカスが残ると hjkl が
+          // スルー判定で効かなくなるため。editingItemId のクリアは編集 input の onBlur/onKeyDown
+          // でも走るが、フォーカス未外れのケースの安全網としてここでも明示的にクリアする。
           refocusSelection:
             settings.keybindingMode === 'vim' && viewMode === 'work'
               ? () => {
+                  setEditingItemId(null);
                   focusElementAtSelection(selection, {
                     todo: workData?.todos ?? [],
                     blocker: workData?.blockers ?? [],
@@ -929,6 +1003,7 @@ export default function App() {
                 }
               : undefined,
           closeSettings: () => setSettingsOpen(false),
+          closeHelp: () => setHelpOpen(false),
           goToWork: () => {
             void setModeWithFlush('work');
           },
@@ -937,9 +1012,9 @@ export default function App() {
         return;
       }
 
-      // 設定モーダルが開いている時は上記以外のショートカットを処理しない
-      // （モーダル内のラジオ操作等を優先）
-      if (settingsOpen) return;
+      // 設定モーダル / キーバインドガイドが開いている時は上記以外のショートカットを処理しない
+      // （モーダル内の操作を優先。`?` トグルと Esc は既に上で処理済み）
+      if (settingsOpen || helpOpen) return;
 
       // ----- 標準キーバインド専用（仕事整理モードのみ、[要件 8.2]） -----
       if (settings.keybindingMode === 'standard' && viewMode === 'work') {
@@ -1039,6 +1114,7 @@ export default function App() {
     settings.keybindingMode,
     vimState,
     settingsOpen,
+    helpOpen,
     setModeWithFlush,
     goToday,
     goPrevDay,
@@ -1110,6 +1186,7 @@ export default function App() {
             keybindingMode={settings.keybindingMode}
             onVimModeChange={setVimState}
             resolvedMode={resolvedMode}
+            onOpenHelp={() => setHelpOpen(true)}
           />
         </div>
       ) : (
@@ -1123,6 +1200,7 @@ export default function App() {
             isToday={isToday}
             onThemeEdit={(theme) => edit(THEME_TARGET, theme)}
             onOpenSettings={() => setSettingsOpen(true)}
+            onOpenHelp={() => setHelpOpen(true)}
             onToast={setToast}
             selection={selection}
             showSelection={settings.keybindingMode === 'vim'}
@@ -1170,6 +1248,9 @@ export default function App() {
                 selection={selection}
                 vimState={vimState}
                 keybindingMode={settings.keybindingMode}
+                editingItemId={editingItemId}
+                onEditingChange={handleEditingChange}
+                onCommitAddInput={handleCommitAddInput}
               />
             )}
           </main>
@@ -1203,6 +1284,14 @@ export default function App() {
         theme={theme}
         onChangeTheme={setTheme}
         onClose={() => setSettingsOpen(false)}
+      />
+
+      {/* キーバインドガイドモーダル（[ui_interaction_spec.md §10.5]、AC-23） */}
+      <KeybindingGuide
+        open={helpOpen}
+        viewMode={viewMode}
+        keybindingMode={settings.keybindingMode}
+        onClose={() => setHelpOpen(false)}
       />
 
       {/* 重複変換確認ダイアログ（Phase 5、[§7]） */}

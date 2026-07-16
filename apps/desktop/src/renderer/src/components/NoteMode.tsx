@@ -44,6 +44,8 @@ export type NoteModeProps = {
   onVimModeChange?: (mode: 'normal' | 'insert') => void;
   /** 外観モード（墨と波テーマ）。CodeMirror の配色切替に使用 */
   resolvedMode?: 'dark' | 'light';
+  /** キーバインドガイドを開く（[ui_interaction_spec.md §10.5]、AC-23） */
+  onOpenHelp?: () => void;
 };
 
 export const NoteMode = forwardRef<NoteEditorHandle, NoteModeProps>(function NoteMode(
@@ -59,6 +61,7 @@ export const NoteMode = forwardRef<NoteEditorHandle, NoteModeProps>(function Not
     keybindingMode,
     onVimModeChange,
     resolvedMode,
+    onOpenHelp,
   },
   ref,
 ) {
@@ -78,7 +81,7 @@ export const NoteMode = forwardRef<NoteEditorHandle, NoteModeProps>(function Not
             <span className="text-sm text-faint">Meetings, talks &amp; notes</span>
           </div>
 
-          {/* 戻る操作の案内（[要件 6.3]） */}
+          {/* 戻る操作の案内（[要件 6.3]） + キーバインドガイド（[§10.5]、AC-23） */}
           <div className="flex items-center gap-3 text-sm text-faint">
             <span>
               <kbd className="rounded border border-line bg-raised px-1.5 py-0.5 font-sans text-xs text-sub">
@@ -93,6 +96,33 @@ export const NoteMode = forwardRef<NoteEditorHandle, NoteModeProps>(function Not
               </kbd>{' '}
               戻る
             </span>
+            {/* ヘルプ（?）アイコン（[ui_interaction_spec.md §10.5]、AC-23） */}
+            {onOpenHelp && (
+              <button
+                type="button"
+                onClick={onOpenHelp}
+                aria-label="キーバインドガイドを開く"
+                className="ml-1 rounded p-1 text-faint hover:bg-raised hover:text-sub focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1"
+              >
+                {/* CircleHelp アイコン（SVG） */}
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  width="18"
+                  height="18"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  aria-hidden="true"
+                >
+                  <circle cx="12" cy="12" r="10" />
+                  <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" />
+                  <path d="M12 17h.01" />
+                </svg>
+              </button>
+            )}
           </div>
         </div>
       </header>

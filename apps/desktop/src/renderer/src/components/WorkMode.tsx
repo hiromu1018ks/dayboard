@@ -55,6 +55,18 @@ export type WorkModeProps = {
   vimState: VimState;
   /** キーバインドモード。standard の時は選択ハイライトを表示しない */
   keybindingMode: KeybindingMode;
+  /**
+   * 現在編集中の todo/blocker id（Vim `i`/`Enter`/`a` で外部制御、[§3.4]）。
+   * null = 編集中なし。Vim キーバインド時のみ指定。
+   */
+  editingItemId?: string | null;
+  /** 編集モードの開始/終了を親へ通知（id または null） */
+  onEditingChange?: (id: string | null) => void;
+  /**
+   * 追加入力欄で Enter 確定した際のコールバック（Vim 時のみ指定、[§5.1]）。
+   * 親で vimState を Normal へ戻し、選択要素へフォーカスを戻す。
+   */
+  onCommitAddInput?: () => void;
 };
 
 /**
@@ -77,9 +89,15 @@ export function WorkMode({
   selection,
   vimState,
   keybindingMode,
+  editingItemId,
+  onEditingChange,
+  onCommitAddInput,
 }: WorkModeProps) {
   // Vim キーバインド時のみ選択ハイライトを有効化
   const showSelection = keybindingMode === 'vim';
+  // Vim キーバインド時のみ編集モード外部制御と追加入力欄の Normal 戻りを有効化
+  const editingProps =
+    keybindingMode === 'vim' ? { editingItemId, onEditingChange, onCommitAddInput } : {};
   return (
     <div className="grid min-h-0 flex-1 grid-cols-1 gap-6 md:grid-cols-3">
       <TodoColumn
@@ -96,6 +114,7 @@ export function WorkMode({
         selection={selection}
         showSelection={showSelection}
         vimState={vimState}
+        {...editingProps}
       />
       <BlockerColumn
         date={date}
@@ -112,6 +131,7 @@ export function WorkMode({
         selection={selection}
         showSelection={showSelection}
         vimState={vimState}
+        {...editingProps}
       />
       <ReflectionColumn
         reflection={reflection}

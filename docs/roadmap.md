@@ -752,6 +752,35 @@
 - [x] `u`/`Ctrl+r` で全文編集含む undo/redo
 - [x] Blocker で `x` が解決切替として動作（TODO の `x` と統一）
 
+### Phase 7 拡張: キーバインドガイド（`?`）
+
+**動機:** キーバインドがわからないユーザーがいつでもショートカットを確認できるガイドを提供する。Vim 文化に合わせ `?` キーで開き、ヘッダーのヘルプアイコンからも開ける。表示内容は現在のモード（仕事整理/ノート × 標準/Vim）に応じて自動切替する（[ui_interaction_spec.md §10.5](ui_interaction_spec.md)）。
+
+**対象AC:** AC-23
+
+**タスク:**
+
+- **T-7-G-01** `?` キー判定純粋関数
+  - 出力: `apps/desktop/src/renderer/src/keybindings/help.ts`（`isHelpShortcut(e)`）、`help.test.ts`
+  - 完了条件: `?`（修飾キーなし）で true、修飾付きや `/` で false。入力要素フォーカス中の貫通は App.tsx 側で `isTextInputElement` により判定（[§10.5]）。
+- **T-7-G-02** Esc 優先順位へガイドモーダルを追加
+  - 出力: `apps/desktop/src/renderer/src/keybindings/escPriority.ts`（`EscContext.helpOpen` / `closeHelp`、段3拡張）
+  - 完了条件: ガイド open 時の `Esc` でガイドを閉じる（[§9.2] 段3）。
+- **T-7-G-03** KeybindingGuide モーダルコンポーネント
+  - 出力: `apps/desktop/src/renderer/src/components/KeybindingGuide.tsx`
+  - 完了条件: `SettingsModal` パターンを踏襲。現モード別に [§11.1〜§11.4] の内容を表示。
+- **T-7-G-04** App.tsx / Header.tsx / NoteMode.tsx 接続
+  - 完了条件: `?` トグル、ヘルプアイコン、Esc/背景クリック閉じる、モード別表示が動作。
+- **T-7-G-05** docs 整合
+  - 完了条件: `dayborad_requirements.md §8.1/§15(AC-23)`、`ui_interaction_spec.md §9.2/§10.5`、本節が実装と一致。
+
+### Phase 7 拡張（ガイド）のチェック基準
+
+- [ ] `?` キーでガイドが開く（入力要素フォーカス中は貫通）
+- [ ] Header / NoteMode のヘルプアイコンから開ける
+- [ ] Esc / 背景クリック / 閉じるボタン / 再 `?` で閉じる
+- [ ] 現モード（work/note × standard/vim）に応じた内容が表示される（AC-23）
+
 ---
 
 ## Phase 8: 統合・E2E・リリース確認
@@ -882,6 +911,7 @@ T-0-01 → T-0-05 → T-1-04 → T-1-07 → T-1-08 → T-2-07 → T-3-10 → T-4
 | AC-20 | Vim `h/j/k/l` 移動 | T-7-05, T-7-06* |
 | AC-21 | 単一ユーザー・PostgreSQL保存 | T-0-04, T-0-05, T-1-04* |
 | AC-22 | Post-MVPショートカットは不発 | T-7-10*, T-7-11 |
+| AC-23 | `?` / ヘルプアイコンでガイド表示 | T-7-G-01, T-7-G-02, T-7-G-03, T-7-G-04* |
 
 ---
 

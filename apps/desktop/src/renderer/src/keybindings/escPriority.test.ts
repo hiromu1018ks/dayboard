@@ -1,10 +1,10 @@
 /**
- * Esc 4段優先順位の Unit テスト（[roadmap.md T-4-07/T-7-09]、[ui_interaction_spec.md §9.2]）
+ * Esc 4段優先順位の Unit テスト（[roadmap.md T-4-07/T-7-09/T-7-G-02]、[ui_interaction_spec.md §9.2]）
  *
  * 優先順位:
  *   1. IME 変換中（呼出前ガード済みだが、本関数到達時は IME 終了済みの前提）
  *   2. Vim Insert → Normal（AC-17）
- *   3. 設定モーダル open → 閉じる
+ *   3. モーダル open（設定 / キーバインドガイド）→ 閉じる（AC-23）
  *   4. ノートモード時 → 仕事整理モードへ戻る（AC-04/AC-18）
  *
  * handleEsc は純粋（ctx を受け取って bool を返す）。
@@ -19,9 +19,11 @@ function ctx(props: Partial<EscContext>): EscContext {
     viewMode: 'note',
     vimState: 'normal',
     settingsOpen: false,
+    helpOpen: false,
     setVimState: vi.fn(),
     refocusSelection: vi.fn(),
     closeSettings: vi.fn(),
+    closeHelp: vi.fn(),
     goToWork: vi.fn(),
     ...props,
   };
@@ -78,6 +80,23 @@ describe('Esc 4段優先順位（[§9.2]）', () => {
       expect(c.closeSettings).toHaveBeenCalled();
       expect(c.goToWork).not.toHaveBeenCalled();
     });
+
+    it('キーバインドガイド open 時はガイドを閉じるのみ（AC-23）', () => {
+      const c = ctx({ viewMode: 'work', vimState: 'normal', helpOpen: true });
+      const result = handleEsc(c);
+      expect(result).toBe(true);
+      expect(c.closeHelp).toHaveBeenCalled();
+      // work 戻りは呼ばれない
+      expect(c.goToWork).not.toHaveBeenCalled();
+    });
+
+    it('ノートモード + ガイド open の場合もガイド閉じるが優先', () => {
+      const c = ctx({ viewMode: 'note', vimState: 'normal', helpOpen: true });
+      const result = handleEsc(c);
+      expect(result).toBe(true);
+      expect(c.closeHelp).toHaveBeenCalled();
+      expect(c.goToWork).not.toHaveBeenCalled();
+    });
   });
 
   describe('段4: ノートモード → work 戻り（AC-04/AC-18）', () => {
@@ -100,11 +119,12 @@ describe('Esc 4段優先順位（[§9.2]）', () => {
 
   describe('該当なし', () => {
     it('仕事整理モード + Normal + モーダル閉じ は何もしない', () => {
-      const c = ctx({ viewMode: 'work', vimState: 'normal', settingsOpen: false });
+      const c = ctx({ viewMode: 'work', vimState: 'normal', settingsOpen: false, helpOpen: false });
       const result = handleEsc(c);
       expect(result).toBe(false);
       expect(c.goToWork).not.toHaveBeenCalled();
       expect(c.closeSettings).not.toHaveBeenCalled();
+      expect(c.closeHelp).not.toHaveBeenCalled();
       expect(c.setVimState).not.toHaveBeenCalled();
     });
   });

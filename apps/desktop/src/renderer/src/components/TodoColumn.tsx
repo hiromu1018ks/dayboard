@@ -35,6 +35,19 @@ export type TodoColumnProps = {
   showSelection: boolean;
   /** Vim操作状態（選択ハイライト強調用） */
   vimState: VimState;
+  /**
+   * 現在編集中のアイテム id（Vim `i`/`Enter`/`a` で外部制御、[§3.4]）。
+   * null = 編集中なし。未指定時は各アイテムのローカル制御。
+   */
+  editingItemId?: string | null;
+  /** 編集モードの開始/終了を親へ通知（id または null） */
+  onEditingChange?: (id: string | null) => void;
+  /**
+   * 追加入力欄で Enter 確定した際のコールバック（Vim 時のみ指定、[§5.1]）。
+   * App 側で vimState を Normal へ戻し、選択要素へフォーカスを戻す。
+   * 未指定（標準キーバインド）時は連続追加（フォーカス維持）の現状挙動。
+   */
+  onCommitAddInput?: () => void;
 };
 
 export function TodoColumn({
@@ -51,6 +64,9 @@ export function TodoColumn({
   selection,
   showSelection,
   vimState,
+  editingItemId,
+  onEditingChange,
+  onCommitAddInput,
 }: TodoColumnProps) {
   const [draft, setDraft] = useState('');
   const [confirmCarryOver, setConfirmCarryOver] = useState(false);
@@ -66,12 +82,19 @@ export function TodoColumn({
     const trimmed = draft.trim();
     if (trimmed.length === 0) {
       setDraft('');
+      // Vim 時は空確定でも Normal 戻り（追加入力欄から抜ける）
+      onCommitAddInput?.();
       return;
     }
     onAdd(trimmed);
     setDraft('');
-    // フォーカス維持（連続追加、[ui_interaction_spec.md §5.1]）
-    requestAnimationFrame(() => inputRef.current?.focus());
+    if (onCommitAddInput) {
+      // Vim 時: Normal 戻り + 選択要素へフォーカス（連続追加しない）
+      onCommitAddInput();
+    } else {
+      // 標準時: フォーカス維持（連続追加、[ui_interaction_spec.md §5.1]）
+      requestAnimationFrame(() => inputRef.current?.focus());
+    }
   };
 
   // 持ち越し対象: 未完了（status='todo'）のみ。done/carried は除外
@@ -131,6 +154,8 @@ export function TodoColumn({
             isSelected={selectedItemId === todo.id}
             showSelection={showSelection}
             vimState={vimState}
+            isEditing={editingItemId === todo.id}
+            onEditingChange={(e) => onEditingChange?.(e ? todo.id : null)}
             onToggle={() => onToggle(todo.id)}
             onEditTitle={(title) => onEditTitle(todo.id, title)}
             onDelete={() => onDelete(todo.id)}
