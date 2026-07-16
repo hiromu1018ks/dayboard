@@ -6,12 +6,30 @@
  * - Enter で確定 → POST、確定後フォーカス維持（連続追加）
  * - 空入力で Enter/Esc でフォーカスをリスト先頭へ
  *
- * 並替は ↑/↓ ボタン（TodoItem 内）。ドラッグ&ドロップは Post-MVP。
+ * 並替はドラッグ&ドロップ（@dnd-kit）+ ↑/↓ ボタン（アクセシビリティ/キーボードの代替）。
+ * DnD は carried 以外の TODO をドラッグ可能。ドロップ時に既存 `onReorder(orderedIds)` へ流す。
  */
 
 import { useEffect, useRef, useState } from 'react';
+import {
+  DndContext,
+  PointerSensor,
+  KeyboardSensor,
+  useSensor,
+  useSensors,
+  closestCenter,
+  type DragEndEvent,
+} from '@dnd-kit/core';
+import {
+  SortableContext,
+  arrayMove,
+  sortableKeyboardCoordinates,
+  useSortable,
+  verticalListSortingStrategy,
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 import type { NoteLineMeta, TodoItem as TodoItemType } from 'shared-types';
-import { TodoItem } from './TodoItem.js';
+import { TodoItem, type TodoItemProps } from './TodoItem.js';
 import type { VimState } from './VimStateBadge.js';
 import type { WorkSelection } from '../keybindings/selection.js';
 
@@ -40,6 +58,11 @@ export type TodoColumnProps = {
    * null = 編集中なし。未指定時は各アイテムのローカル制御。
    */
   editingItemId?: string | null;
+  /**
+   * 編集開始時のカーソル位置ヒント（Vim `A` = 行末、それ以外 = 維持、[§3.4]）。
+   * editingItemId がセットされたタイミングで参照される。
+   */
+  editCursorHint?: 'keep' | 'end';
   /** 編集モードの開始/終了を親へ通知（id または null） */
   onEditingChange?: (id: string | null) => void;
   /**
@@ -49,6 +72,32 @@ export type TodoColumnProps = {
    */
   onCommitAddInput?: () => void;
 };
+
+/**
+ * 並替可能な TODO アイテムのラッパー（@dnd-kit useSortable 適用）。
+ * TodoItem には sortableRef/style/dragHandleProps/isDragging を注入する。
+ * carried TODO（status==='carried'）は `disabled: true` でドラッグ不可。
+ */
+function SortableTodoItem(props: TodoItemProps) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id: props.todo.id,
+    // carried は操作不可（[要件 7.10]、ドラッグでも位置不変）
+    disabled: props.todo.status === 'carried',
+  });
+  const sortableStyle = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+  };
+  return (
+    <TodoItem
+      {...props}
+      sortableRef={setNodeRef}
+      sortableStyle={sortableStyle}
+      dragHandleProps={listeners ? { ...listeners, ...attributes } : undefined}
+      isDragging={isDragging}
+    />
+  );
+}
 
 export function TodoColumn({
   date,
@@ -65,6 +114,7 @@ export function TodoColumn({
   showSelection,
   vimState,
   editingItemId,
+  editCursorHint,
   onEditingChange,
   onCommitAddInput,
 }: TodoColumnProps) {
@@ -124,6 +174,23 @@ export function TodoColumn({
       : null;
   const isAddInputSelected = isThisColumnSelected && selection.itemIndex === todos.length;
 
+  // DnD センサ: ドラッグは意図的な移動量が必要（誤発動防止）、キーボードは座標ベースでアクセシビリティ対応
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+  );
+
+  /** DnD 終了時: ドロップ先へ id を移動した全 id 配列を構築し onReorder へ（API/repo は再利用） */
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+    const ids = todos.map((t) => t.id);
+    const oldIndex = ids.indexOf(String(active.id));
+    const newIndex = ids.indexOf(String(over.id));
+    if (oldIndex < 0 || newIndex < 0) return;
+    onReorder(arrayMove(ids, oldIndex, newIndex));
+  };
+
   return (
     <section
       className={`flex min-h-0 flex-col overflow-hidden rounded border bg-panel/30 p-7 transition-colors focus:outline-none ${
@@ -138,35 +205,40 @@ export function TodoColumn({
         Today
       </h2>
 
-      <ul className="min-h-0 flex-1 space-y-1 overflow-y-auto">
-        {todos.map((todo, i) => (
-          <TodoItem
-            key={todo.id}
-            todo={todo}
-            isFirst={i === 0}
-            isLast={i === todos.length - 1}
-            sourceNoteLineMeta={
-              todo.sourceNoteLineMetaId && noteLineMetaMap
-                ? (noteLineMetaMap.get(todo.sourceNoteLineMetaId) ?? null)
-                : null
-            }
-            highlight={highlightIds?.has(todo.id) ?? false}
-            isSelected={selectedItemId === todo.id}
-            showSelection={showSelection}
-            vimState={vimState}
-            isEditing={editingItemId === todo.id}
-            onEditingChange={(e) => onEditingChange?.(e ? todo.id : null)}
-            onToggle={() => onToggle(todo.id)}
-            onEditTitle={(title) => onEditTitle(todo.id, title)}
-            onDelete={() => onDelete(todo.id)}
-            onMoveUp={() => moveUp(i)}
-            onMoveDown={() => moveDown(i)}
-          />
-        ))}
-        {todos.length === 0 && (
-          <li className="py-4 text-center text-xs text-faint">No tasks yet</li>
-        )}
-      </ul>
+      <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+        <SortableContext items={todos.map((t) => t.id)} strategy={verticalListSortingStrategy}>
+          <ul className="min-h-0 flex-1 space-y-1 overflow-y-auto">
+            {todos.map((todo, i) => (
+              <SortableTodoItem
+                key={todo.id}
+                todo={todo}
+                isFirst={i === 0}
+                isLast={i === todos.length - 1}
+                sourceNoteLineMeta={
+                  todo.sourceNoteLineMetaId && noteLineMetaMap
+                    ? (noteLineMetaMap.get(todo.sourceNoteLineMetaId) ?? null)
+                    : null
+                }
+                highlight={highlightIds?.has(todo.id) ?? false}
+                isSelected={selectedItemId === todo.id}
+                showSelection={showSelection}
+                vimState={vimState}
+                isEditing={editingItemId === todo.id}
+                editCursorHint={editCursorHint}
+                onEditingChange={(e) => onEditingChange?.(e ? todo.id : null)}
+                onToggle={() => onToggle(todo.id)}
+                onEditTitle={(title) => onEditTitle(todo.id, title)}
+                onDelete={() => onDelete(todo.id)}
+                onMoveUp={() => moveUp(i)}
+                onMoveDown={() => moveDown(i)}
+              />
+            ))}
+            {todos.length === 0 && (
+              <li className="py-4 text-center text-xs text-faint">No tasks yet</li>
+            )}
+          </ul>
+        </SortableContext>
+      </DndContext>
 
       {/* 未完了TODOの翌日持ち越しボタン（Phase 6、要件 7.10）
           未完了（status='todo'）のTODOがある場合のみ表示。

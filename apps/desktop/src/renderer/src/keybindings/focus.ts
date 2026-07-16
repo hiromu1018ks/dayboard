@@ -148,7 +148,21 @@ export function focusInputAtSelection(
   const container = getSectionContainer(selection.section);
   if (!container) return false;
 
-  if (selection.section === 'theme' || selection.section === 'reflection') {
+  if (selection.section === 'theme') {
+    return focusSectionInput(selection.section);
+  }
+  if (selection.section === 'reflection') {
+    // 選択中 field（doneText/stuckText/tomorrowActionText）の textarea へ直接フォーカス。
+    // data-focus-field が解決できないときのみ focusSectionInput のフォールバック（最初の入力欄）。
+    if (selection.field) {
+      const fieldEl = container.querySelector<HTMLElement>(
+        `[data-focus-field="${selection.field}"]`,
+      );
+      if (fieldEl) {
+        fieldEl.focus();
+        return true;
+      }
+    }
     return focusSectionInput(selection.section);
   }
 

@@ -121,6 +121,22 @@ const REFLECTION_TARGET: SaveTarget = { type: 'reflection' };
 /** ノート本文の保存対象識別子（T-4-04） */
 const NOTE_ENTRY_TARGET: SaveTarget = { type: 'noteEntry' };
 
+/**
+ * Vim `o`/`O` で新規アイテムを所望位置へ挿入するための並替後 id 配列を構築（[§3.4]）。
+ * API は末尾採番のみのため、追加後の全 id 配列から新 id を抜き出し目標 index へ挿入する。
+ *
+ * @param beforeIds 追加前の全 id 配列（順序維持）
+ * @param newId 追加された新規 id（末尾に append 済みの前提で除外してから挿入）
+ * @param insertAtIndex 挿入したい目標 index（0..beforeIds.length、末尾超はクランプ）
+ * @returns 新 id を insertAtIndex へ挿入した全 id 配列
+ */
+function computeInsertedOrder(beforeIds: string[], newId: string, insertAtIndex: number): string[] {
+  const clamped = Math.max(0, Math.min(insertAtIndex, beforeIds.length));
+  const result = [...beforeIds];
+  result.splice(clamped, 0, newId);
+  return result;
+}
+
 export default function App() {
   const { currentDate, goTo, isToday } = useDateNavigation();
   const { data, loading, error, refetch } = useDayNote(currentDate);
@@ -151,6 +167,22 @@ export default function App() {
   // 現在編集中の todo/blocker id（Vim `i`/`Enter`/`a` でアイテム編集モードを外部制御、[§3.4]）。
   // null = 編集中なし。Vim キーバインド時のみ使用。
   const [editingItemId, setEditingItemId] = useState<string | null>(null);
+  // 編集開始時のカーソル位置ヒント（Vim `A` = 末尾、それ以外 = 維持、[§3.4]）。
+  // editingItemId と同時にセットされ、TodoItem/BlockerItem の編集開始 useEffect で参照される。
+  const [editCursorHint, setEditCursorHint] = useState<'keep' | 'end'>('keep');
+  // Vim `o`/`O` で新規追加する際の挿入位置要求（[§3.4]: 選択行の下/上に新規追加）。
+  // 追加入力欄へフォーカス中のみ非 null。確定（onAdd）時に新 id をこの位置へ挿入し reorder。
+  // null のときは通常の末尾追加。section/theme には追加入力欄がないため対象外。
+  //
+  // **ref で保持する理由**: pendingInsert はレンダリングに影響しない（UI の見た目は追加入力欄の
+  // フォーカスだけで決まる）内部状態。state にすると handleAddTodo/handleAddBlocker の
+  // useCallback 依存配列に入れざるを得ず、ハンドラが毎回再生成されて子へ伝播する。
+  // ref なら依存配列から外せ、常に最新値を参照できる（commit→onAdd の非同期ギャップでも安全）。
+  const pendingInsertRef = useRef<{
+    section: 'todo' | 'blocker';
+    /** 新規アイテムを挿入する目標 index（並替後の全 id 配列でこの位置へ入れる） */
+    insertAtIndex: number;
+  } | null>(null);
   // サイドバー表示状態（Post-MVP: localStorage で永続化、既定 true）
   const [sidebarVisible, setSidebarVisible] = useState(() => {
     if (typeof window === 'undefined') return true;
@@ -409,18 +441,37 @@ export default function App() {
 
   // --- TODO ---
 
-  /** TODO 追加: 即時 API 呼出 + 楽観的 state 更新 */
+  /**
+   * TODO 追加: 即時 API 呼出 + 楽観的 state 更新。
+   * Vim `o`/`O` で起動した場合、`pendingInsertRef` が指定位置へ新規アイテムを挿入するよう reorder する
+   * （[§3.4]: 選択行の下/上に新規追加）。API は末尾採番のみのため create + reorder の2call で実現。
+   * pendingInsert は ref 参照のため依存配列に含まず、常に最新値を読む（commit→onAdd の非同期ギャップでも安全）。
+   */
   const handleAddTodo = useCallback(
     async (title: string) => {
       try {
         const created = await apiPostTodo(currentDate, title);
         dispatch({ type: 'ADD_TODO', todo: created });
+        // Vim o/O で挿入位置指定がある場合、新 id を所望位置へ移動（[§3.4]）
+        const insert = pendingInsertRef.current;
+        if (insert?.section === 'todo') {
+          const before = workData?.todos ?? [];
+          const orderedIds = computeInsertedOrder(
+            before.map((t) => t.id),
+            created.id,
+            insert.insertAtIndex,
+          );
+          dispatch({ type: 'REORDER_TODOS', orderedIds });
+          saveNow(TODO_ORDER_TARGET, orderedIds);
+        }
       } catch (err) {
         // エラー時は再フェッチで同期（楽観的更新の巻き戻し）
         console.error('TODO追加に失敗:', err);
+      } finally {
+        pendingInsertRef.current = null;
       }
     },
-    [currentDate, dispatch],
+    [currentDate, dispatch, workData?.todos, saveNow],
   );
 
   /** TODO 完了切替: 即時保存（saveNow）+ 楽観的 state 更新（AC-09） */
@@ -458,13 +509,28 @@ export default function App() {
     [dispatch],
   );
 
-  /** TODO 並替: 即時保存（saveNow）+ 楽観的 state 更新 */
+  /**
+   * TODO 並替: 即時保存（saveNow）+ 楽観的 state 更新。
+   * DnD・↑/↓ いずれの経路でも呼ばれる。selection が当該 todo を指している場合は
+   * 新しい index へ追従（id ベースで再マップ）。他セクション選択中は触れない。
+   */
   const handleReorderTodos = useCallback(
     (orderedIds: string[]) => {
       dispatch({ type: 'REORDER_TODOS', orderedIds });
       saveNow(TODO_ORDER_TARGET, orderedIds);
+      // selection の id ベース追従（ドラッグで順序が変わっても選択アイテムがずれない）
+      if (selection.section === 'todo' && selection.itemIndex !== null) {
+        const before = workData?.todos ?? [];
+        const selId = selectedItemId(selection, before);
+        if (selId) {
+          const newIdx = orderedIds.indexOf(selId);
+          if (newIdx >= 0 && newIdx !== selection.itemIndex) {
+            setSelectionState({ section: 'todo', itemIndex: newIdx, field: null });
+          }
+        }
+      }
     },
-    [dispatch, saveNow],
+    [dispatch, saveNow, selection, workData?.todos],
   );
 
   /**
@@ -508,17 +574,34 @@ export default function App() {
 
   // --- Blocker ---
 
-  /** 障害追加: 即時 API 呼出 + 楽観的 state 更新 */
+  /**
+   * 障害追加: 即時 API 呼出 + 楽観的 state 更新。
+   * Vim `o`/`O` の挿入位置指定は TODO と同様に create + reorder で実現（[§3.4]）。
+   * pendingInsert は ref 参照（handleAddTodo と同様、依存配列から除外して最新値を読む）。
+   */
   const handleAddBlocker = useCallback(
     async (text: string, linkedTodoId: string | null) => {
       try {
         const created = await apiPostBlocker(currentDate, text, linkedTodoId);
         dispatch({ type: 'ADD_BLOCKER', blocker: created });
+        const insert = pendingInsertRef.current;
+        if (insert?.section === 'blocker') {
+          const before = workData?.blockers ?? [];
+          const orderedIds = computeInsertedOrder(
+            before.map((b) => b.id),
+            created.id,
+            insert.insertAtIndex,
+          );
+          dispatch({ type: 'REORDER_BLOCKERS', orderedIds });
+          saveNow(BLOCKER_ORDER_TARGET, orderedIds);
+        }
       } catch (err) {
         console.error('障害追加に失敗:', err);
+      } finally {
+        pendingInsertRef.current = null;
       }
     },
-    [currentDate, dispatch],
+    [currentDate, dispatch, workData?.blockers, saveNow],
   );
 
   /** 障害解消切替: 即時保存（saveNow）+ 楽観的 state 更新 */
@@ -565,13 +648,23 @@ export default function App() {
     [dispatch],
   );
 
-  /** 障害並替: 即時保存（saveNow）+ 楽観的 state 更新 */
+  /** 障害並替: 即時保存（saveNow）+ 楽観的 state 更新。selection の id ベース追従も行う（TODO と同様）。 */
   const handleReorderBlockers = useCallback(
     (orderedIds: string[]) => {
       dispatch({ type: 'REORDER_BLOCKERS', orderedIds });
       saveNow(BLOCKER_ORDER_TARGET, orderedIds);
+      if (selection.section === 'blocker' && selection.itemIndex !== null) {
+        const before = workData?.blockers ?? [];
+        const selId = selectedItemId(selection, before);
+        if (selId) {
+          const newIdx = orderedIds.indexOf(selId);
+          if (newIdx >= 0 && newIdx !== selection.itemIndex) {
+            setSelectionState({ section: 'blocker', itemIndex: newIdx, field: null });
+          }
+        }
+      }
     },
-    [dispatch, saveNow],
+    [dispatch, saveNow, selection, workData?.blockers],
   );
 
   // --- Reflection ---
@@ -739,15 +832,20 @@ export default function App() {
   );
 
   /**
-   * 選択中アイテムを編集モードへ（Vim `i`/`a`/`Enter`）。Insert 状態へ移行。
+   * 選択中アイテムを編集モードへ（Vim `i`/`a`/`A`/`Enter`）。Insert 状態へ移行。
    * `focusInputAtSelection` で実際の入力要素（input/textarea）へフォーカスする。
    * （`focusElementAtSelection` は選択移動用・section コンテナへフォーカスするため、
    *   入力開始時には入力欄へ直接フォーカスする本関数を使う）
+   *
+   * `cursorHint`（[§3.4]）:
+   * - `'keep'`（既定）: `i`/`a`/`Enter` — カーソル位置を維持（現状どおり全選択）
+   * - `'end'`: `A` — 入力欄の末尾へカーソルを置く（行末から編集）
    */
   const editItemAt = useCallback(
-    (sel: WorkSelection) => {
+    (sel: WorkSelection, cursorHint: 'keep' | 'end' = 'keep') => {
+      setEditCursorHint(cursorHint);
       // todo/blocker のアイテム選択時: editingItemId をセットし、TodoItem/BlockerItem の
-      // isEditing を通じて編集モードを開始（[§3.4]: i/Enter/a で選択アイテム編集）。
+      // isEditing を通じて編集モードを開始（[§3.4]: i/Enter/a/A で選択アイテム編集）。
       // フォーカスは編集モード開始時の useEffect で input へ当たる。
       if (sel.section === 'todo' || sel.section === 'blocker') {
         const items = sel.section === 'todo' ? (workData?.todos ?? []) : (workData?.blockers ?? []);
@@ -764,26 +862,54 @@ export default function App() {
           }
         }
       }
-      // theme/reflection、または番哨行: 従来通り入力欄へフォーカス
+      // theme/reflection、または番哨行: 従来通り入力欄へフォーカス。
+      // カーソル末尾移動は focusInputAtSelection 内で処理（textarea の場合）
       focusInputAtSelection(sel, {
         todo: workData?.todos ?? [],
         blocker: workData?.blockers ?? [],
       });
+      if (cursorHint === 'end') {
+        const el = document.activeElement as HTMLInputElement | HTMLTextAreaElement | null;
+        if (el && typeof el.setSelectionRange === 'function') {
+          const len = el.value.length;
+          el.setSelectionRange(len, len);
+        }
+      }
       setVimState('insert');
     },
     [workData?.todos, workData?.blockers],
   );
 
   /**
-   * 選択行の下/上に新規追加（Vim `o`/`O`）。Insert 状態へ移行し追加入力欄へフォーカス。
-   * MVP では「選択中列の追加入力欄へフォーカス」で代用（厳密な挿入位置制御は Post-MVP）。
-   * theme/reflection は追加入力欄が無いため、`focusSectionInput` は最初のフォーカス可能要素へフォールバック。
+   * 選択行の下/上に新規追加（Vim `o`/`O`、[§3.4]）。Insert 状態へ移行し追加入力欄へフォーカス。
+   *
+   * 挿入位置は `pendingInsertRef` で記憶し、追加入力欄の確定（onAdd）時に新 id をこの位置へ
+   * 挿入する（create + reorder の2call）。theme/reflection は追加入力欄がないため対象外
+   * （focusSectionInput は最初のフォーカス可能要素へフォールバック）。
+   *
+   * 挿入 index の計算:
+   * - `below`: 選択行の itemIndex + 1（追加入力欄＝番哨行選択時は末尾＝itemIndex）
+   * - `above`: 選択行の itemIndex
+   * 追加入力欄（番哨行）選択時は below/above ともに末尾追加扱い。
    */
-  const addItemAt = useCallback((sel: WorkSelection, _position: 'below' | 'above') => {
-    // 選択中列の追加入力欄へフォーカス（o/O で列は維持）
-    focusSectionInput(sel.section);
-    setVimState('insert');
-  }, []);
+  const addItemAt = useCallback(
+    (sel: WorkSelection, position: 'below' | 'above') => {
+      if (sel.section === 'todo' || sel.section === 'blocker') {
+        const items = sel.section === 'todo' ? (workData?.todos ?? []) : (workData?.blockers ?? []);
+        const idx = sel.itemIndex ?? items.length;
+        const onSentinel = idx >= items.length; // 追加入力欄（番哨行）
+        const insertAtIndex = onSentinel
+          ? items.length // 番哨行の o/O は末尾追加
+          : position === 'below'
+            ? idx + 1
+            : idx;
+        pendingInsertRef.current = { section: sel.section, insertAtIndex };
+      }
+      focusSectionInput(sel.section);
+      setVimState('insert');
+    },
+    [workData?.todos, workData?.blockers],
+  );
 
   /**
    * Vim 編集モードの開始/終了を TodoItem/BlockerItem から受ける（[§3.4]）。
@@ -812,6 +938,9 @@ export default function App() {
    */
   const handleCommitAddInput = useCallback(() => {
     setVimState('normal');
+    // 空確定（キャンセル）で onAdd が呼ばれなかった場合の pendingInsert 残りを防ぐ。
+    // 値あり確定時は handleAddTodo/handleAddBlocker の finally でもクリアされる（二重で問題なし）。
+    pendingInsertRef.current = null;
     focusElementAtSelection(selection, {
       todo: workData?.todos ?? [],
       blocker: workData?.blockers ?? [],
@@ -1249,6 +1378,7 @@ export default function App() {
                 vimState={vimState}
                 keybindingMode={settings.keybindingMode}
                 editingItemId={editingItemId}
+                editCursorHint={editCursorHint}
                 onEditingChange={handleEditingChange}
                 onCommitAddInput={handleCommitAddInput}
               />

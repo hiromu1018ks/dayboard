@@ -12,7 +12,7 @@
  * [ui_interaction_spec.md §12]: 色だけで状態を伝えずアイコン/テキスト併用。
  */
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type CSSProperties } from 'react';
 import { formatMonthDay } from '@dayboard/domain';
 import type { NoteLineMeta, TodoItem as TodoItemType } from 'shared-types';
 import type { VimState } from './VimStateBadge.js';
@@ -37,11 +37,17 @@ export type TodoItemProps = {
   /** Vim操作状態（Insert 時は選択ハイライトを強調） */
   vimState?: VimState;
   /**
-   * 外部からの編集モード指定（Vim `i`/`Enter`/`a` で親が制御、[§3.4]）。
+   * 外部からの編集モード指定（Vim `i`/`Enter`/`a`/`A` で親が制御、[§3.4]）。
    * 未指定（undefined）時は従来通りローカル制御（ダブルクリック/✎ボタン）。
    * true が来たら input へフォーカスし編集モードへ入る。
    */
   isEditing?: boolean;
+  /**
+   * 編集開始時のカーソル位置ヒント（Vim `A` = 行末、それ以外 = 維持、[§3.4]）。
+   * `isEditing` が true に切り替わったタイミングで参照される。
+   * 未指定時は 'keep'（全選択、従来挙動）。
+   */
+  editCursorHint?: 'keep' | 'end';
   /** 編集モードの開始/終了を親へ通知（Vim の Insert→Normal 連動用） */
   onEditingChange?: (editing: boolean) => void;
   onToggle: () => void;
@@ -49,6 +55,20 @@ export type TodoItemProps = {
   onDelete: () => void;
   onMoveUp: () => void;
   onMoveDown: () => void;
+  /**
+   * DnD（@dnd-kit）用の ref コールバック。SortableContext 配下で渡される。
+   * 未指定時は DnD 無効（従来の静的リスト項目）。
+   */
+  sortableRef?: (el: HTMLLIElement | null) => void;
+  /** DnD の transform/transition を反映するスタイル（useSortable().attributes.style） */
+  sortableStyle?: CSSProperties;
+  /**
+   * ドラッグハンドル（グリップ）へ適用する listeners/attributes。
+   * `sortableRef` が指定されているとき、行頭のグリップを表示しドラッグ開始できる。
+   */
+  dragHandleProps?: Record<string, unknown>;
+  /** ドラッグ中か（視覚フィードバック用） */
+  isDragging?: boolean;
 };
 
 export function TodoItem({
@@ -61,12 +81,17 @@ export function TodoItem({
   showSelection = false,
   vimState = 'normal',
   isEditing,
+  editCursorHint = 'keep',
   onEditingChange,
   onToggle,
   onEditTitle,
   onDelete,
   onMoveUp,
   onMoveDown,
+  sortableRef,
+  sortableStyle,
+  dragHandleProps,
+  isDragging = false,
 }: TodoItemProps) {
   // 外部制御（Vim の i/Enter）とローカル制御（ダブルクリック/✎）の合成。
   // isEditing が undefined の時は従来通りローカル state が真実源。
@@ -76,13 +101,21 @@ export function TodoItem({
   const [confirmDelete, setConfirmDelete] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  // 編集モード開始時にフォーカス（外部制御・ローカル制御どちらも対象）
+  // 編集モード開始時にフォーカス（外部制御・ローカル制御どちらも対象）。
+  // カーソル位置は editCursorHint で制御（[§3.4]）:
+  // - 'keep'（既定）: 全選択（従来挙動。i/a/Enter）
+  // - 'end': 末尾へカーソル（Vim `A`: 行末から編集）
   useEffect(() => {
     if (editing && inputRef.current) {
       inputRef.current.focus();
-      inputRef.current.select();
+      if (editCursorHint === 'end') {
+        const len = inputRef.current.value.length;
+        inputRef.current.setSelectionRange(len, len);
+      } else {
+        inputRef.current.select();
+      }
     }
-  }, [editing]);
+  }, [editing, editCursorHint]);
 
   const startEdit = () => {
     setDraft(todo.title);
@@ -127,12 +160,30 @@ export function TodoItem({
 
   return (
     <li
+      ref={sortableRef}
+      style={sortableStyle}
       className={`group relative flex items-start gap-2.5 rounded px-2 py-1.5 transition-colors duration-150 hover:bg-raised/30 ${
         editing
           ? 'before:absolute before:bottom-1.5 before:left-0.5 before:top-1.5 before:w-0.5 before:rounded before:bg-ink/70'
           : ''
-      } ${highlight ? 'bg-warn/15' : ''} ${selectionClass}`}
+      } ${highlight ? 'bg-warn/15' : ''} ${selectionClass} ${
+        isDragging ? 'opacity-50 shadow-lg ring-1 ring-accent/40' : ''
+      }`}
     >
+      {/* ドラッグハンドル（DnD 有効時のみ表示。carried は親で sortable 無効化されるため来ない） */}
+      {dragHandleProps && (
+        <button
+          type="button"
+          aria-label="ドラッグで並替"
+          className="mt-0.5 flex h-5 w-3 shrink-0 cursor-grab items-center justify-center text-faint opacity-0 hover:text-ink active:cursor-grabbing group-hover:opacity-100"
+          // dragHandleProps = @dnd-kit の listeners + attributes。これでドラッグ開始。
+          {...dragHandleProps}
+        >
+          <span aria-hidden="true" className="text-xs leading-none">
+            ⠿
+          </span>
+        </button>
+      )}
       {/* 完了チェック（carried は操作不可）
           Phase 7: data-focus-item で Vim j/k（項目移動）・x（完了切替、AC-09）のターゲット */}
       <button

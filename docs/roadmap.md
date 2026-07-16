@@ -418,6 +418,28 @@
 - [x] 並替・削除が動作する
 - [x] TODO/Blocker Integration テストが通る
 
+### Phase 3 拡張: ドラッグ&ドロップ並替え（@dnd-kit）
+
+**動機:** 当初 Post-MVP 扱いだった ↑/↓ ボタンのみの並替えを、ドラッグ&ドロップへ昇格。直感的なマウス操作と、dnd-kit 内蔵のキーボード操作（アクセシビリティ）を両立する。既存の `onReorder(orderedIds)` 口（API/repo/autosave）をそのまま再利用し、UI 層のみの追加で済ませた。
+
+**出力:**
+- `apps/desktop/src/renderer/src/components/{TodoColumn,BlockerColumn}.tsx` — `DndContext` + `SortableContext`（verticalListSortingStrategy）で `<ul>` をラップ
+- `apps/desktop/src/renderer/src/components/{TodoItem,BlockerItem}.tsx` — `sortableRef`/`sortableStyle`/`dragHandleProps`/`isDragging` を受ける行頭グリップハンドル（⠿）
+- `apps/desktop/e2e/dnd.spec.ts` — 順序入れ替え・carried 不可の E2E
+
+**設計上の決定:**
+- carried TODO（`status==='carried'`）は `useSortable({ disabled: true })` でドラッグ不可（要件 7.10 と整合）
+- ↑/↓ ボタンはアクセシビリティ/キーボードの代替として残置（同じ `onReorder` へ流す）
+- ドラッグ終了時に selection を id ベースで再マップ（App.tsx `handleReorderTodos`/`handleReorderBlockers`）し、順序変更後も選択アイテムがずれない
+- 新依存: `@dnd-kit/core`, `@dnd-kit/sortable`, `@dnd-kit/utilities`（React 18.3 対応）
+
+**チェック基準:**
+
+- [x] TODO/障害をドラッグハンドルで並替えでき、reorder API（POST /reorder）へ反映される
+- [x] carried TODO はドラッグ不可（ハンドル非表示）
+- [x] ドラッグ後も Vim selection が選択アイテムを正しく追従する
+- [x] `dnd.spec.ts` が通る（順序入れ替え・carried 不可の2シナリオ）
+
 ---
 
 ## Phase 4: ノートモード（会議メモ本文）
@@ -749,6 +771,8 @@
 - [x] TODO/Stuck/Reflection で hjkl による2Dグリッド移動が可能
 - [x] 選択中項目に視覚フィードバック（背景+カーソルバー）
 - [x] `i`/`Enter` で選択アイテム編集、`o`/`O` で新規追加、`x` で切替、`dd` で削除
+- [x] `o`/`O` で選択行の下/上に新規追加（[§3.4]: create + reorder の2call で厳密な挿入位置を実現）
+- [x] `a` は現在位置維持、`A` は行末から編集（[§3.4]: editCursorHint でカーソル位置を切替）
 - [x] `u`/`Ctrl+r` で全文編集含む undo/redo
 - [x] Blocker で `x` が解決切替として動作（TODO の `x` と統一）
 
@@ -776,20 +800,20 @@
 
 ### Phase 7 拡張（ガイド）のチェック基準
 
-- [ ] `?` キーでガイドが開く（入力要素フォーカス中は貫通）
-- [ ] Header / NoteMode のヘルプアイコンから開ける
-- [ ] Esc / 背景クリック / 閉じるボタン / 再 `?` で閉じる
-- [ ] 現モード（work/note × standard/vim）に応じた内容が表示される（AC-23）
+- [x] `?` キーでガイドが開く（入力要素フォーカス中は貫通）
+- [x] Header / NoteMode のヘルプアイコンから開ける
+- [x] Esc / 背景クリック / 閉じるボタン / 再 `?` で閉じる
+- [x] 現モード（work/note × standard/vim）に応じた内容が表示される（AC-23）
 
 ---
 
 ## Phase 8: 統合・E2E・リリース確認
 
-**目標:** AC-01〜AC-22 をすべて満たし、[要件 4.3 成功指標](dayborad_requirements.md) を確認可能な状態にする。
+**目標:** AC-01〜AC-23 をすべて満たし、[要件 4.3 成功指標](dayborad_requirements.md) を確認可能な状態にする。
 
 ### 完了定義
 
-- AC-01〜AC-22 全合格
+- AC-01〜AC-23 全合格
 - 成功指標の測定準備完了（限定配布できる状態）
 - [test_strategy.md §8](test_strategy.md) の品質ゲート全通過
 
@@ -797,7 +821,7 @@
 
 - [x] **T-8-01** [test] E2Eシナリオ完全網羅
   - 依存: Phase 1〜7
-  - 対象AC: AC-01〜AC-22
+  - 対象AC: AC-01〜AC-23
   - 出力: `apps/desktop/e2e/` 配下の全シナリオ（[test_strategy.md §5.2](test_strategy.md) と §6 重点領域）
   - 完了条件: 主要ACのクリティカルパスが全て通る
   - 備考: 26件合格・1件スキップ（Vim `i` の Insert 移行は Playwright の合成キーボードイベントと @replit/codemirror-vim のコマンド認識の相性で再現不可。実機の本物キーボードでは動作。AC-16〜AC-20 は Unit テスト escPriority でカバー）。E2E 安定化のため `app://dayborad` カスタムプロトコル実装・userData 隔離・CodeMirror 入力反映待ち・waitForResponse による保存完了検知を導入。AC-13 クラッシュ→復元（SIGTERM）E2E を新規追加（要件 4.3「入力喪失 0件」の経路検証）。
@@ -840,7 +864,7 @@
 
 ### Phase 8 のチェック基準
 
-- [x] AC-01〜AC-22 全合格（Unit/Integration/E2E の3層で検証。E2E は26件合格・1件スキップ[Vim `i`: Playwright×Vim拡張の合成イベント相性、Unit でカバー]）
+- [x] AC-01〜AC-23 全合格（Unit/Integration/E2E の3層で検証。E2E は26件合格・1件スキップ[Vim `i`: Playwright×Vim拡張の合成イベント相性、Unit でカバー]）
 - [x] 品質ゲート全通過（lint / format / typecheck / unit 350 / integration 120 / カバレッジ閾値 / E2E 26）
 - [x] 限定配布できる状態（`pnpm package` で macOS dmg arm64/x64 生成確認、手順は [release_checklist.md](release_checklist.md)）
 
@@ -946,13 +970,15 @@ T-0-01 → T-0-05 → T-1-04 → T-1-07 → T-1-08 → T-2-07 → T-3-10 → T-4
 | Phase 0 | 12 | 12 | 完了 |
 | Phase 1 | 14 | 14 | 完了 |
 | Phase 2 | 15 | 15 | 完了 |
-| Phase 3 | 14 | 14 | 完了 |
+| Phase 3（本体 + 拡張[DnD]） | 14 | 14 | 完了 |
 | Phase 4 | 10 | 10 | 完了 |
 | Phase 5 | 14 | 14 | 完了 |
 | Phase 6 | 6 | 6 | 完了 |
-| Phase 7 | 11 | 11 | 完了 |
+| Phase 7（本体 + 拡張[selection model / ガイド]） | 22 | 22 | 完了 |
 | Phase 8 | 7 | 7 | 完了 |
-| **合計** | **103** | **103** | — |
+| **合計** | **114** | **114** | — |
+
+> 備考: Phase 3 拡張（DnD）・Phase 7 拡張（selection model / ガイド）は個別タスク番号を振っていないためタスク総数には含まないが、いずれも完了済み（各拡張セクションのチェック基準が [x]）。DnD は新依存 `@dnd-kit/*` を追加。
 
 ---
 

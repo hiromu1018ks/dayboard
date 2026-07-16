@@ -87,8 +87,11 @@ export type VimWorkContext = {
   buffer: string;
   /** selection を更新 */
   setSelection: (sel: WorkSelection) => void;
-  /** 選択中アイテムを編集モードへ（Insert 遷移）。追加入力欄選択時は新規追加モード */
-  editItemAt: (sel: WorkSelection) => void;
+  /**
+   * 選択中アイテムを編集モードへ（Insert 遷移）。追加入力欄選択時は新規追加モード。
+   * `cursorHint` は `A`（行末から編集）のとき `'end'`、それ以外（`i`/`a`/`Enter`）は `'keep'`。
+   */
+  editItemAt: (sel: WorkSelection, cursorHint?: 'keep' | 'end') => void;
   /** 選択行の下/上に新規追加（Insert 遷移）。position='below'|'above' */
   addItemAt: (sel: WorkSelection, position: 'below' | 'above') => void;
   /** 選択中アイテムの完了/解決切替（AC-09、todo=done切替、blocker=resolved切替） */
@@ -229,8 +232,12 @@ function executeCommand(buffer: string, ctx: VimWorkContext): VimHandleResult {
     }
     case 'edit-insert':
     case 'edit-append':
+      // i / a: 現在のカーソル位置を維持して編集（[§3.4]）
+      ctx.editItemAt(ctx.selection, 'keep');
+      return 'handled';
     case 'edit-append-end':
-      ctx.editItemAt(ctx.selection);
+      // A: 行末へカーソルを移動してから編集（[§3.4]: 末尾から編集）
+      ctx.editItemAt(ctx.selection, 'end');
       return 'handled';
     case 'add-below':
       ctx.addItemAt(ctx.selection, 'below');

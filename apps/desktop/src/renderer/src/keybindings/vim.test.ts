@@ -318,15 +318,29 @@ describe('handleVimWorkKey: gg / G / dd（2文字・リーダー）', () => {
 });
 
 describe('handleVimWorkKey: 編集系', () => {
-  it('i で editItemAt 呼出', () => {
-    const ctx = makeCtx();
-    expect(handleVimWorkKey(key('i'), ctx)).toBe('handled');
-    expect(ctx.editItemAt).toHaveBeenCalledOnce();
-  });
-  it('a で editItemAt 呼出（append も同導線）', () => {
+  it('a で editItemAt(cursorHint=keep) 呼出（[§3.4]: 末尾でなく現在位置維持）', () => {
     const ctx = makeCtx();
     expect(handleVimWorkKey(key('a'), ctx)).toBe('handled');
     expect(ctx.editItemAt).toHaveBeenCalledOnce();
+    expect(ctx.editItemAt).toHaveBeenCalledWith(ctx.selection, 'keep');
+  });
+  it('A（Shift+a）で editItemAt(cursorHint=end) 呼出（[§3.4]: 行末から編集）', () => {
+    const ctx = makeCtx();
+    const ev = {
+      key: 'A',
+      ctrlKey: false,
+      metaKey: false,
+      altKey: false,
+      shiftKey: true,
+    } as KeyboardEvent;
+    expect(handleVimWorkKey(ev, ctx)).toBe('handled');
+    expect(ctx.editItemAt).toHaveBeenCalledOnce();
+    expect(ctx.editItemAt).toHaveBeenCalledWith(ctx.selection, 'end');
+  });
+  it('i で editItemAt(cursorHint=keep) 呼出', () => {
+    const ctx = makeCtx();
+    expect(handleVimWorkKey(key('i'), ctx)).toBe('handled');
+    expect(ctx.editItemAt).toHaveBeenCalledWith(ctx.selection, 'keep');
   });
   it('o で addItemAt(below)', () => {
     const ctx = makeCtx();
@@ -355,10 +369,10 @@ describe('handleVimWorkKey: 編集系', () => {
     expect(handleVimWorkKey(key('u'), ctx)).toBe('handled');
     expect(ctx.undo).toHaveBeenCalledOnce();
   });
-  it('Enter で editItemAt', () => {
+  it('Enter で editItemAt（既定 cursorHint=keep）', () => {
     const ctx = makeCtx();
     expect(handleVimWorkKey(key('Enter'), ctx)).toBe('handled');
-    expect(ctx.editItemAt).toHaveBeenCalledOnce();
+    expect(ctx.editItemAt).toHaveBeenCalledWith(ctx.selection);
   });
 });
 

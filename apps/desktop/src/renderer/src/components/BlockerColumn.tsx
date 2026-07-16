@@ -2,16 +2,33 @@
  * 障害・詰まり列（[roadmap.md T-3-12]）
  *
  * [要件 7.4]: 追加・編集・解消切替・TODO紐付け（任意）。
- * TodoColumn と同構造。並替は ↑/↓ ボタン。
+ * TodoColumn と同構造。並替はドラッグ&ドロップ（@dnd-kit）+ ↑/↓ ボタン（アクセシビリティ代替）。
  */
 
 import { useEffect, useRef, useState } from 'react';
+import {
+  DndContext,
+  PointerSensor,
+  KeyboardSensor,
+  useSensor,
+  useSensors,
+  closestCenter,
+  type DragEndEvent,
+} from '@dnd-kit/core';
+import {
+  SortableContext,
+  arrayMove,
+  sortableKeyboardCoordinates,
+  useSortable,
+  verticalListSortingStrategy,
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 import type {
   BlockerItem as BlockerItemType,
   NoteLineMeta,
   TodoItem as TodoItemType,
 } from 'shared-types';
-import { BlockerItem } from './BlockerItem.js';
+import { BlockerItem, type BlockerItemProps } from './BlockerItem.js';
 import type { VimState } from './VimStateBadge.js';
 import type { WorkSelection } from '../keybindings/selection.js';
 
@@ -36,10 +53,15 @@ export type BlockerColumnProps = {
   /** Vim操作状態（選択ハイライト強調用） */
   vimState: VimState;
   /**
-   * 現在編集中のアイテム id（Vim `i`/`Enter`/`a` で外部制御、[§3.4]）。
+   * 現在編集中のアイテム id（Vim `i`/`Enter`/`a`/`A` で外部制御、[§3.4]）。
    * null = 編集中なし。未指定時は各アイテムのローカル制御。
    */
   editingItemId?: string | null;
+  /**
+   * 編集開始時のカーソル位置ヒント（Vim `A` = 行末、それ以外 = 維持、[§3.4]）。
+   * editingItemId がセットされたタイミングで参照される。
+   */
+  editCursorHint?: 'keep' | 'end';
   /** 編集モードの開始/終了を親へ通知（id または null） */
   onEditingChange?: (id: string | null) => void;
   /**
@@ -49,6 +71,33 @@ export type BlockerColumnProps = {
    */
   onCommitAddInput?: () => void;
 };
+
+/**
+ * 並替可能な障害アイテムのラッパー（@dnd-kit useSortable 適用）。
+ * BlockerItem には sortableRef/style/dragHandleProps/isDragging を注入する。
+ *
+ * TODO 側（SortableTodoItem）とは異なり `disabled` 指定なし。理由: TODO には carried
+ * （持ち越し済み）という操作不可状態があるが、Blocker には resolved（解消）しかなく、
+ * 解消済みでも並替えは有効な操作のため全行ドラッグ可能とする。
+ */
+function SortableBlockerItem(props: BlockerItemProps) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id: props.blocker.id,
+  });
+  const sortableStyle = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+  };
+  return (
+    <BlockerItem
+      {...props}
+      sortableRef={setNodeRef}
+      sortableStyle={sortableStyle}
+      dragHandleProps={listeners ? { ...listeners, ...attributes } : undefined}
+      isDragging={isDragging}
+    />
+  );
+}
 
 export function BlockerColumn({
   date,
@@ -66,6 +115,7 @@ export function BlockerColumn({
   showSelection,
   vimState,
   editingItemId,
+  editCursorHint,
   onEditingChange,
   onCommitAddInput,
 }: BlockerColumnProps) {
@@ -117,6 +167,23 @@ export function BlockerColumn({
       : null;
   const isAddInputSelected = isThisColumnSelected && selection.itemIndex === blockers.length;
 
+  // DnD センサ（TodoColumn と同構成）
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+  );
+
+  /** DnD 終了時: 全 id 配列を再構築し onReorder へ */
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+    const ids = blockers.map((b) => b.id);
+    const oldIndex = ids.indexOf(String(active.id));
+    const newIndex = ids.indexOf(String(over.id));
+    if (oldIndex < 0 || newIndex < 0) return;
+    onReorder(arrayMove(ids, oldIndex, newIndex));
+  };
+
   return (
     <section
       className={`flex min-h-0 flex-col overflow-hidden rounded border bg-panel/30 p-7 transition-colors focus:outline-none ${
@@ -131,37 +198,42 @@ export function BlockerColumn({
         Stuck
       </h2>
 
-      <ul className="min-h-0 flex-1 space-y-1 overflow-y-auto">
-        {blockers.map((blocker, i) => (
-          <BlockerItem
-            key={blocker.id}
-            blocker={blocker}
-            todos={todos}
-            isFirst={i === 0}
-            isLast={i === blockers.length - 1}
-            sourceNoteLineMeta={
-              blocker.sourceNoteLineMetaId && noteLineMetaMap
-                ? (noteLineMetaMap.get(blocker.sourceNoteLineMetaId) ?? null)
-                : null
-            }
-            highlight={highlightIds?.has(blocker.id) ?? false}
-            isSelected={selectedItemId === blocker.id}
-            showSelection={showSelection}
-            vimState={vimState}
-            isEditing={editingItemId === blocker.id}
-            onEditingChange={(e) => onEditingChange?.(e ? blocker.id : null)}
-            onToggleResolved={() => onToggleResolved(blocker.id)}
-            onEditText={(text) => onEditText(blocker.id, text)}
-            onChangeLinkedTodo={(linkedTodoId) => onChangeLinkedTodo(blocker.id, linkedTodoId)}
-            onDelete={() => onDelete(blocker.id)}
-            onMoveUp={() => moveUp(i)}
-            onMoveDown={() => moveDown(i)}
-          />
-        ))}
-        {blockers.length === 0 && (
-          <li className="py-4 text-center text-xs text-faint">No blockers</li>
-        )}
-      </ul>
+      <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+        <SortableContext items={blockers.map((b) => b.id)} strategy={verticalListSortingStrategy}>
+          <ul className="min-h-0 flex-1 space-y-1 overflow-y-auto">
+            {blockers.map((blocker, i) => (
+              <SortableBlockerItem
+                key={blocker.id}
+                blocker={blocker}
+                todos={todos}
+                isFirst={i === 0}
+                isLast={i === blockers.length - 1}
+                sourceNoteLineMeta={
+                  blocker.sourceNoteLineMetaId && noteLineMetaMap
+                    ? (noteLineMetaMap.get(blocker.sourceNoteLineMetaId) ?? null)
+                    : null
+                }
+                highlight={highlightIds?.has(blocker.id) ?? false}
+                isSelected={selectedItemId === blocker.id}
+                showSelection={showSelection}
+                vimState={vimState}
+                isEditing={editingItemId === blocker.id}
+                editCursorHint={editCursorHint}
+                onEditingChange={(e) => onEditingChange?.(e ? blocker.id : null)}
+                onToggleResolved={() => onToggleResolved(blocker.id)}
+                onEditText={(text) => onEditText(blocker.id, text)}
+                onChangeLinkedTodo={(linkedTodoId) => onChangeLinkedTodo(blocker.id, linkedTodoId)}
+                onDelete={() => onDelete(blocker.id)}
+                onMoveUp={() => moveUp(i)}
+                onMoveDown={() => moveDown(i)}
+              />
+            ))}
+            {blockers.length === 0 && (
+              <li className="py-4 text-center text-xs text-faint">No blockers</li>
+            )}
+          </ul>
+        </SortableContext>
+      </DndContext>
 
       {/* Phase 7: data-focus-input で列フォーカス（⌘2, Vim h/l/Space 2, i）の対象 */}
       <div className="mt-3 flex items-center gap-2 border-t border-linesoft pt-3">

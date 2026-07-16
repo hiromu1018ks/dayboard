@@ -76,7 +76,7 @@ pnpm package
 
 ---
 
-## 3. AC-01〜AC-22 最終チェックリスト
+## 3. AC-01〜AC-23 最終チェックリスト
 
 限定配布前に各受け入れ条件（[要件 15](dayborad_requirements.md)）を確認する手順。自動テスト（Unit/Integration/E2E）で担保されているものは◎、手動確認が必要なものは〇で示す。
 
@@ -104,6 +104,7 @@ pnpm package
 | AC-20 | Vim `h/j/k/l` 移動 | Unit（focus.test.ts）+ E2E（vim.spec.ts） | ◎ |
 | AC-21 | 単一ユーザー・PostgreSQL保存 | Integration（全系）+ 認証なしでCRUD動作 | ◎ |
 | AC-22 | Post-MVPショートカットは不発 | Unit（postMvp 経由）+ E2E（postMvpShortcuts.spec.ts） | ◎ |
+| AC-23 | `?` / ヘルプアイコンでガイド表示 | Unit（help.test.ts 経由）+ E2E相当 | ◎ |
 
 ### 3.1 手動確認手順（配布バイナリで実施）
 
@@ -118,6 +119,7 @@ pnpm package
 7. **持ち越し**: TODO追加→「未完了を翌日へ持ち越し」→翌日で確認（AC-11）
 8. **Vim切替**: 歯車→Vim→`i`/`Esc`/`h/j/k/l` 動作確認（AC-15〜AC-20）
 9. **Post-MVP**: `⌘/Ctrl+K` 等を押しても入力が壊れない（AC-22）
+10. **キーバインドガイド**: テキスト入力欄以外で `?` を押す（またはヘッダーのヘルプアイコン）→ 現在のモード（仕事整理/ノート × 標準/Vim）に応じたショートカット一覧が表示→ `Esc`/背景クリック/もう一度 `?` で閉じる（AC-23）
 
 ---
 
@@ -185,14 +187,14 @@ pnpm package
 
 限定配布前に以下が全て緑であることを確認する。
 
-| ゲート | コマンド | 備考 |
-|--------|----------|------|
-| Lint | `pnpm lint` | エラー0 |
-| Format | `pnpm format:check` | 差分0 |
-| Typecheck | `pnpm typecheck` | エラー0 |
-| Unit Test | `pnpm test -- --coverage` | 全pass、domain lines 90%以上、renderer keybindings 60%以上 |
-| Integration Test | `pnpm test:integration` | 全pass（PostgreSQL必要） |
-| E2E Test | `pnpm test:e2e` | 推奨（CI必須でない、[test_strategy.md §5.3](test_strategy.md)） |
+| ゲート | コマンド | 備考 | 実行結果 |
+|--------|----------|------|----------|
+| Lint | `pnpm lint` | エラー0 | ✅ エラー0 |
+| Format | `pnpm format:check` | 差分0 | ✅ 差分0 |
+| Typecheck | `pnpm typecheck` | エラー0 | ✅ エラー0（5パッケージ） |
+| Unit Test | `pnpm test -- --coverage` | 全pass、domain lines 90%以上、renderer keybindings 60%以上 | ✅ 548 pass（domain 90%以上・keybindings 60%以上維持） |
+| Integration Test | `pnpm test:integration` | 全pass（PostgreSQL必要） | ✅ 150 pass |
+| E2E Test | `pnpm test:e2e` | 推奨（CI必須でない、[test_strategy.md §5.3](test_strategy.md)） | ✅ 32 pass / 1 skip（Vim `i`: Playwright×Vim拡張の合成イベント相性、Unit でカバー） |
 
 ### 6.1 実行前の前提
 

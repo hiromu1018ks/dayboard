@@ -176,8 +176,14 @@ describe('focusInputAtSelection', () => {
     expect(document.activeElement?.hasAttribute('data-focus-input')).toBe(true);
   });
 
-  it('reflection 選択時は入力欄（最初のフォーカス可能要素）へフォーカス', () => {
+  it('reflection 選択時は選択中 field の入力欄へフォーカス', () => {
     expect(focusInputAtSelection(sel('reflection', null, 'stuckText'), {})).toBe(true);
+    // data-focus-field で選択中 field（stuckText）へ直接フォーカス
+    expect(document.activeElement?.getAttribute('data-focus-field')).toBe('stuckText');
+  });
+
+  it('reflection で field 未選択時は最初のフォーカス可能要素へフォールバック', () => {
+    expect(focusInputAtSelection(sel('reflection', null, null), {})).toBe(true);
     // focusSectionInput 経由で最初のフォーカス可能要素（doneText の textarea）へ
     expect(document.activeElement?.getAttribute('data-focus-field')).toBe('doneText');
   });

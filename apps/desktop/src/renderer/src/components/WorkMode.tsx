@@ -60,6 +60,11 @@ export type WorkModeProps = {
    * null = 編集中なし。Vim キーバインド時のみ指定。
    */
   editingItemId?: string | null;
+  /**
+   * 編集開始時のカーソル位置ヒント（Vim `A` = 行末、それ以外 = 維持、[§3.4]）。
+   * editingItemId がセットされたタイミングで参照される。
+   */
+  editCursorHint?: 'keep' | 'end';
   /** 編集モードの開始/終了を親へ通知（id または null） */
   onEditingChange?: (id: string | null) => void;
   /**
@@ -90,6 +95,7 @@ export function WorkMode({
   vimState,
   keybindingMode,
   editingItemId,
+  editCursorHint,
   onEditingChange,
   onCommitAddInput,
 }: WorkModeProps) {
@@ -97,7 +103,9 @@ export function WorkMode({
   const showSelection = keybindingMode === 'vim';
   // Vim キーバインド時のみ編集モード外部制御と追加入力欄の Normal 戻りを有効化
   const editingProps =
-    keybindingMode === 'vim' ? { editingItemId, onEditingChange, onCommitAddInput } : {};
+    keybindingMode === 'vim'
+      ? { editingItemId, editCursorHint, onEditingChange, onCommitAddInput }
+      : {};
   return (
     <div className="grid min-h-0 flex-1 grid-cols-1 gap-6 md:grid-cols-3">
       <TodoColumn

@@ -347,7 +347,7 @@ Phase 8: 統合・E2E・リリース確認
 
 ## Phase 7: キーバインド（標準 / Vim）
 
-**目標:** 要件 8 の全ショートカットを完成させる。AC-15〜AC-20, AC-22, US-MVP-013, US-MVP-014, US-MVP-015。
+**目標:** 要件 8 の全ショートカットを完成させる。AC-15〜AC-20, AC-22, AC-23, US-MVP-013, US-MVP-014, US-MVP-015。
 
 ### バックエンド
 
@@ -383,16 +383,17 @@ Phase 8: 統合・E2E・リリース確認
 - Vim `i`/`Esc`/`h/j/k/l`/`x`/`Space系` 動作（AC-16〜AC-20）
 - IME変換中の `Esc` が仕様どおり優先順位で処理（AC-19）
 - Post-MVPショートカットが不発で入力破壊しない（AC-22）
+- `?` / ヘルプアイコンでキーバインドガイドが開閉し、モード別に内容が表示される（AC-23）
 
 ### 対象AC
 
-- AC-15, AC-16, AC-17, AC-18, AC-19, AC-20, AC-22
+- AC-15, AC-16, AC-17, AC-18, AC-19, AC-20, AC-22, AC-23
 
 ---
 
 ## Phase 8: 統合・E2E・リリース確認
 
-**目標:** AC-01〜AC-22 をすべて満たし、[要件 4.3 成功指標](dayborad_requirements.md) を確認可能な状態にする。
+**目標:** AC-01〜AC-23 をすべて満たし、[要件 4.3 成功指標](dayborad_requirements.md) を確認可能な状態にする。
 
 ### 作業
 
@@ -414,7 +415,7 @@ Phase 8: 統合・E2E・リリース確認
 
 ### 完了定義
 
-- AC-01〜AC-22 全合格
+- AC-01〜AC-23 全合格
 - [要件 4.3](dayborad_requirements.md) 成功指標の測定準備完了（限定配布できる状態）
 - [test_strategy.md §8](test_strategy.md) の品質ゲート全通過
 
@@ -430,7 +431,7 @@ Phase 8: 統合・E2E・リリース確認
 | Phase 4 | AC-03, AC-04 |
 | Phase 5 | AC-05, AC-06, AC-07, AC-08 |
 | Phase 6 | AC-11, AC-12 |
-| Phase 7 | AC-15, AC-16, AC-17, AC-18, AC-19, AC-20, AC-22 |
+| Phase 7 | AC-15, AC-16, AC-17, AC-18, AC-19, AC-20, AC-22, AC-23 |
 | Phase 8 | （全AC統合確認） |
 
 AC-21（PostgreSQL保存・認証なし）は Phase 0/1 で基盤として達成済み。
