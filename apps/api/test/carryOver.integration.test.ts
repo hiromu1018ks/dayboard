@@ -117,9 +117,12 @@ describe('持ち越し API (Integration)', () => {
 
       await carryOver('2026-07-08', { todoIds: [todo.id] });
 
-      const pool = getPool();
-      const row = await pool.query('SELECT status FROM todo_items WHERE id = $1', [todo.id]);
-      expect(row.rows[0].status).toBe('carried');
+      const client = getPool();
+      const row = await client.execute({
+        sql: 'SELECT status FROM todo_items WHERE id = ?',
+        args: [todo.id],
+      });
+      expect((row.rows[0] as { status: string }).status).toBe('carried');
     });
 
     it('翌日DayNoteが未生成の場合は自動生成される（AC-2、Reflection/NoteEntry も同時作成）', async () => {
@@ -127,19 +130,19 @@ describe('持ち越し API (Integration)', () => {
       const todo = await addTodo('2026-07-08', '田中さん確認');
 
       // 翌日（2026-07-09）の DayNote は未生成
-      const pool = getPool();
-      const beforeCount = await pool.query(
-        "SELECT COUNT(*)::int AS count FROM day_notes WHERE date = '2026-07-09'",
+      const client = getPool();
+      const beforeCount = await client.execute(
+        "SELECT COUNT(*) AS count FROM day_notes WHERE date = '2026-07-09'",
       );
-      expect(beforeCount.rows[0].count).toBe(0);
+      expect(Number((beforeCount.rows[0] as { count: unknown }).count)).toBe(0);
 
       await carryOver('2026-07-08', { todoIds: [todo.id] });
 
       // 持ち越し後、翌日の DayNote + Reflection + NoteEntry が生成されている
-      const afterCount = await pool.query(
-        "SELECT COUNT(*)::int AS count FROM day_notes WHERE date = '2026-07-09'",
+      const afterCount = await client.execute(
+        "SELECT COUNT(*) AS count FROM day_notes WHERE date = '2026-07-09'",
       );
-      expect(afterCount.rows[0].count).toBe(1);
+      expect(Number((afterCount.rows[0] as { count: unknown }).count)).toBe(1);
 
       const nextDay = await fetchFull('2026-07-09');
       expect(nextDay.reflection).toBeDefined();
@@ -319,11 +322,11 @@ describe('持ち越し API (Integration)', () => {
       const body = (await res.json()) as CarryOverResult;
 
       // DB の翌日TODO数と carried 数が一致
-      const pool = getPool();
-      const rows = await pool.query(
-        'SELECT COUNT(*)::int AS count FROM todo_items WHERE carried_from_todo_id IS NOT NULL',
+      const client = getPool();
+      const rows = await client.execute(
+        'SELECT COUNT(*) AS count FROM todo_items WHERE carried_from_todo_id IS NOT NULL',
       );
-      expect(rows.rows[0].count).toBe(body.carried.length);
+      expect(Number((rows.rows[0] as { count: unknown }).count)).toBe(body.carried.length);
     });
   });
 });

@@ -19,18 +19,19 @@ const app = createApp();
 
 /** user_settings を初期値（standard/normal）へリセット */
 async function resetUserSettings(): Promise<void> {
-  const pool = getPool();
-  await pool.query(
-    `INSERT INTO user_settings (id, keybinding_mode, vim_default_state)
+  const client = getPool();
+  await client.execute({
+    sql: `INSERT INTO user_settings (id, keybinding_mode, vim_default_state)
      VALUES ('default', 'standard', 'normal')
-     ON CONFLICT (id) DO UPDATE SET keybinding_mode = 'standard', vim_default_state = 'normal', updated_at = now()`,
-  );
+     ON CONFLICT (id) DO UPDATE SET keybinding_mode = 'standard', vim_default_state = 'normal', updated_at = (unixepoch())`,
+    args: [],
+  });
 }
 
 /** user_settings を空にする（未作成状態を再現） */
 async function clearUserSettings(): Promise<void> {
-  const pool = getPool();
-  await pool.query(`DELETE FROM user_settings WHERE id = 'default'`);
+  const client = getPool();
+  await client.execute(`DELETE FROM user_settings WHERE id = 'default'`);
 }
 
 function expectValidSettings(s: UserSettings, expected: Partial<UserSettings>): void {

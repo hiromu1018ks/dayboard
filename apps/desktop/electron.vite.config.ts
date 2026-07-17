@@ -15,7 +15,8 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
  * 重要: ワークスペースパッケージ（shared-types, domain, repository, api）は
  * ソース（.ts）を直接エクスポートしているため、Vite がバンドルに取り込む必要がある。
  * 一方で Electron のビルトインモジュール（electron 等）と、ネイティブバインディングを
- * 持つ `pg`（pg-native）は実行時に Node/Electron から解決させるため外部化する。
+ * 持つ `@libsql/client` / `libsql`（Neon-RS prebuilt）は実行時に Node/Electron から
+ * 解決させるため外部化する。
  *
  * `externalizeDepsPlugin` は dependencies を全て外部化してしまうため、ここでは使わず、
  * 外部化対象を明示的に列挙する（ワークスペースパッケージは含めない）。
@@ -26,9 +27,10 @@ const WORKSPACE_PACKAGES = ['shared-types', '@dayboard/domain', 'repository', 'a
 const externalized = [
   'electron',
   ...builtinModules.flatMap((m) => [m, `node:${m}`]),
-  // ネイティブバインディングを含むためバンドルせず実行時解決
-  /^pg($|\/)/,
-  /^pg-native/,
+  // libSQL（Neon-RS prebuilt バイナリ）をバンドルせず実行時解決
+  '@libsql/client',
+  /^libsql($|\/)/,
+  /^@libsql\//,
 ];
 
 const workspaceAlias = {

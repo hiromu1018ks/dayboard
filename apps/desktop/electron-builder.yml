@@ -2,10 +2,10 @@
 #
 # 配布用バイナリ（macOS dmg / Windows nsis / Linux AppImage）を生成する。
 #
-# PostgreSQL 同梱の方針（[architecture.md §2.2]）:
-#   バイナリには PostgreSQL サーバープロセスを同梱しない。
-#   ユーザー環境の PostgreSQL への接続を前提とし、DATABASE_URL で接続先を指定する
-#   （設定手順は docs/release_checklist.md 参照）。
+# データストアは SQLite（libSQL）。
+#   バイナリには @libsql/client（pure JS + Neon-RS prebuilt ネイティブバイナリ）を
+#   同梱する。利用者はデータベースのセットアップ不要で、初回起動時に
+#   userData/dayborad.db が作られる（[architecture.md §2.2]）。
 #
 # マイグレーションファイルは extraResources で resources/migrations へ同梱。
 # main/index.ts の resolveMigrationsFolder() が app.isPackaged 時にこのパスを参照する。
@@ -20,16 +20,22 @@ directories:
   buildResources: build
 
 # electron-vite のビルド成果物と package.json を同梱
-# node_modules は production 依存のみ（pg 関連を含む）が electron-builder により解決される
+# node_modules は production 依存のみ（@libsql/client, libsql を含む）が
+# electron-builder により解決される
 files:
   - out/**/*
   - package.json
   - '!**/.DS_Store'
 
-# asar アーカイブ化。pg は pure-JS（pg-native 未導入）のため unpack 不要
+# asar アーカイブ化。
+# @libsql/client は pure JS だが、依存の libsql が Neon-RS prebuilt バイナリを
+# 読み込むため、ネイティブバイナリが正しく解決されるよう asarUnpack で展開する。
 asar: true
+asarUnpack:
+  - '**/node_modules/libsql/**'
+  - '**/node_modules/@libsql/**'
 
-# ネイティブモジュールの再ビルドは不要（pg-native 未導入）
+# ネイティブモジュールの node-gyp 再ビルドは不要（libsql は prebuilt 配布のため）
 nodeGypRebuild: false
 
 # マイグレーションファイルを resources/migrations へ同梱

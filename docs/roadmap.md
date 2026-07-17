@@ -2,6 +2,8 @@
 
 本書は [implementation_plan.md](implementation_plan.md) の Phase 0〜8 を、実装者が単独で着手できる粒度（ファイル・関数・エンドポイント・テスト）に分解したタスク総覧である。各タスクはチェックボックスで進捗管理し、完了条件を満たしたら `[x]` に更新する。
 
+> **注記（2026-07）:** 本書の Phase 0/1/8 周りの記述は PostgreSQL を前提に書かれていましたが、その後**データストアを SQLite（libSQL）へ全面移行**しました。現在は PostgreSQL は使われていません。PostgreSQL に関する記述（`pg.Pool`、`dayborad_dev` DB、PostgreSQL サービスコンテナ等）は移行前の実装履歴として残しています。現在の姿は [architecture.md §2.2](architecture.md) / [dev_setup.md](dev_setup.md) / [database_schema.md §10](database_schema.md) を参照してください。
+
 - 一次情報: [要件定義書](dayborad_requirements.md) / [ユーザーストーリー](dayborad_user_stories.md)
 - 設計契約: [architecture.md](architecture.md) / [database_schema.md](database_schema.md) / [api_contract.md](api_contract.md) / [autosave_spec.md](autosave_spec.md) / [note_conversion_spec.md](note_conversion_spec.md) / [ui_interaction_spec.md](ui_interaction_spec.md) / [edge_cases.md](edge_cases.md) / [test_strategy.md](test_strategy.md) / [dev_setup.md](dev_setup.md)
 - リリース: [release_checklist.md](release_checklist.md)（限定配布手順・AC確認リスト・成功指標測定、Phase 8 成果物）

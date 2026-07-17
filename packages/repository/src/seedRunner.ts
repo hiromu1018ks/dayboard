@@ -13,11 +13,11 @@ export const DEFAULT_SETTINGS_ID = 'default';
  * user_settings にデフォルト行が無ければ挿入する（冪等）。
  */
 export async function seedUserSettings(): Promise<void> {
-  const pool = getPool();
-  await pool.query(
-    `INSERT INTO user_settings (id, keybinding_mode, vim_default_state)
-     VALUES ($1, 'standard', 'normal')
+  const client = getPool();
+  await client.execute({
+    sql: `INSERT INTO user_settings (id, keybinding_mode, vim_default_state)
+     VALUES (?, 'standard', 'normal')
      ON CONFLICT (id) DO NOTHING`,
-    [DEFAULT_SETTINGS_ID],
-  );
+    args: [DEFAULT_SETTINGS_ID],
+  });
 }

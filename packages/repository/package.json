@@ -20,13 +20,12 @@
   },
   "dependencies": {
     "@dayboard/domain": "workspace:*",
-    "drizzle-orm": "^0.33.0",
-    "pg": "^8.12.0",
+    "@libsql/client": "^0.14.0",
+    "drizzle-orm": "^0.36.4",
     "shared-types": "workspace:*"
   },
   "devDependencies": {
-    "@types/pg": "^8.11.0",
-    "drizzle-kit": "^0.24.0",
+    "drizzle-kit": "^0.28.0",
     "tsx": "^4.19.0"
   }
 }

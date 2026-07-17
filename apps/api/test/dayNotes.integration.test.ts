@@ -255,12 +255,12 @@ describe('DayNote API (Integration)', () => {
       await app.request('/api/day-notes/2026-07-08/full');
       await app.request('/api/day-notes/2026-07-08/full');
 
-      const pool = getPool();
-      const result = await pool.query(
-        'SELECT COUNT(*)::int AS count FROM day_notes WHERE date = $1',
-        ['2026-07-08'],
-      );
-      expect(result.rows[0].count).toBe(1);
+      const client = getPool();
+      const result = await client.execute({
+        sql: 'SELECT COUNT(*) AS count FROM day_notes WHERE date = ?',
+        args: ['2026-07-08'],
+      });
+      expect(Number((result.rows[0] as { count: unknown }).count)).toBe(1);
     });
   });
 

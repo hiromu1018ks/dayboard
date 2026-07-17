@@ -199,10 +199,32 @@ export async function findFullByDate(date: string): Promise<DayNoteFull | null> 
   } satisfies DayNoteFull;
 }
 
-/** PostgreSQL の unique_violation（SQLSTATE 23505）か判定。 */
+/**
+ * 一意制約違反か判定。
+ *
+ * SQLite（libSQL）では SQLITE_CONSTRAINT_UNIQUE（SQLITE_CONSTRAINT + 拡張コード 2067）を送出する。
+ * `@libsql/client` はエラーオブジェクトに `code` プロパティとして数値または文字列を載せる。
+ *   - libSQL 独自コード: "SQLITE_CONSTRAINT_UNIQUE" もしくは数値 2067
+ *   - SQLite 汎用: "SQLITE_CONSTRAINT"（19）
+ * UNIQUE 違反を厳密に識別するため、文字列/数値両形式とメッセージの "UNIQUE" 含有で判定する。
+ */
 function isUniqueViolation(err: unknown): boolean {
-  if (err && typeof err === 'object' && 'code' in err) {
-    return (err as { code: string }).code === '23505';
+  if (!err || typeof err !== 'object') return false;
+  const e = err as { code?: unknown; message?: unknown };
+  const code = e.code;
+  if (typeof code === 'string') {
+    if (code === 'SQLITE_CONSTRAINT_UNIQUE') return true;
+    if (
+      code === 'SQLITE_CONSTRAINT' &&
+      typeof e.message === 'string' &&
+      /UNIQUE/i.test(e.message)
+    ) {
+      return true;
+    }
+  }
+  if (typeof code === 'number') {
+    if (code === 2067) return true; // SQLITE_CONSTRAINT_UNIQUE
+    if (code === 19 && typeof e.message === 'string' && /UNIQUE/i.test(e.message)) return true;
   }
   return false;
 }

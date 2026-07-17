@@ -34,11 +34,11 @@ pnpm package
 
 - Electron 本体 + Renderer（React + CodeMirror）のプロダクションビルド
 - `packages/repository/migrations`（`Resources/migrations` へ同梱、初回起動時に自動適用）
-- `pg`（pure-JS PostgreSQL クライアント。ネイティブバインディングなし）
+- `@libsql/client` + `libsql`（pure JS + Neon-RS prebuilt ネイティブバイナリ。ユーザー環境のセットアップ不要）
 
-### 1.4 PostgreSQL 同梱の方針（[architecture.md §2.2](architecture.md)）
+### 1.4 データストアの方針（[architecture.md §2.2](architecture.md)）
 
-**PostgreSQL サーバープロセスはバイナリに同梱しない。** バイナリサイズと起動処理の複雑さを避けるため、ユーザー環境の PostgreSQL への接続を前提とする。リポジトリIFで抽象化しているため、将来 SQLite 差し替えも可能な構造。
+**データストアは SQLite（libSQL）。** ユーザー環境へのセットアップを不要とするため、DBエンジンはバイナリに同梱し、データファイルは OS 標準のアプリ別データ領域（userData）配下の `dayborad.db` に置く。PostgreSQL のように利用者自身にサーバーセットアップを求めることはない。
 
 ---
 
@@ -46,31 +46,21 @@ pnpm package
 
 限定配布先のユーザーが行う手順。
 
-### 2.1 PostgreSQL の準備
+### 2.1 事前準備
 
-1. PostgreSQL 15 以上をインストール（[dev_setup.md §1](dev_setup.md)）
-   - macOS: `brew install postgresql@15 && brew services start postgresql@15`
-   - Windows: [PostgreSQL公式](https://www.postgresql.org/download/) からインストール
-2. dayborad 用データベースを作成
-   ```bash
-   createdb dayborad
-   ```
-3. `DATABASE_URL` 環境変数を設定
-   - 例: `postgres://localhost:5432/dayborad`
-   - macOS/Linux: `export DATABASE_URL="postgres://localhost:5432/dayborad"`
-   - Windows: システム環境変数、または起動時に設定
+**特になし。** データベースのインストール・設定は不要。初回起動時に userData 配下へ `dayborad.db` が自動作成され、スキーマもマイグレーションされる。
 
 > **マイグレーションは初回起動時に自動適用される。** ユーザーが手動で `db:migrate` を行う必要はない（main プロセスが `app.isPackaged` 時に `Resources/migrations` から実行）。
 
 ### 2.2 アプリの起動
 
 1. 配布されたバイナリ（dmg/exe/AppImage）をインストール・起動
-2. `DATABASE_URL` が正しく設定されていれば、初回起動でスキーマが作成され、当日の DayNote が表示される
-3. `DATABASE_URL` 未設定・PostgreSQL 未起動の場合は「起動エラー」ダイアログで `DATABASE_URL` の設定を促す
+2. 初回起動でスキーマが作成され、当日の DayNote が表示される
+3. 何らかの理由で DB ファイルの作成・アクセスに失敗した場合は「起動エラー」ダイアログを表示する（ディスク容量・アクセス権限の確認を促す）
 
 ### 2.3 トラブルシューティング
 
-- **「起動エラー」ダイアログが出る**: PostgreSQL が起動しているか、`DATABASE_URL` が正しいか確認
+- **「起動エラー」ダイアログが出る**: ディスクの空き容量・userData ディレクトリのアクセス権限を確認。破損した場合は `dayborad.db` を削除して再起動（データは失われる）
 - **macOS で「開発元を確認できない」警告**: コード署名なしのバイナリのため。右クリック→「開く」で許可、または `xattr -d com.apple.quarantine /Applications/dayborad.app`
 - **ポートが占有されている**: main プロセスは動的ポートで Hono を起動するため、ポート衝突は通常発生しない
 
@@ -102,7 +92,7 @@ pnpm package
 | AC-18 | Vim Normal `Esc` でモード戻り | Unit（escPriority.test.ts）+ E2E（vim.spec.ts） | ◎ |
 | AC-19 | IME変換中 `Esc` の優先順位 | Unit（guardIme 経由）+ E2E（ime.spec.ts） | ◎ |
 | AC-20 | Vim `h/j/k/l` 移動 | Unit（focus.test.ts）+ E2E（vim.spec.ts） | ◎ |
-| AC-21 | 単一ユーザー・PostgreSQL保存 | Integration（全系）+ 認証なしでCRUD動作 | ◎ |
+| AC-21 | 単一ユーザー・ローカルDB保存 | Integration（全系）+ 認証なしでCRUD動作 | ◎ |
 | AC-22 | Post-MVPショートカットは不発 | Unit（postMvp 経由）+ E2E（postMvpShortcuts.spec.ts） | ◎ |
 | AC-23 | `?` / ヘルプアイコンでガイド表示 | Unit（help.test.ts 経由）+ E2E相当 | ◎ |
 
@@ -193,30 +183,25 @@ pnpm package
 | Format | `pnpm format:check` | 差分0 | ✅ 差分0 |
 | Typecheck | `pnpm typecheck` | エラー0 | ✅ エラー0（5パッケージ） |
 | Unit Test | `pnpm test -- --coverage` | 全pass、domain lines 90%以上、renderer keybindings 60%以上 | ✅ 548 pass（domain 90%以上・keybindings 60%以上維持） |
-| Integration Test | `pnpm test:integration` | 全pass（PostgreSQL必要） | ✅ 150 pass |
-| E2E Test | `pnpm test:e2e` | 推奨（CI必須でない、[test_strategy.md §5.3](test_strategy.md)） | ✅ 32 pass / 1 skip（Vim `i`: Playwright×Vim拡張の合成イベント相性、Unit でカバー） |
+| Integration Test | `pnpm test:integration` | 全pass（SQLite ファイル使用） | ✅ pass |
+| E2E Test | `pnpm test:e2e` | 推奨（CI必須でない、[test_strategy.md §5.3](test_strategy.md)） | ✅ pass（Vim `i` は Unit でカバー） |
 
 ### 6.1 実行前の前提
 
-- PostgreSQL 15 以上が起動済み
-- `dayborad_dev`, `dayborad_test`, `dayborad_e2e` の各DBが作成済み（[dev_setup.md §10.4](dev_setup.md)）
-- 各DBへマイグレーション適用済み
-  ```bash
-  DATABASE_URL=postgres://localhost:5432/dayborad_dev pnpm db:migrate && pnpm db:seed
-  DATABASE_URL=postgres://localhost:5432/dayborad_test pnpm db:migrate
-  DATABASE_URL=postgres://localhost:5432/dayborad_e2e pnpm db:migrate && DATABASE_URL=postgres://localhost:5432/dayborad_e2e pnpm db:seed
-  ```
+- 外部データベース不要。各テストは SQLite ファイルを使用する。
+- Integration テストは環境変数 `DATABASE_URL`（例: `file:./dayborad_test.db`）で指定したファイルへマイグレーションが適用済みであること
+- E2E テストは `launchApp` が一時 userData ディレクトリ内の `dayborad.db` を自動使用するため、事前準備不要
 
 ### 6.2 E2E テスト用 DB
 
-E2E テストは開発用DB（dayborad_dev）を汚さないよう、専用の dayborad_e2e を使う（[test_strategy.md §4.1](test_strategy.md) の隔離方針）。`apps/desktop/e2e/helpers.ts` の `launchApp` が未設定時は dayborad_e2e を既定値とする。
+E2E テストは起動ごとに一時 userData ディレクトリを作り、その中の `dayborad.db` を使う（[test_strategy.md §4.1](test_strategy.md) の隔離方針）。テスト間でファイルが完全に分離されるため、PostgreSQL 版のような `dayborad_e2e` DB の事前準備は不要。
 
 ---
 
 ## 7. 制限事項（MVP）
 
 - **コード署名・公証なし**: 配布バイナリはコード署名されていない。macOS では Gatekeeper 警告が出るため、ユーザーが明示的に許可する必要がある。本格配布時は Apple Developer ID 等の取得が必要
-- **PostgreSQL 外部依存**: ユーザー環境の PostgreSQL が必要。バンドルしていないため、セットアップ手順の案内が必須
+- **データは userData 配下の単一ファイル**: `dayborad.db` はローカルにのみ存在。バックアップ・デバイス間同期はユーザー責任（将来の拡張候補、[要件 §16](dayborad_requirements.md)）
 - **自動更新なし**: Electron の autoUpdater は未対応。バージョンアップは手動再インストール
 - **単一ユーザー前提**: 認証・同期なし（[要件 12.3](dayborad_requirements.md)、[architecture.md C7](architecture.md)）
 
