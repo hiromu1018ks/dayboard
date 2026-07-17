@@ -25,6 +25,9 @@ pnpm-debug.log*
 coverage/
 test-results/
 
+# ローカル SQLite ファイル（テスト・開発用、環境ごとに生成される）
+*.db
+
 # Electron / Vite キャッシュ
 .vite/
 .electron-vite/
