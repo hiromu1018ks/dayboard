@@ -40,6 +40,24 @@ async function addTodo(window: Page, title: string): Promise<void> {
   await window.waitForTimeout(300);
 }
 
+/** Blockerを1件追加するヘルパ。POST /blockers の 201 を待つ。 */
+async function addBlocker(window: Page, text: string): Promise<void> {
+  const input = window.locator('input[aria-label="新規障害入力"]');
+  await input.click();
+  await input.fill(text);
+  const postPromise = window.waitForResponse(
+    (res) =>
+      res.url().includes('/blockers') &&
+      res.request().method() === 'POST' &&
+      !res.url().includes('reorder') &&
+      res.status() === 201,
+    { timeout: 10_000 },
+  );
+  await window.keyboard.press('Enter');
+  await postPromise;
+  await window.waitForTimeout(300);
+}
+
 /**
  * TODOリストのテキストを上から順に取得（順序検証用）。
  * 追加入力欄や空状態メッセージを除外するため、data-focus-item を持つ行のテキストを拾う。
@@ -157,5 +175,113 @@ test.describe('ドラッグ&ドロップ並替え', () => {
     const handleCount = await handles.count();
     // TODO 2件のうち1件（B）は carried → ハンドルは1つのみ（A は残る）
     expect(handleCount).toBe(1);
+  });
+
+  test('Blocker をドラッグして順序を入れ替え → reorder API へ反映', async () => {
+    ({ app, window } = await launchApp());
+    await expect(window.locator(THEME_INPUT)).toBeVisible({ timeout: 15_000 });
+
+    // Blocker を2件追加
+    await addBlocker(window, 'BLK-A');
+    await addBlocker(window, 'BLK-B');
+
+    // Blocker 列セクション内でドラッグハンドルを取得
+    const blockerSection = window.locator('section[aria-label="障害・詰まり"]');
+    const handles = blockerSection.locator('button[aria-label="ドラッグで並替"]');
+    await expect(handles.nth(0)).toBeVisible();
+    await expect(handles.nth(1)).toBeVisible();
+
+    // 初期順序確認: [A, B]
+    const items = blockerSection.locator('li:has(button[data-focus-item])');
+    await expect(items.nth(0)).toContainText('BLK-A');
+    await expect(items.nth(1)).toContainText('BLK-B');
+
+    // B のハンドル → A の中央上へドラッグ
+    const handleB = handles.nth(1);
+    const targetA = blockerSection.locator('li').nth(0);
+    const bBox = await handleB.boundingBox();
+    const aBox = await targetA.boundingBox();
+    expect(bBox).not.toBeNull();
+    expect(aBox).not.toBeNull();
+
+    await window.mouse.move(bBox!.x + bBox!.width / 2, bBox!.y + bBox!.height / 2);
+    await window.mouse.down();
+    await window.mouse.move(bBox!.x + bBox!.width / 2, bBox!.y + bBox!.height / 2 - 10, {
+      steps: 5,
+    });
+    await window.mouse.move(aBox!.x + aBox!.width / 2, aBox!.y + aBox!.height / 2, {
+      steps: 10,
+    });
+
+    const reorderPromise = window.waitForResponse(
+      (res) =>
+        res.url().includes('/blockers/reorder') &&
+        res.request().method() === 'POST' &&
+        res.status() === 200,
+      { timeout: 10_000 },
+    );
+    await window.mouse.up();
+    await reorderPromise;
+    await window.waitForTimeout(300);
+
+    // 順序が入れ替わる: [B, A]
+    await expect(items.nth(0)).toContainText('BLK-B');
+    await expect(items.nth(1)).toContainText('BLK-A');
+  });
+
+  test('TODO並替え → 再起動後も順序が維持される（永続化）', async () => {
+    // 1回目: TODO を3件追加して並替え
+    ({ app, window } = await launchApp());
+    await expect(window.locator(THEME_INPUT)).toBeVisible({ timeout: 15_000 });
+    await addTodo(window, 'PERSIST-1');
+    await addTodo(window, 'PERSIST-2');
+    await addTodo(window, 'PERSIST-3');
+
+    const section = window.locator('section[aria-label="TODO"]');
+    const items = section.locator('li:has(button[data-focus-item])');
+
+    // 3番目のアイテムを先頭へ移動（ドラッグハンドル経由）
+    const handles = window.locator('button[aria-label="ドラッグで並替"]');
+    const handleC = handles.nth(2);
+    const targetA = section.locator('li').nth(0);
+    const cBox = await handleC.boundingBox();
+    const aBox = await targetA.boundingBox();
+    expect(cBox).not.toBeNull();
+    expect(aBox).not.toBeNull();
+
+    await window.mouse.move(cBox!.x + cBox!.width / 2, cBox!.y + cBox!.height / 2);
+    await window.mouse.down();
+    await window.mouse.move(cBox!.x + cBox!.width / 2, cBox!.y + cBox!.height / 2 - 10, {
+      steps: 5,
+    });
+    await window.mouse.move(aBox!.x + aBox!.width / 2, aBox!.y + aBox!.height / 2, {
+      steps: 10,
+    });
+    const reorderPromise = window.waitForResponse(
+      (res) =>
+        res.url().includes('/todos/reorder') &&
+        res.request().method() === 'POST' &&
+        res.status() === 200,
+      { timeout: 10_000 },
+    );
+    await window.mouse.up();
+    await reorderPromise;
+    await window.waitForTimeout(500);
+
+    // 並替え後の順序: [3, 1, 2]
+    await expect(items.nth(0)).toContainText('PERSIST-3');
+    await expect(items.nth(1)).toContainText('PERSIST-1');
+    await expect(items.nth(2)).toContainText('PERSIST-2');
+
+    await closeApp(app);
+
+    // 2回目: 再起動後も同じ順序が維持される
+    ({ app, window } = await launchApp());
+    await expect(window.locator(THEME_INPUT)).toBeVisible({ timeout: 15_000 });
+    const section2 = window.locator('section[aria-label="TODO"]');
+    const items2 = section2.locator('li:has(button[data-focus-item])');
+    await expect(items2.nth(0)).toContainText('PERSIST-3', { timeout: 10_000 });
+    await expect(items2.nth(1)).toContainText('PERSIST-1');
+    await expect(items2.nth(2)).toContainText('PERSIST-2');
   });
 });

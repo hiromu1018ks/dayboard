@@ -163,6 +163,68 @@ test.describe('ノート行変換（AC-05/AC-06/AC-07/AC-08）', () => {
     await expect(window.locator(DUPLICATE_DIALOG)).toBeHidden({ timeout: 3000 });
   });
 
+  test('重複TODO化で確認ダイアログ（AC-06）: 別TODOとして追加（force=1）で2件目が作成される', async () => {
+    ({ app, window } = await launchAppReady());
+
+    await pressModeToggle(window);
+    await expect(window.locator(NOTE_EDITOR)).toBeVisible();
+
+    await typeIntoEditor(window, '重複許可テスト');
+
+    // 1回目: TODO化成功（201）
+    const convertPromise1 = waitForConvertResponse(window, 'todo');
+    await window.keyboard.press(`${MOD}+Enter`);
+    expect(await convertPromise1).toBe(201);
+    await expect(window.locator(TOAST)).toBeHidden({ timeout: 5000 });
+
+    // フォーカスを CodeMirror へ戻す
+    await window.locator(CM_CONTENT).click();
+
+    // 2回目: 重複ダイアログ（409）
+    const convertPromise2 = waitForConvertResponse(window, 'todo');
+    await window.keyboard.press(`${MOD}+Enter`);
+    expect(await convertPromise2).toBe(409);
+    await expect(window.locator(DUPLICATE_DIALOG)).toBeVisible({ timeout: 5000 });
+
+    // 「別TODOとして追加」クリック → force=1 で POST → 201
+    // クリック前に waitForResponse の Promise を作り、クリック後に await する（競合回避）
+    const forcePromise = window.waitForResponse(
+      (r) =>
+        r.url().includes('/convert/todo') &&
+        r.request().method() === 'POST' &&
+        r.url().includes('force=1') &&
+        r.status() === 201,
+      { timeout: 10_000 },
+    );
+    await window.locator(DUPLICATE_DIALOG).getByText('別TODOとして追加').click();
+    const forceResponse = await forcePromise;
+    expect(forceResponse.status()).toBe(201);
+
+    // ダイアログが閉じる
+    await expect(window.locator(DUPLICATE_DIALOG)).toBeHidden({ timeout: 5000 });
+
+    // 仕事整理モードへ戻ると、同一タイトルの TODO が2件存在する（AC-06: 重複許可）
+    await window.keyboard.press('Escape');
+    const todoSection = window.locator('section[aria-label="TODO"]');
+    const todoMatches = todoSection.locator('li:has(span:has-text("重複許可テスト"))');
+    await expect(todoMatches).toHaveCount(2, { timeout: 10_000 });
+  });
+
+  test('空行変換 → 「空行は変換できません」通知（edge_cases §1.2）', async () => {
+    ({ app, window } = await launchAppReady());
+
+    await pressModeToggle(window);
+    await expect(window.locator(NOTE_EDITOR)).toBeVisible();
+
+    // 空行（何も入力せず）で ⌘+Enter
+    await window.locator(CM_CONTENT).click();
+    await window.keyboard.press(`${MOD}+Enter`);
+
+    // 「空行は変換できません」の info トーストが表示される
+    await expect(window.locator(TOAST)).toBeVisible({ timeout: 5_000 });
+    await expect(window.locator(TOAST)).toContainText('空行は変換できません');
+  });
+
   test('仕事整理モード復帰後、TODOに発生元が確認できる（AC-08）', async () => {
     ({ app, window } = await launchAppReady());
 
@@ -182,5 +244,50 @@ test.describe('ノート行変換（AC-05/AC-06/AC-07/AC-08）', () => {
 
     // TODO列に「見積作成」が表示される（ラベル除去済み）
     await expect(window.getByText('見積作成').first()).toBeVisible({ timeout: 5000 });
+  });
+
+  test('変換後のノート行を編集 → 発生元スナップショットは元のまま（AC-08 lineHash追従）', async () => {
+    // [note_conversion_spec.md §9.2]: 発生元スナップショットは変換時点の行テキストを保持し、
+    // その後ノート行が編集されても TODO 側のスナップショットは変わらない（追従せず固定）。
+    // 本テストはこの仕様（lineHash による発生元追従ではなくスナップショット保持）を検証。
+    ({ app, window } = await launchAppReady());
+
+    await pressModeToggle(window);
+    await expect(window.locator(NOTE_EDITOR)).toBeVisible();
+
+    await typeIntoEditor(window, '変換元の文章');
+    const convertPromise = waitForConvertResponse(window, 'todo');
+    await window.keyboard.press(`${MOD}+Enter`);
+    expect(await convertPromise).toBe(201);
+    await expect(window.locator(TOAST)).toBeHidden({ timeout: 5000 });
+
+    // 仕事整理モードへ戻り、TODO に発生元スナップショット（ⓘ）があることを確認
+    await window.keyboard.press('Escape');
+    const todoItem = window.locator('section[aria-label="TODO"] li').first();
+    await expect(todoItem).toContainText('変換元の文章', { timeout: 5000 });
+    // ⓘ アイコン（発生元スナップショット存在を示す）が表示
+    await expect(todoItem.locator('text=ⓘ')).toBeVisible();
+
+    // ノートモードへ戻り、元行を編集
+    await pressModeToggle(window);
+    await expect(window.locator(NOTE_EDITOR)).toBeVisible();
+    // 行末へカーソルを移動して追記
+    await window.locator(CM_CONTENT).click();
+    await window.keyboard.press('End');
+    await window.keyboard.type('（追記）');
+    // 本文反映を待つ
+    await window.waitForFunction(
+      () => {
+        const line = document.querySelector('.cm-content .cm-line')?.textContent ?? '';
+        return line.includes('（追記）');
+      },
+      { timeout: 5_000 },
+    );
+
+    // 仕事整理モードへ戻ると、TODO のスナップショットは「変換時点の元の文章」のまま
+    // （※ ホバーで popover 表示される lineText は変換時点で固定、追記は反映されない仕様）
+    await window.keyboard.press('Escape');
+    await expect(todoItem).toContainText('変換元の文章');
+    await expect(todoItem.locator('text=ⓘ')).toBeVisible();
   });
 });

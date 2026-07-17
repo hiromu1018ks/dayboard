@@ -217,7 +217,11 @@ export function BlockerColumn({
                 isSelected={selectedItemId === blocker.id}
                 showSelection={showSelection}
                 vimState={vimState}
-                isEditing={editingItemId === blocker.id}
+                // editingItemId が未指定（undefined = 標準キーバインド）の場合は
+                // isEditing も undefined にして BlockerItem 側の internalEditing を権威とする。
+                // `editingItemId === blocker.id` とすると undefined/null が false に変換され、
+                // `editing = isEditing ?? internalEditing` で internalEditing が無視されてしまう。
+                isEditing={editingItemId === undefined ? undefined : editingItemId === blocker.id}
                 editCursorHint={editCursorHint}
                 onEditingChange={(e) => onEditingChange?.(e ? blocker.id : null)}
                 onToggleResolved={() => onToggleResolved(blocker.id)}

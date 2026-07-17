@@ -27,7 +27,7 @@ test.describe('サイドバー・検索・Markdown出力（Post-MVP）', () => {
     if (app) await closeApp(app);
   });
 
-  test('サイドバーが表示され、カレンダーから日付へジャンプできる', async () => {
+  test('サイドバーが表示され、カレンダーから別日付へジャンプできる', async () => {
     ({ app, window } = await launchApp());
     await expect(window.locator(THEME_INPUT)).toBeVisible({ timeout: 15_000 });
 
@@ -35,12 +35,33 @@ test.describe('サイドバー・検索・Markdown出力（Post-MVP）', () => {
     const searchInput = window.locator('input[aria-label="検索"]');
     await expect(searchInput).toBeVisible();
 
-    // 今日の日付セルをクリック（カレンダーの当日セル）
+    // 当日の日付表示を取得（ジャンプ前後で変わることを検証するため）
+    const initialDateText = await window.locator('h1[data-testid="date-display"]').textContent();
+
+    // 翌日の日付セルを特定してクリック（当日の1日後）
+    // カレンダーの翌日セルは data-date 属性で一意に特定できる
     const today = new Date();
-    const todayDateStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
-    const todayCell = window.locator(`button[data-date="${todayDateStr}"]`);
-    await expect(todayCell).toBeVisible();
-    await todayCell.click();
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    const tomorrowDateStr = `${tomorrow.getFullYear()}-${String(tomorrow.getMonth() + 1).padStart(2, '0')}-${String(tomorrow.getDate()).padStart(2, '0')}`;
+    const tomorrowCell = window.locator(`button[data-date="${tomorrowDateStr}"]`);
+
+    // 翌日が当月内ならクリック可能。月末を跨ぐ場合は月送りボタンで翌月へ移動してからクリック
+    if (await tomorrowCell.isVisible().catch(() => false)) {
+      await tomorrowCell.click();
+    } else {
+      // 月送りボタンで翌月へ
+      await window.locator('button[aria-label="翌月へ"]').click();
+      await expect(tomorrowCell).toBeVisible({ timeout: 5_000 });
+      await tomorrowCell.click();
+    }
+
+    // 日付表示が切り替わる（別日付へジャンプした）
+    const afterDateText = await window.locator('h1[data-testid="date-display"]').textContent();
+    expect(afterDateText).not.toBe(initialDateText);
+
+    // テーマ入力欄が空（別日付の DayNote が自動生成される）
+    await expect(window.locator(THEME_INPUT)).toHaveValue('', { timeout: 10_000 });
 
     // 仕事整理モードのまま（モード切替は起きない）
     await expect(window.locator(THEME_INPUT)).toBeVisible();
@@ -93,10 +114,18 @@ test.describe('サイドバー・検索・Markdown出力（Post-MVP）', () => {
     ({ app, window } = await launchApp());
     await expect(window.locator(THEME_INPUT)).toBeVisible({ timeout: 15_000 });
 
-    // テーマを入力
+    // テーマを入力して保存（保存完了後に Export することでクリップボード内容に反映させる）
     const themeText = `エクスポート検証${Date.now()}`;
     await window.locator(THEME_INPUT).click();
     await window.keyboard.type(themeText);
+    // デバウンス + サーバー保存完了を待つ
+    await window
+      .locator('text=保存中')
+      .waitFor({ state: 'visible', timeout: 5_000 })
+      .catch(() => {
+        /* 既に保存完了している場合は無視 */
+      });
+    await window.locator('text=保存中').waitFor({ state: 'detached', timeout: 10_000 });
 
     // Export ボタンをクリック
     const exportButton = window.locator('button[aria-label="Markdownとしてコピー"]');
@@ -107,5 +136,59 @@ test.describe('サイドバー・検索・Markdown出力（Post-MVP）', () => {
     await expect(window.locator('[data-testid="toast"]')).toContainText('Copied to clipboard', {
       timeout: 5_000,
     });
+
+    // クリップボードへ実際にテーマが含まれる Markdown がコピーされたか検証
+    // （Electron の clipboard API 経由でクリップボード内容を読み取る）
+    const clipboardText = await app.evaluate(({ clipboard }) => clipboard.readText());
+    expect(clipboardText).toContain(themeText);
+  });
+
+  test('検索結果をクリック → 対象日付へジャンプする', async () => {
+    ({ app, window } = await launchApp());
+    await expect(window.locator(THEME_INPUT)).toBeVisible({ timeout: 15_000 });
+
+    // 当日に特徴的なテーマを入力して保存
+    const themeText = `検索ジャンプ対象テーマ${Date.now()}`;
+    await window.fill(THEME_INPUT, themeText);
+    await window
+      .locator('text=保存中')
+      .waitFor({ state: 'visible', timeout: 5_000 })
+      .catch(() => {});
+    await window.locator('text=保存中').waitFor({ state: 'detached', timeout: 10_000 });
+
+    // 翌日へ移動して、当日のテーマが見えない状態にする
+    await window.click('button[aria-label="翌日へ"]');
+    await expect(window.locator(THEME_INPUT)).toHaveValue('', { timeout: 10_000 });
+    const initialDateText = await window.locator('h1[data-testid="date-display"]').textContent();
+
+    // 検索ボックスへ入力
+    const searchInput = window.locator('input[aria-label="検索"]');
+    await searchInput.click();
+    await window.keyboard.type('検索ジャンプ');
+
+    // 検索結果が出現し、特徴的なテーマが含まれる
+    const resultButton = window.locator('text=検索ジャンプ対象テーマ');
+    await expect(resultButton.first()).toBeVisible({ timeout: 10_000 });
+
+    // 検索結果をクリック → 当日（テーマ入力済みの日付）へジャンプ
+    await resultButton.first().click();
+    // テーマ入力欄に対象テーマが復元される（ジャンプ成功の証拠）
+    await expect(window.locator(THEME_INPUT)).toHaveValue(themeText, { timeout: 15_000 });
+    // 日付表示が変わっている（別日付へジャンプした）
+    const afterDateText = await window.locator('h1[data-testid="date-display"]').textContent();
+    expect(afterDateText).not.toBe(initialDateText);
+  });
+
+  test('検索結果が0件 → No results found 表示', async () => {
+    ({ app, window } = await launchApp());
+    await expect(window.locator(THEME_INPUT)).toBeVisible({ timeout: 15_000 });
+
+    // 存在しないキーワードで検索
+    const searchInput = window.locator('input[aria-label="検索"]');
+    await searchInput.click();
+    await window.keyboard.type(`ZZZNOTEXIST${Date.now()}`);
+
+    // No results found が表示される
+    await expect(window.locator('text=No results found')).toBeVisible({ timeout: 10_000 });
   });
 });

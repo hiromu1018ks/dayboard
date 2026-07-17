@@ -202,7 +202,12 @@ function createWindow(apiBaseUrl: string): void {
   });
 
   mainWindow.on('ready-to-show', () => {
-    mainWindow.show();
+    // E2E テスト実行時（E2E_HEADLESS=1）はウィンドウを表示せず完全ヘッドレスで動かす。
+    // Playwright の _electron API は show:false の BrowserWindow でも操作可能だが、
+    // ready-to-show で show() すると画面にウィンドウが出て他の作業の邪魔になるため。
+    if (process.env['E2E_HEADLESS'] !== '1') {
+      mainWindow.show();
+    }
   });
 
   // 外部リンクは既定ブラウザで開く

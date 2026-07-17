@@ -223,7 +223,11 @@ export function TodoColumn({
                 isSelected={selectedItemId === todo.id}
                 showSelection={showSelection}
                 vimState={vimState}
-                isEditing={editingItemId === todo.id}
+                // editingItemId が未指定（undefined = 標準キーバインド）の場合は
+                // isEditing も undefined にして TodoItem 側の internalEditing を権威とする。
+                // `editingItemId === todo.id` とすると undefined/null が false に変換され、
+                // `editing = isEditing ?? internalEditing` で internalEditing が無視されてしまう。
+                isEditing={editingItemId === undefined ? undefined : editingItemId === todo.id}
                 editCursorHint={editCursorHint}
                 onEditingChange={(e) => onEditingChange?.(e ? todo.id : null)}
                 onToggle={() => onToggle(todo.id)}

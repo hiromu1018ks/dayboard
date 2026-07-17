@@ -97,5 +97,94 @@ test.describe('未完了TODO持ち越し（AC-11/AC-12）', () => {
     // carried になったTODOは「未完了」から除外されるため、持ち越しボタンが表示されないことを検証
     // （incompleteTodos.length === 0 なので「未完了を翌日へ持ち越し」は表示されない）
     await expect(window.locator('text=/未完了を翌日へ持ち越し/')).toHaveCount(0);
+
+    // AC-12 の実質検証: 翌日へ移動し、同一タイトルのTODOが1件のみ（重複なし）であることを確認。
+    // API の重複判定（lineHash ベース、[api_contract.md §10]）が正しく働けば、
+    // 2回持ち越しても2件目は作成されない。本テストは1回の持ち越し後の状態で検証。
+    await window.locator(NEXT_BUTTON).click();
+    await expect(window.locator(THEME_INPUT)).toBeVisible({ timeout: 10_000 });
+    await waitForSavedSteady(window);
+    // 同一タイトルのTODOが1件のみ（重複していない）
+    const carriedTodos = window.locator(
+      `section[aria-label="TODO"] li:has(span:has-text("${todoTitle}"))`,
+    );
+    await expect(carriedTodos).toHaveCount(1, { timeout: 15_000 });
+  });
+
+  test('複数未完了TODOを一度に持ち越し → 全件 carried + 翌日に全件出現（AC-11）', async () => {
+    ({ app, window } = await launchApp());
+    await expect(window.locator(THEME_INPUT)).toBeVisible({ timeout: 15_000 });
+
+    // 3件追加
+    await addTodo(window, '一括持ち越し1');
+    await addTodo(window, '一括持ち越し2');
+    await addTodo(window, '一括持ち越し3');
+
+    // 「未完了を翌日へ持ち越し（3件）」であることを確認
+    await expect(window.locator('text=/未完了を翌日へ持ち越し（3件）/')).toBeVisible();
+
+    // 持ち越し実行
+    await window.click('text=/未完了を翌日へ持ち越し/');
+    // POST /carry-over の 200 を待つ
+    const carryOverPromise = window.waitForResponse(
+      (res) => res.url().includes('/carry-over') && res.request().method() === 'POST',
+      { timeout: 10_000 },
+    );
+    await window.click('button:has-text("持ち越す")');
+    await carryOverPromise;
+
+    // 全3件が carried 表示
+    await expect(window.locator('text=/Carried to tomorrow/')).toHaveCount(3, { timeout: 10_000 });
+
+    // 翌日へ移動 → 3件すべて出現
+    await window.locator(NEXT_BUTTON).click();
+    await expect(window.locator(THEME_INPUT)).toBeVisible({ timeout: 10_000 });
+    await waitForSavedSteady(window);
+    await expect(window.locator('section[aria-label="TODO"]')).toContainText('一括持ち越し1', {
+      timeout: 15_000,
+    });
+    await expect(window.locator('section[aria-label="TODO"]')).toContainText('一括持ち越し2');
+    await expect(window.locator('section[aria-label="TODO"]')).toContainText('一括持ち越し3');
+    // 3件すべて「から持ち越し」ラベル付き
+    await expect(window.locator('text=/から持ち越し/')).toHaveCount(3);
+  });
+
+  test('完了済みTODOは持ち越し対象外 → 持ち越し後に当日に残る（AC-11、edge_cases §3.2）', async () => {
+    ({ app, window } = await launchApp());
+    await expect(window.locator(THEME_INPUT)).toBeVisible({ timeout: 15_000 });
+
+    // 未完了1件 + 完了1件
+    await addTodo(window, '持ち越し対象');
+    await addTodo(window, '完了済みで残る');
+
+    // 2件目を完了
+    await window
+      .locator('section[aria-label="TODO"] li')
+      .nth(1)
+      .locator('button[data-focus-item]')
+      .click();
+    await window.waitForTimeout(300);
+
+    // 「未完了を翌日へ持ち越し（1件）」→ 完了済みは対象外で1件のみ
+    await expect(window.locator('text=/未完了を翌日へ持ち越し（1件）/')).toBeVisible();
+
+    // 持ち越し実行
+    await window.click('text=/未完了を翌日へ持ち越し/');
+    await window.click('button:has-text("持ち越す")');
+
+    // 「持ち越し対象」は carried 化
+    await expect(window.locator('text=/Carried to tomorrow/')).toHaveCount(1, { timeout: 10_000 });
+    // 「完了済みで残る」は done のまま当日に残る（carried にならない）
+    await expect(window.locator('section[aria-label="TODO"]')).toContainText('完了済みで残る');
+    await expect(window.locator('section[aria-label="TODO"] span.line-through')).toHaveText(
+      '完了済みで残る',
+    );
+
+    // 翌日へ移動 → 「完了済みで残る」は翌日に持ち越されていない
+    await window.locator(NEXT_BUTTON).click();
+    await expect(window.locator(THEME_INPUT)).toBeVisible({ timeout: 10_000 });
+    await waitForSavedSteady(window);
+    await expect(window.locator('section[aria-label="TODO"]')).toContainText('持ち越し対象');
+    await expect(window.locator('section[aria-label="TODO"]')).not.toContainText('完了済みで残る');
   });
 });

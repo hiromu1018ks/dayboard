@@ -39,16 +39,32 @@ import type { AutosaveEntry } from '../autosave/types.js';
 import { persistTarget, clearTarget } from '../autosave/pendingStore.js';
 
 /**
+ * 「ペイロード未設定」を表すセンチネル。
+ *
+ * `pendingPayload` / `inFlightPayload` は `unknown` 型のため、値としての `null`
+ * （例: theme を空にしたときの `edit(THEME_TARGET, null)`）と「保留なし」の初期状態を
+ * 同じ `null` で表すと区別できず、null ペイロードの保存がスキップされる不具合があった。
+ * これを防ぐため、「未設定」はこの Symbol で表し、明示的な null は正当なペイロードとして扱う。
+ */
+const UNSET: unique symbol = Symbol('autosave.unset');
+
+/**
+ * ペイロード型。`UNSET`（保留なしの初期値）または任意の値（null 含む）。
+ * null は正当なペイロード（theme の空文字→null 等）として扱う。
+ */
+type Payload = typeof UNSET | unknown;
+
+/**
  * 対象ごとの内部状態。
  */
 type TargetRuntime = {
   status: SaveStatus;
   /** デバウンスタイマーハンドル（null=未設定） */
   debounceTimer: ReturnType<typeof setTimeout> | null;
-  /** 保留中の最新ペイロード（未保存の編集）。null=保留なし */
-  pendingPayload: unknown;
-  /** 現在サーバーへ送信中のペイロード。null=保存中ではない */
-  inFlightPayload: unknown;
+  /** 保留中の最新ペイロード（未保存の編集）。UNSET=保留なし（null は正当なペイロード） */
+  pendingPayload: Payload;
+  /** 現在サーバーへ送信中のペイロード。UNSET=保存中ではない */
+  inFlightPayload: Payload;
   /** リトライ試行回数（0=初回保存失敗直後） */
   retryAttempt: number;
   /** リトライ待機タイマーハンドル */
@@ -59,8 +75,8 @@ function createInitialRuntime(): TargetRuntime {
   return {
     status: 'saved',
     debounceTimer: null,
-    pendingPayload: null,
-    inFlightPayload: null,
+    pendingPayload: UNSET,
+    inFlightPayload: UNSET,
     retryAttempt: 0,
     retryTimer: null,
   };
@@ -154,8 +170,9 @@ export function useAutosave(
       const entry = entriesMap.get(key);
       const rt = runtimesRef.current.get(key);
       if (!entry || !rt) return;
-      // 送信対象は常に最新の保留ペイロード（リトライも最新値を使う、レビュー #2）
-      if (rt.pendingPayload === null) return;
+      // 送信対象は常に最新の保留ペイロード（リトライも最新値を使う、レビュー #2）。
+      // UNSET = 保留なし（null は正当なペイロードなので保存対象）。
+      if (rt.pendingPayload === UNSET) return;
 
       rt.inFlightPayload = rt.pendingPayload;
       applyTransition(key, { type: isRetry ? 'RETRY_FIRE' : 'TIMER_FIRE' });
@@ -166,10 +183,10 @@ export function useAutosave(
 
       if (result.ok) {
         rt.retryAttempt = 0;
-        rt.inFlightPayload = null;
+        rt.inFlightPayload = UNSET;
         // 保存成功時点で保留ペイロードが同一ならクリア（新規編集があれば残す）
         if (!hasNewerEdit) {
-          rt.pendingPayload = null;
+          rt.pendingPayload = UNSET;
           // localStorage から成功対象を削除（部分成功でも他対象は残る、§6.2）
           clearTarget(date, entry.target);
         }
@@ -183,7 +200,7 @@ export function useAutosave(
       }
 
       // 失敗
-      rt.inFlightPayload = null;
+      rt.inFlightPayload = UNSET;
       applyTransition(key, { type: 'SAVE_FAILURE' });
 
       // リトライ判定（§7.1）。リトライは最新 pendingPayload を使う
@@ -302,7 +319,7 @@ export function useAutosave(
   const flush = useCallback(async () => {
     let localStorageOk = true;
     for (const [key, rt] of runtimesRef.current) {
-      if (rt.pendingPayload === null) continue;
+      if (rt.pendingPayload === UNSET) continue;
       const entry = entriesMap.get(key);
       if (!entry) continue;
       // デバウンス・リトライタイマーをクリア
@@ -325,12 +342,18 @@ export function useAutosave(
 
   /**
    * retryAll: error 状態の対象を手動再試行（§7.2）。
+   *
+   * 注意: executeSave には isRetry=true を渡すこと。
+   * isRetry=false だと TIMER_FIRE イベントになり、error 状態では
+   * `state === 'idle' ? 'saving' : state` で saving へ遷移せず、
+   * 結果として保存成功後の SAVE_SUCCESS も機能しない（saving からしか saved へ遷移しないため）。
+   * isRetry=true で RETRY_FIRE イベントを発火させ、`error → saving` へ確実に遷移させる。
    */
   const retryAll = useCallback(() => {
     for (const [key, rt] of runtimesRef.current) {
-      if (rt.status !== 'error' || rt.pendingPayload === null) continue;
+      if (rt.status !== 'error' || rt.pendingPayload === UNSET) continue;
       rt.retryAttempt = 0; // 手動再試行でカウンタリセット
-      void executeSaveRef.current(key, false);
+      void executeSaveRef.current(key, true);
     }
   }, []);
 

@@ -22,22 +22,23 @@ const SETTINGS_BUTTON = 'button[aria-label="設定を開く"]';
 const NOTE_EDITOR = '[data-testid="note-editor"]';
 const CM_CONTENT = `${NOTE_EDITOR} .cm-content`;
 
-/** 設定で Vim へ切替するヘルパ */
+/**
+ * 設定で Vim へ切替するヘルパ。
+ * PATCH /api/settings の 200 を待って確実に永続化（固定待機ではなくレスポンス完了で検知）。
+ * これにより環境負荷時の不安定化と無駄な待ち時間を両方排除する。
+ */
 async function enableVim(window: Page): Promise<void> {
   await window.locator(SETTINGS_BUTTON).click();
   await expect(window.locator('text=キーバインド')).toBeVisible({ timeout: 5_000 });
+  // PATCH /api/settings の完了を確実に待つ（radio.check が onChange を発火 → PATCH送信）
+  const patchPromise = window.waitForResponse(
+    (res) => res.url().includes('/settings') && res.request().method() === 'PATCH',
+    { timeout: 10_000 },
+  );
   await window.locator('input[type="radio"][value="vim"]').check();
-  await window.waitForTimeout(500);
+  await patchPromise;
   await window.keyboard.press('Escape'); // モーダルを閉じる
   await expect(window.locator(THEME_INPUT)).toBeVisible({ timeout: 5_000 });
-}
-
-/** 設定で標準へ戻すヘルパ（後続テストへの影響を防ぐ） */
-async function restoreStandard(window: Page): Promise<void> {
-  await window.locator(SETTINGS_BUTTON).click();
-  await window.locator('input[type="radio"][value="standard"]').check();
-  await window.waitForTimeout(500);
-  await window.keyboard.press('Escape');
 }
 
 test.describe('Vim キーバインド（AC-16〜AC-20）', () => {
@@ -50,12 +51,10 @@ test.describe('Vim キーバインド（AC-16〜AC-20）', () => {
 
   test.afterEach(async () => {
     if (app) {
-      // 標準へ戻す試行（失敗しても無視）
-      try {
-        await restoreStandard(window);
-      } catch {
-        // ignore
-      }
+      // 標準へ戻す処理は不要: 各テストは独立した userDataDir を使い、
+      // beforeEach の resetE2eDatabase が user_settings を standard/normal へ
+      // リセットするため、テスト間で Vim 設定はリークしない。
+      // （従来の restoreStandard 試行は失敗時に握りつぶしで時間を浪費していたため削除）
       await closeApp(app);
     }
   });
@@ -85,47 +84,40 @@ test.describe('Vim キーバインド（AC-16〜AC-20）', () => {
     await expect(window.locator(NOTE_EDITOR)).toBeVisible({ timeout: 5_000 });
   });
 
-  // skip 理由: Playwright の合成キーボードイベントは @replit/codemirror-vim の
-  // コマンド認識に必要な KeyboardEvent プロパティを完全に再現しないため、
-  // CodeMirror 内で `i` を押しても Vim Insert へ移行しない（debug 検証済み:
-  // Vim 拡張自体は有効で VIM NORMAL バッジは表示されるが、`i` が処理されない）。
-  // 実機の本物のキーボードでは動作する（ユーザー手動確認済み）。
-  // AC-16〜AC-20（Vim 状態遷移・Esc 優先順位）は Unit テスト（escPriority.test.ts）
-  // で純粋関数としてカバー済み。本 E2E は Playwright × Vim 拡張の限界のため skip。
-  // 実機での手動確認は release_checklist.md §3.1 の手順8（Vim 切替）で担保。
-  test.skip('Vim ノートモードで Esc → Normal、再度 Esc → work 戻り（AC-17/AC-18）', async () => {
+  // AC-18（Vim Normal 状態のノートモードで Esc → 仕事整理モードへ戻る）の E2E 検証。
+  //
+  // 注意（AC-17 の一部と AC-16 は Unit 層で担保）:
+  // Playwright の合成キーボードは @replit/codemirror-vim の `i` コマンド認識に必要な
+  // KeyboardEvent プロパティを完全再現しないため、CodeMirror 内で `i` を押しても
+  // Vim Insert へ移行しない（実機の本物のキーボードでは動作、ユーザー手動確認済み）。
+  // そのため AC-16（i で Insert 移行）と AC-17 の Insert→Normal 遷移部分は Unit テスト
+  // （vim.test.ts 35+テスト、escPriority.test.ts）で純粋関数としてカバーする。
+  // 実機での手動確認は release_checklist.md §3.1 手順8（Vim 切替）で担保。
+  //
+  // 一方 AC-18（Normal 状態の Esc → work 戻り）は Playwright でも再現可能なため、
+  // 本テストで明示的に検証する（プローブ検証済み: Normal状態でEsc押下→work復帰する）。
+  test('Vim ノートモード（Normal状態）で Esc → 仕事整理モードへ戻る（AC-18）', async () => {
     ({ app, window } = await launchApp());
     await expect(window.locator(THEME_INPUT)).toBeVisible({ timeout: 15_000 });
 
     await enableVim(window);
 
-    // ⌘J でノートモードへ
+    // ⌘J でノートモードへ（Vim は初期状態 Normal）
     const isMac = process.platform === 'darwin';
     await window.keyboard.press(isMac ? 'Meta+J' : 'Control+J');
     await expect(window.locator(NOTE_EDITOR)).toBeVisible({ timeout: 5_000 });
 
-    // CodeMirror へフォーカス後、`i` で Insert へ（AC-16）
+    // CodeMirror へフォーカス（Vim 拡張は有効だが Normal 状態を維持）
     await window.locator(CM_CONTENT).click();
-    // CodeMirror がフォーカスを得て Vim 拡張がアクティブになるまで待つ
     await expect(window.locator(CM_CONTENT)).toBeFocused({ timeout: 5_000 });
-    // 少し待機して Vim 拡張のキーハンドラが準備完了する余地を与える
-    await window.waitForTimeout(200);
-    // `keyboard.type` はキーダウン/文字挿入/キーアップの完全シーケンスを生成し、
-    // Vim 拡張が `i` を Insert 移行コマンドとして確実に認識できるようにする。
-    // （`press` は input イベントを伴わないことがあり、CodeMirror の文字処理が
-    //  動かない場合がある）
-    await window.keyboard.type('i');
-    // VIM INSERT バッジに切替わる（AC-16）
-    await expect(window.locator('text=VIM INSERT')).toBeVisible({ timeout: 5_000 });
-
-    // Esc → Normal へ戻る（AC-17）。ノートモードには留まる
-    await window.keyboard.press('Escape');
+    // Vim 状態は Normal のまま（i を押していないので Insert へは移行しない）
     await expect(window.locator('text=VIM NORMAL')).toBeVisible({ timeout: 5_000 });
-    // ノートモードのまま
-    await expect(window.locator(NOTE_EDITOR)).toBeVisible();
 
-    // もう一度 Esc → 仕事整理モードへ戻る（AC-18）
+    // Esc → 仕事整理モードへ戻る（AC-18）。
+    // escPriority 段4: Vim Normal 状態のノートモードで Esc → work 戻り。
     await window.keyboard.press('Escape');
     await expect(window.locator(THEME_INPUT)).toBeVisible({ timeout: 5_000 });
+    // ノートエディタは非表示（仕事整理モードへ完全に切替わった）
+    await expect(window.locator(NOTE_EDITOR)).toHaveCount(0);
   });
 });

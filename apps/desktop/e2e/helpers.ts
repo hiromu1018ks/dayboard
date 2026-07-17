@@ -89,6 +89,9 @@ export async function launchApp(options?: {
       ...(options?.env ?? {}),
       // ヘッドレス GPU を無効化（CI 環境向け）
       ELECTRON_DISABLE_GPU: '1',
+      // E2E 実行時は BrowserWindow を表示しない（完全ヘッドレス）。
+      // main プロセスの ready-to-show ハンドラがこの値を見て show() をスキップする。
+      E2E_HEADLESS: '1',
     },
     timeout: 30_000,
   });
