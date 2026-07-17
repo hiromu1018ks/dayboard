@@ -254,9 +254,9 @@ describe('変換 API (Integration)', () => {
       expect(todo2.title).toBe('見積作成');
 
       // DB に2件
-      const pool = getPool();
-      const result = await pool.query('SELECT COUNT(*)::int AS count FROM todo_items');
-      expect(result.rows[0].count).toBe(2);
+      const client = getPool();
+      const result = await client.execute('SELECT COUNT(*) AS count FROM todo_items');
+      expect(Number((result.rows[0] as { count: unknown }).count)).toBe(2);
     });
 
     it('TODO化済みの行を障害化は重複扱いしない（[§10]）', async () => {
@@ -341,18 +341,22 @@ describe('変換 API (Integration)', () => {
       const body = await res.json();
 
       // 相互参照が設定されている
-      const pool = getPool();
-      const todoRow = await pool.query(
-        'SELECT source_note_line_meta_id FROM todo_items WHERE id = $1',
-        [body.todo.id],
-      );
-      expect(todoRow.rows[0].source_note_line_meta_id).toBe(body.noteLineMeta.id);
+      const client = getPool();
+      const todoRow = await client.execute({
+        sql: 'SELECT source_note_line_meta_id FROM todo_items WHERE id = ?',
+        args: [body.todo.id],
+      });
+      expect(
+        (todoRow.rows[0] as { source_note_line_meta_id: string }).source_note_line_meta_id,
+      ).toBe(body.noteLineMeta.id);
 
-      const metaRow = await pool.query(
-        'SELECT converted_to_todo_id FROM note_line_metas WHERE id = $1',
-        [body.noteLineMeta.id],
+      const metaRow = await client.execute({
+        sql: 'SELECT converted_to_todo_id FROM note_line_metas WHERE id = ?',
+        args: [body.noteLineMeta.id],
+      });
+      expect((metaRow.rows[0] as { converted_to_todo_id: string }).converted_to_todo_id).toBe(
+        body.todo.id,
       );
-      expect(metaRow.rows[0].converted_to_todo_id).toBe(body.todo.id);
     });
 
     it('TODO削除で convertedToTodoId が ON DELETE SET NULL になる（[§1.2]、[§8.4]）', async () => {
@@ -369,15 +373,17 @@ describe('変換 API (Integration)', () => {
       expect(delRes.status).toBe(204);
 
       // NoteLineMeta は残るが convertedToTodoId が NULL（変換済みマーク消失、[§8.4]）
-      const pool = getPool();
-      const metaRow = await pool.query(
-        'SELECT converted_to_todo_id, line_text FROM note_line_metas WHERE id = $1',
-        [noteLineMeta.id],
-      );
+      const client = getPool();
+      const metaRow = await client.execute({
+        sql: 'SELECT converted_to_todo_id, line_text FROM note_line_metas WHERE id = ?',
+        args: [noteLineMeta.id],
+      });
       expect(metaRow.rows).toHaveLength(1);
-      expect(metaRow.rows[0].converted_to_todo_id).toBeNull();
+      expect(
+        (metaRow.rows[0] as { converted_to_todo_id: string | null }).converted_to_todo_id,
+      ).toBeNull();
       // lineText（スナップショット）は保持
-      expect(metaRow.rows[0].line_text).toBe('見積作成');
+      expect((metaRow.rows[0] as { line_text: string }).line_text).toBe('見積作成');
     });
 
     it('NoteEntry削除で NoteLineMeta が cascade 削除される（[§10.1]）', async () => {
@@ -389,14 +395,14 @@ describe('変換 API (Integration)', () => {
       });
 
       // NoteLineMeta が1件あることを確認
-      const pool = getPool();
-      const before = await pool.query('SELECT COUNT(*)::int AS count FROM note_line_metas');
-      expect(before.rows[0].count).toBe(1);
+      const client = getPool();
+      const before = await client.execute('SELECT COUNT(*) AS count FROM note_line_metas');
+      expect(Number((before.rows[0] as { count: unknown }).count)).toBe(1);
 
       // DayNote削除 → cascade で NoteEntry → NoteLineMeta も削除
-      await pool.query('DELETE FROM day_notes WHERE id = $1', [full.dayNote.id]);
-      const after = await pool.query('SELECT COUNT(*)::int AS count FROM note_line_metas');
-      expect(after.rows[0].count).toBe(0);
+      await client.execute({ sql: 'DELETE FROM day_notes WHERE id = ?', args: [full.dayNote.id] });
+      const after = await client.execute('SELECT COUNT(*) AS count FROM note_line_metas');
+      expect(Number((after.rows[0] as { count: unknown }).count)).toBe(0);
     });
   });
 

@@ -11,21 +11,24 @@ import { getPool, closePool, runMigrations } from '../index.js';
 import { seedUserSettings } from '../seedRunner.js';
 
 async function reset(): Promise<void> {
-  const pool = getPool();
+  const client = getPool();
 
-  // 全テーブルTRUNCATE（外部キー依存順を考慮し CASCADE）
-  await pool.query(
-    `TRUNCATE TABLE
-       note_line_metas,
-       note_entries,
-       reflections,
-       blocker_items,
-       todo_items,
-       day_notes,
-       user_settings
-     CASCADE`,
-  );
-  console.log('[reset] truncated all tables');
+  // 全テーブルを DELETE（外部キー依存順を考慮）。SQLite は TRUNCATE を持たないため
+  // DELETE で代用。また autoincrement は使っていないので sqlite_sequence のリセットも不要。
+  // ON DELETE CASCADE が効いているため、親（day_notes / user_settings）から消せば
+  // 子も伝播するが、FK 強制（PRAGMA foreign_keys = ON）前提で確実を期すため子から順に消す。
+  for (const table of [
+    'note_line_metas',
+    'note_entries',
+    'reflections',
+    'blocker_items',
+    'todo_items',
+    'day_notes',
+    'user_settings',
+  ]) {
+    await client.execute(`DELETE FROM ${table}`);
+  }
+  console.log('[reset] deleted all rows from all tables');
 
   // マイグレーション再適用（冪等）。リポジトリパッケージルート基準で ./migrations を指定。
   await runMigrations('./migrations');

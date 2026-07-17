@@ -14,7 +14,7 @@
            │    E2E    │  Electronアプリ全体。主要AC・クリティカルパス
            └───────────┘
          ┌───────────────┐
-         │ Integration   │  Hono + PostgreSQL、複数レイヤー
+         │ Integration   │  Hono + SQLite、複数レイヤー
          └───────────────┘
        ┌───────────────────┐
        │     Unit          │  ピュアTS（domain/shared-types）。厚く
@@ -26,15 +26,15 @@
 | 層 | 対象 | 割合の目安 | ツール（指針） |
 |----|------|------------|----------------|
 | **Unit** | `packages/domain`（正規化、状態遷移、lineHash、タイトル生成）、`packages/shared-types` の検証、自動保存ステートマシン（モック） | 多い | Vitest |
-| **Integration** | Honoエンドポイント + リポジトリ + PostgreSQL（テスト用DB）、変換トランザクション、持ち越し生成 | 中程度 | Vitest + テスト用PostgreSQL |
+| **Integration** | Honoエンドポイント + リポジトリ + SQLite（テスト用DBファイル）、変換トランザクション、持ち越し生成 | 中程度 | Vitest + テスト用 SQLite |
 | **E2E** | Electronアプリ全体。AC-01〜AC-22のユーザー視点シナリオ、ショートカット、IME、CodeMirror操作 | 少ない（クリティカルのみ） | Playwright（Electron対応） |
 
 ### 1.2 テストツール指針
 
 - **Unit/Integration:** [Vitest](https://vitest.dev/)（Viteエコシステム、TypeScript親和性）
 - **E2E:** [Playwright](https://playwright.dev/) の Electronサポート（`_electron`）
-- **DBテスト:** テスト専用のPostgreSQLデータベース（例: `dayborad_test`）。各テストでトランザクションロールバックまたはTRUNCATEで隔離
-- **モック:** HonoのリポジトリはIFベースで差し替え可能（[database_schema.md §11](database_schema.md)）。結合テストでは実PostgreSQL、Unitではインメモリモックを使う
+- **DBテスト:** テスト専用の SQLite ファイル（例: `DATABASE_URL=file:./dayborad_test.db`）。各テストで `DELETE FROM ...` で隔離（SQLite は TRUNCATE を持たない）
+- **モック:** HonoのリポジトリはIFベースで差し替え可能（[database_schema.md §11](database_schema.md)）。結合テストでは実SQLite、Unitではインメモリモックを使う
 
 ---
 
@@ -66,14 +66,14 @@
 | AC-18 | Vim Normal `Esc` でモード戻り | E2E | — | 同上 |
 | AC-19 | IME変換中 `Esc` の優先順位 | E2E | Unit | `isComposing` チェック（[§4.5](#45-ac-19-ime扱い最重要)） |
 | AC-20 | Vim `h/j/k/l` 移動 | E2E | Unit | Normal=列/項目移動（[§4.4](#44-ac-20-vim-hjkl-移動)） |
-| AC-21 | 単一ユーザー・PostgreSQL保存 | Integration | — | 認証なしでCRUD（[§3.6](#36-ac-21-単一ユーザーローカル保存)） |
+| AC-21 | 単一ユーザー・ローカルDB保存 | Integration | — | 認証なしでCRUD（[§3.6](#36-ac-21-単一ユーザーローカル保存)） |
 | AC-22 | Post-MVPショートカットは不発、入力破壊しない | E2E | — | `⌘K`等の無効化（[§4.6](#46-ac-22-post-mvpショートカットの不発)） |
 
 ---
 
 ## 3. Unit テスト詳細
 
-`packages/domain` を中心に、ピュア関数とステートマシンを厚くテストする。実行環境にPostgreSQL不要で高速。
+`packages/domain` を中心に、ピュア関数とステートマシンを厚くテストする。実行環境に SQLite ファイル不要で高速。
 
 ### 3.1 AC-01 当日DayNote自動生成
 
@@ -125,7 +125,7 @@
 ### 3.6 AC-21 単一ユーザー・ローカル保存
 
 - 対象: リポジトリのIF準拠（[database_schema.md §11](database_schema.md)）。Unitではモック実装で検証
-- 観点: IFに沿ったCRUDが呼べる（実PostgreSQLとの結合はIntegration層）
+- 観点: IFに沿ったCRUDが呼べる（実SQLiteとの結合はIntegration層）
 
 ### 3.7 自動保存ステートマシン（AC-13/AC-14）
 
@@ -143,13 +143,13 @@
 
 ## 4. Integration テスト詳細
 
-Honoエンドポイント + リポジトリ + テスト用PostgreSQLを実環境で繋ぐ。各テストはトランザクション内で実行し、終了時にロールバック（またはTRUNCATE）で隔離する。
+Honoエンドポイント + リポジトリ + テスト用 SQLite ファイルを実環境で繋ぐ。各テストは終了時に `DELETE FROM ...` で隔離する（SQLite は TRUNCATE を持たないため）。
 
 ### 4.1 共通セットアップ
 
-- テスト用DB: `dayborad_test`（`.env.test` 等で指定）
+- テスト用DB: `DATABASE_URL=file:./dayborad_test.db` 等で SQLite ファイルを指定
 - 各テストスイート実行前にマイグレーション適用（`pnpm db:migrate` 相当）
-- テストごとに `TRUNCATE day_notes, todo_items, ...` で初期化（またはトランザクションロールバック方式）
+- テストごとに `DELETE FROM note_line_metas, note_entries, reflections, blocker_items, todo_items, day_notes` で初期化
 
 ### 4.2 代表的なIntegrationテスト
 

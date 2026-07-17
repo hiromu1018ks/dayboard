@@ -2,10 +2,11 @@
  * Electron メインプロセス
  *
  * アプリ起動フロー（[architecture.md §6.1]）:
- *   1. PostgreSQL 接続確認（未起動ならエラー）
- *   2. マイグレーション実行（最新でなければ適用）
- *   3. Hono API を localhost 動的ポートで起動
- *   4. BrowserWindow 生成、Renderer に API ベースURLを注入（preload 経由）
+ *   1. SQLite ファイルパス解決（userData/dayborad.db）
+ *   2. DB 接続確認（ファイル作成・読み書き可否）
+ *   3. マイグレーション実行（最新でなければ適用）
+ *   4. Hono API を localhost 動的ポートで起動
+ *   5. BrowserWindow 生成、Renderer に API ベースURLを注入（preload 経由）
  *
  * main はドメインロジックを持たず（[architecture.md §3.1]）、起動・ライフサイクル管理のみを行う。
  */
@@ -155,7 +156,23 @@ function resolveMigrationsFolder(): string {
 }
 
 /**
- * アプリ起動フロー（DB接続 → マイグレーション → API起動）。
+ * SQLite データベースファイルの配置パスを解決し、DATABASE_URL を設定する。
+ *
+ * [architecture.md §2.2] の「ローカル保存（SQLite）」方針に基づき、
+ * ユーザーの userData ディレクトリ（OS 標準のアプリ別データ領域）配下へ
+ * `dayborad.db` を置く。これにより利用者は何もセットアップせずに起動できる。
+ *
+ * DATABASE_URL が既に環境変数で設定されている場合はそれを尊重する
+ * （E2E テストで一時ディレクトリを明示指定する場合等）。
+ */
+function ensureDatabaseUrl(): void {
+  if (process.env.DATABASE_URL) return;
+  const dbPath = join(app.getPath('userData'), 'dayborad.db');
+  process.env.DATABASE_URL = `file:${dbPath}`;
+}
+
+/**
+ * アプリ起動フロー（DBパス解決 → DB接続確認 → マイグレーション → API起動）。
  * BrowserWindow 生成前に呼ぶ。
  *
  * [architecture.md §6.1] の起動シーケンスに従う。
@@ -163,9 +180,13 @@ function resolveMigrationsFolder(): string {
  * main プロセスは drizzle に直接依存しない。
  */
 async function bootstrap(): Promise<StartedServer> {
-  // 1. PostgreSQL 接続確認
+  // 0. SQLite ファイルパスを userData 配下へ解決し DATABASE_URL を設定
+  //    （既に環境変数が設定されている場合は尊重する）
+  ensureDatabaseUrl();
+
+  // 1. DB 接続確認（ファイル作成可否・読み書き権限の検証を兼ねる）
   await ping();
-  console.log('[main] PostgreSQL connected');
+  console.log(`[main] SQLite connected: ${process.env.DATABASE_URL}`);
 
   // 2. マイグレーション実行（repository パッケージ経由）
   await runMigrations(resolveMigrationsFolder());
@@ -242,12 +263,13 @@ app.whenReady().then(async () => {
   } catch (err) {
     console.error('[main] bootstrap failed:', err);
     // ユーザーへエラー表示して終了。
-    // パッケージ版では PostgreSQL が未起動・DATABASE_URL 未設定が主な原因のため、
-    // 設定手順を併記する（[release_checklist.md] 参照）。
-    const dbHint = process.env.DATABASE_URL
-      ? ''
-      : '\n\nDATABASE_URL 環境変数が設定されていません。\nPostgreSQL を起動し、DATABASE_URL を設定してから起動してください。\n（例: postgres://localhost:5432/dayborad）';
-    dialog.showErrorBox('起動エラー', `アプリを起動できませんでした:\n${err}${dbHint}`);
+    // SQLite（libSQL）環境では主な原因は userData ディレクトリのアクセス権限・
+    // ディスク容量・マイグレーション破損等。DATABASE_URL を明示設定している場合は併記する。
+    const dbInfo = process.env.DATABASE_URL ? `\n\nDB: ${process.env.DATABASE_URL}` : '';
+    dialog.showErrorBox(
+      '起動エラー',
+      `アプリを起動できませんでした:\n${err}${dbInfo}\n\nディスクの空き容量・フォルダのアクセス権限をご確認ください。`,
+    );
     app.quit();
   }
 

@@ -9,6 +9,9 @@
  *
  * 注意: リポジトリは ESM (`"type": "module"`) のため、`__dirname` は未定義。
  * `import.meta.url` から生成する（main/index.ts と同じパターン）。
+ *
+ * データストアは SQLite（libSQL）。テストごとに一時ディレクトリ内の
+ * `dayborad.db` ファイルを使用する（PostgreSQL 版の dayborad_e2e DB を廃止）。
  */
 
 import { _electron as electron, type ElectronApplication, type Page } from '@playwright/test';
@@ -20,13 +23,19 @@ import { fileURLToPath } from 'node:url';
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
 /**
- * E2E テスト用 DATABASE_URL の既定値。
+ * E2E テスト用 SQLite ファイルの既定パス（全 launchApp で共有）。
  *
- * 開発用DB（dayborad_dev）を汚さないため、E2E 専用の dayborad_e2e を使う
- * （[test_strategy.md §4.1] の隔離方針）。事前作成・マイグレーションが必要
- * （docs/release_checklist.md の手順参照）。
+ * 仕様: テスト用の一時ディレクトリ内に `dayborad-e2e.db` を1つ作り、すべての起動で
+ * 共有する。userDataDir はテストごとに新しく作り localStorage 等のキャッシュリークを
+ * 防ぐが、DB だけは共通ファイルを使う。これは PostgreSQL 版の「単一の dayborad_e2e DB
+ * を全テストで共有し、beforeEach でリセットする」挙動と等価にするため。
+ * リセットは各 spec の beforeEach が resetE2eDatabase() を呼んで行う。
+ *
+ * `DATABASE_URL` で明示的に上書きされた場合はそちらを優先する
+ * （CI で一時ファイルを明示指定する場合等）。
  */
-const DEFAULT_E2E_DATABASE_URL = 'postgres://localhost:5432/dayborad_e2e';
+const SHARED_E2E_DB_DIR = mkdtempSync(join(tmpdir(), 'dayborad-e2e-db-'));
+const SHARED_E2E_DB_URL = `file:${join(SHARED_E2E_DB_DIR, 'dayborad-e2e.db')}`;
 
 /**
  * launchApp で生成した一時 userData ディレクトリの履歴。
@@ -69,16 +78,22 @@ export async function launchApp(options?: {
   userDataDir?: string;
 }): Promise<{ app: ElectronApplication; window: Page }> {
   const mainPath = resolve(__dirname, '../out/main/index.js');
-  // DATABASE_URL が未設定なら E2E 専用DBへ（開発用DB dayborad_dev の汚染防止）
-  const databaseUrl = process.env.DATABASE_URL ?? DEFAULT_E2E_DATABASE_URL;
 
   // userDataDir が指定されればそれを使い、未指定なら新規作成（テスト間隔離）。
   // クラッシュ→復元テストのように「同一 localStorage を再利用」したい場合は
-  // 呼び出し元で createTempUserDataDir() して同じ dir を渡す。
+  // 呼出し元で createTempUserDataDir() して同じ dir を渡す。
   const userDataDir = options?.userDataDir ?? mkdtempSync(join(tmpdir(), 'dayborad-e2e-'));
   if (!options?.userDataDir) {
     tempUserDataDirs.push(userDataDir);
   }
+
+  // DATABASE_URL 解決（SQLite）:
+  //   1. options.env.DATABASE_URL または process.env.DATABASE_URL があれば尊重
+  //      （CI で一時ファイルを明示指定する場合等）。
+  //   2. 未設定なら共有の E2E 用 DB（SHARED_E2E_DB_URL）を使う。
+  //      userDataDir はテストごとに分かれるが DB は共有し、beforeEach の
+  //      resetE2eDatabase() で掃除する（PostgreSQL 版の dayborad_e2e 運用と等価）。
+  const databaseUrl = options?.env?.DATABASE_URL ?? process.env.DATABASE_URL ?? SHARED_E2E_DB_URL;
 
   const app = await electron.launch({
     args: [mainPath, `--user-data-dir=${userDataDir}`],
@@ -201,39 +216,55 @@ export async function waitForSavedSteady(window: Page, timeoutMs = 10_000): Prom
 }
 
 /**
- * E2E 用 DB のデータテーブルを TRUNCATE して隔離する（[test_strategy.md §4.1]）。
+ * E2E 用 SQLite DB のデータテーブルを空にして隔離する（[test_strategy.md §4.1]）。
  *
  * すべての spec の beforeEach で呼び、前のテストの DayNote/TODO 等が残らないようにする。
  * マイグレーション状態・スキーマは保持。user_settings は既定行が必要なため含めない。
  *
- * launchApp と同じ DATABASE_URL を見るため、未設定時は dayborad_e2e を既定値とする。
- * 前提: DATABASE_URL（既定 dayborad_e2e）がマイグレーション済みであること。
+ * 共有の E2E 用 DB（SHARED_E2E_DB_URL、または DATABASE_URL で上書きされたファイル）
+ * を対象とする。初回呼び出し時はアプリが一度も起動しておらずファイルが無い可能性が
+ * あるため、テーブルが存在しない場合はそっとリターンする（launchApp 後のマイグレー
+ * ション完了を待つ前提）。
  */
 export async function resetE2eDatabase(): Promise<void> {
-  // launchApp と同じ既定値を保証（プロセス env へ設定してから getPool で読ませる）
-  if (!process.env.DATABASE_URL) {
-    process.env.DATABASE_URL = DEFAULT_E2E_DATABASE_URL;
-  }
+  // DATABASE_URL 解決: env があればそれ、未設定なら共有 E2E DB。
+  const dbUrl = process.env.DATABASE_URL ?? SHARED_E2E_DB_URL;
+  process.env.DATABASE_URL = dbUrl;
   // 動的 import で repository パッケージから。テスト実行時に解決。
   const { getPool, closePool } = await import('repository');
-  const pool = getPool();
-  await pool.query(
-    `TRUNCATE TABLE
-       note_line_metas,
-       note_entries,
-       reflections,
-       blocker_items,
-       todo_items,
-       day_notes
-     RESTART IDENTITY CASCADE`,
-  );
+  const client = getPool();
+  // テーブルが存在しない（=まだマイグレーション前）場合は何もしない。
+  let tableExists = false;
+  try {
+    const r = await client.execute(
+      "SELECT name FROM sqlite_master WHERE type='table' AND name='day_notes'",
+    );
+    tableExists = r.rows.length > 0;
+  } catch {
+    tableExists = false;
+  }
+  if (!tableExists) {
+    await closePool();
+    return;
+  }
+  for (const table of [
+    'note_line_metas',
+    'note_entries',
+    'reflections',
+    'blocker_items',
+    'todo_items',
+    'day_notes',
+  ]) {
+    await client.execute(`DELETE FROM ${table}`);
+  }
   // user_settings は「標準キーバインド」へ戻す（テスト間で Vim 設定がリークしないよう）
-  await pool.query(
-    `INSERT INTO user_settings (id, keybinding_mode, vim_default_state)
+  await client.execute({
+    sql: `INSERT INTO user_settings (id, keybinding_mode, vim_default_state)
      VALUES ('default', 'standard', 'normal')
      ON CONFLICT (id) DO UPDATE SET
        keybinding_mode = EXCLUDED.keybinding_mode,
        vim_default_state = EXCLUDED.vim_default_state`,
-  );
+    args: [],
+  });
   await closePool();
 }

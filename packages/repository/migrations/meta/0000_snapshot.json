@@ -1,98 +1,94 @@
 {
-  "id": "d9480d46-0fcb-4c34-b958-9dca7995e674",
+  "version": "6",
+  "dialect": "sqlite",
+  "id": "15bc6118-695f-49a5-aef0-62832e5b66db",
   "prevId": "00000000-0000-0000-0000-000000000000",
-  "version": "7",
-  "dialect": "postgresql",
   "tables": {
-    "public.blocker_items": {
+    "blocker_items": {
       "name": "blocker_items",
-      "schema": "",
       "columns": {
         "id": {
           "name": "id",
           "type": "text",
           "primaryKey": true,
-          "notNull": true
+          "notNull": true,
+          "autoincrement": false
         },
         "day_note_id": {
           "name": "day_note_id",
           "type": "text",
           "primaryKey": false,
-          "notNull": true
+          "notNull": true,
+          "autoincrement": false
         },
         "text": {
           "name": "text",
           "type": "text",
           "primaryKey": false,
-          "notNull": true
+          "notNull": true,
+          "autoincrement": false
         },
         "linked_todo_id": {
           "name": "linked_todo_id",
           "type": "text",
           "primaryKey": false,
-          "notNull": false
+          "notNull": false,
+          "autoincrement": false
         },
         "source_note_line_meta_id": {
           "name": "source_note_line_meta_id",
           "type": "text",
           "primaryKey": false,
-          "notNull": false
+          "notNull": false,
+          "autoincrement": false
         },
         "resolved": {
           "name": "resolved",
-          "type": "boolean",
+          "type": "integer",
           "primaryKey": false,
           "notNull": true,
+          "autoincrement": false,
           "default": false
         },
         "order": {
           "name": "order",
           "type": "integer",
           "primaryKey": false,
-          "notNull": true
+          "notNull": true,
+          "autoincrement": false
         },
         "created_at": {
           "name": "created_at",
-          "type": "timestamp with time zone",
+          "type": "integer",
           "primaryKey": false,
           "notNull": true,
-          "default": "now()"
+          "autoincrement": false,
+          "default": "(unixepoch())"
         },
         "resolved_at": {
           "name": "resolved_at",
-          "type": "timestamp with time zone",
+          "type": "integer",
           "primaryKey": false,
-          "notNull": false
+          "notNull": false,
+          "autoincrement": false
         },
         "updated_at": {
           "name": "updated_at",
-          "type": "timestamp with time zone",
+          "type": "integer",
           "primaryKey": false,
           "notNull": true,
-          "default": "now()"
+          "autoincrement": false,
+          "default": "(unixepoch())"
         }
       },
       "indexes": {
         "idx_blocker_items_day_note_id_order": {
           "name": "idx_blocker_items_day_note_id_order",
           "columns": [
-            {
-              "expression": "day_note_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "order",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
+            "day_note_id",
+            "order"
           ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
+          "isUnique": false
         }
       },
       "foreignKeys": {
@@ -111,126 +107,126 @@
         }
       },
       "compositePrimaryKeys": {},
-      "uniqueConstraints": {}
+      "uniqueConstraints": {},
+      "checkConstraints": {}
     },
-    "public.day_notes": {
+    "day_notes": {
       "name": "day_notes",
-      "schema": "",
       "columns": {
         "id": {
           "name": "id",
           "type": "text",
           "primaryKey": true,
-          "notNull": true
+          "notNull": true,
+          "autoincrement": false
         },
         "date": {
           "name": "date",
-          "type": "date",
+          "type": "text",
           "primaryKey": false,
-          "notNull": true
+          "notNull": true,
+          "autoincrement": false
         },
         "theme": {
           "name": "theme",
           "type": "text",
           "primaryKey": false,
-          "notNull": false
+          "notNull": false,
+          "autoincrement": false
         },
         "last_opened_mode": {
           "name": "last_opened_mode",
           "type": "text",
           "primaryKey": false,
           "notNull": true,
+          "autoincrement": false,
           "default": "'work'"
         },
         "created_at": {
           "name": "created_at",
-          "type": "timestamp with time zone",
+          "type": "integer",
           "primaryKey": false,
           "notNull": true,
-          "default": "now()"
+          "autoincrement": false,
+          "default": "(unixepoch())"
         },
         "updated_at": {
           "name": "updated_at",
-          "type": "timestamp with time zone",
+          "type": "integer",
           "primaryKey": false,
           "notNull": true,
-          "default": "now()"
+          "autoincrement": false,
+          "default": "(unixepoch())"
         }
       },
       "indexes": {
         "uq_day_notes_date": {
           "name": "uq_day_notes_date",
           "columns": [
-            {
-              "expression": "date",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
+            "date"
           ],
-          "isUnique": true,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
+          "isUnique": true
         }
       },
       "foreignKeys": {},
       "compositePrimaryKeys": {},
-      "uniqueConstraints": {}
+      "uniqueConstraints": {},
+      "checkConstraints": {
+        "day_notes_last_opened_mode_check": {
+          "name": "day_notes_last_opened_mode_check",
+          "value": "\"last_opened_mode\" IN ('work', 'note')"
+        }
+      }
     },
-    "public.note_entries": {
+    "note_entries": {
       "name": "note_entries",
-      "schema": "",
       "columns": {
         "id": {
           "name": "id",
           "type": "text",
           "primaryKey": true,
-          "notNull": true
+          "notNull": true,
+          "autoincrement": false
         },
         "day_note_id": {
           "name": "day_note_id",
           "type": "text",
           "primaryKey": false,
-          "notNull": true
+          "notNull": true,
+          "autoincrement": false
         },
         "body": {
           "name": "body",
           "type": "text",
           "primaryKey": false,
           "notNull": true,
+          "autoincrement": false,
           "default": "''"
         },
         "created_at": {
           "name": "created_at",
-          "type": "timestamp with time zone",
+          "type": "integer",
           "primaryKey": false,
           "notNull": true,
-          "default": "now()"
+          "autoincrement": false,
+          "default": "(unixepoch())"
         },
         "updated_at": {
           "name": "updated_at",
-          "type": "timestamp with time zone",
+          "type": "integer",
           "primaryKey": false,
           "notNull": true,
-          "default": "now()"
+          "autoincrement": false,
+          "default": "(unixepoch())"
         }
       },
       "indexes": {
         "uq_note_entries_day_note_id": {
           "name": "uq_note_entries_day_note_id",
           "columns": [
-            {
-              "expression": "day_note_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
+            "day_note_id"
           ],
-          "isUnique": true,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
+          "isUnique": true
         }
       },
       "foreignKeys": {
@@ -249,176 +245,142 @@
         }
       },
       "compositePrimaryKeys": {},
-      "uniqueConstraints": {}
+      "uniqueConstraints": {},
+      "checkConstraints": {}
     },
-    "public.note_line_metas": {
+    "note_line_metas": {
       "name": "note_line_metas",
-      "schema": "",
       "columns": {
         "id": {
           "name": "id",
           "type": "text",
           "primaryKey": true,
-          "notNull": true
+          "notNull": true,
+          "autoincrement": false
         },
         "note_entry_id": {
           "name": "note_entry_id",
           "type": "text",
           "primaryKey": false,
-          "notNull": true
+          "notNull": true,
+          "autoincrement": false
         },
         "line_number_at_conversion": {
           "name": "line_number_at_conversion",
           "type": "integer",
           "primaryKey": false,
-          "notNull": true
+          "notNull": true,
+          "autoincrement": false
         },
         "normalized_line_text": {
           "name": "normalized_line_text",
           "type": "text",
           "primaryKey": false,
-          "notNull": true
+          "notNull": true,
+          "autoincrement": false
         },
         "line_hash": {
           "name": "line_hash",
           "type": "text",
           "primaryKey": false,
-          "notNull": true
+          "notNull": true,
+          "autoincrement": false
         },
         "line_text": {
           "name": "line_text",
           "type": "text",
           "primaryKey": false,
-          "notNull": true
+          "notNull": true,
+          "autoincrement": false
         },
         "converted_to_todo_id": {
           "name": "converted_to_todo_id",
           "type": "text",
           "primaryKey": false,
-          "notNull": false
+          "notNull": false,
+          "autoincrement": false
         },
         "converted_to_blocker_id": {
           "name": "converted_to_blocker_id",
           "type": "text",
           "primaryKey": false,
-          "notNull": false
+          "notNull": false,
+          "autoincrement": false
         },
         "converted_to_reflection": {
           "name": "converted_to_reflection",
-          "type": "boolean",
+          "type": "integer",
           "primaryKey": false,
           "notNull": true,
+          "autoincrement": false,
           "default": false
         },
         "converted_at": {
           "name": "converted_at",
-          "type": "timestamp with time zone",
+          "type": "integer",
           "primaryKey": false,
           "notNull": true,
-          "default": "now()"
+          "autoincrement": false,
+          "default": "(unixepoch())"
         },
         "created_at": {
           "name": "created_at",
-          "type": "timestamp with time zone",
+          "type": "integer",
           "primaryKey": false,
           "notNull": true,
-          "default": "now()"
+          "autoincrement": false,
+          "default": "(unixepoch())"
         },
         "updated_at": {
           "name": "updated_at",
-          "type": "timestamp with time zone",
+          "type": "integer",
           "primaryKey": false,
           "notNull": true,
-          "default": "now()"
+          "autoincrement": false,
+          "default": "(unixepoch())"
         }
       },
       "indexes": {
         "idx_note_line_metas_note_entry_id": {
           "name": "idx_note_line_metas_note_entry_id",
           "columns": [
-            {
-              "expression": "note_entry_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
+            "note_entry_id"
           ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
+          "isUnique": false
         },
         "idx_note_line_metas_todo_duplicate_lookup": {
           "name": "idx_note_line_metas_todo_duplicate_lookup",
           "columns": [
-            {
-              "expression": "note_entry_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "line_hash",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
+            "note_entry_id",
+            "line_hash"
           ],
           "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
+          "where": "\"converted_to_todo_id\" IS NOT NULL"
         },
         "idx_note_line_metas_blocker_duplicate_lookup": {
           "name": "idx_note_line_metas_blocker_duplicate_lookup",
           "columns": [
-            {
-              "expression": "note_entry_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "line_hash",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
+            "note_entry_id",
+            "line_hash"
           ],
           "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
+          "where": "\"converted_to_blocker_id\" IS NOT NULL"
         },
         "uq_note_line_metas_converted_to_todo_id": {
           "name": "uq_note_line_metas_converted_to_todo_id",
           "columns": [
-            {
-              "expression": "converted_to_todo_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
+            "converted_to_todo_id"
           ],
           "isUnique": true,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
+          "where": "\"converted_to_todo_id\" IS NOT NULL"
         },
         "uq_note_line_metas_converted_to_blocker_id": {
           "name": "uq_note_line_metas_converted_to_blocker_id",
           "columns": [
-            {
-              "expression": "converted_to_blocker_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
+            "converted_to_blocker_id"
           ],
           "isUnique": true,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
+          "where": "\"converted_to_blocker_id\" IS NOT NULL"
         }
       },
       "foreignKeys": {
@@ -437,29 +399,32 @@
         }
       },
       "compositePrimaryKeys": {},
-      "uniqueConstraints": {}
+      "uniqueConstraints": {},
+      "checkConstraints": {}
     },
-    "public.reflections": {
+    "reflections": {
       "name": "reflections",
-      "schema": "",
       "columns": {
         "id": {
           "name": "id",
           "type": "text",
           "primaryKey": true,
-          "notNull": true
+          "notNull": true,
+          "autoincrement": false
         },
         "day_note_id": {
           "name": "day_note_id",
           "type": "text",
           "primaryKey": false,
-          "notNull": true
+          "notNull": true,
+          "autoincrement": false
         },
         "done_text": {
           "name": "done_text",
           "type": "text",
           "primaryKey": false,
           "notNull": true,
+          "autoincrement": false,
           "default": "''"
         },
         "stuck_text": {
@@ -467,6 +432,7 @@
           "type": "text",
           "primaryKey": false,
           "notNull": true,
+          "autoincrement": false,
           "default": "''"
         },
         "tomorrow_action_text": {
@@ -474,17 +440,27 @@
           "type": "text",
           "primaryKey": false,
           "notNull": true,
+          "autoincrement": false,
           "default": "''"
         },
         "updated_at": {
           "name": "updated_at",
-          "type": "timestamp with time zone",
+          "type": "integer",
           "primaryKey": false,
           "notNull": true,
-          "default": "now()"
+          "autoincrement": false,
+          "default": "(unixepoch())"
         }
       },
-      "indexes": {},
+      "indexes": {
+        "reflections_day_note_id_unique": {
+          "name": "reflections_day_note_id_unique",
+          "columns": [
+            "day_note_id"
+          ],
+          "isUnique": true
+        }
+      },
       "foreignKeys": {
         "reflections_day_note_id_day_notes_id_fk": {
           "name": "reflections_day_note_id_day_notes_id_fk",
@@ -501,126 +477,109 @@
         }
       },
       "compositePrimaryKeys": {},
-      "uniqueConstraints": {
-        "reflections_day_note_id_unique": {
-          "name": "reflections_day_note_id_unique",
-          "nullsNotDistinct": false,
-          "columns": [
-            "day_note_id"
-          ]
-        }
-      }
+      "uniqueConstraints": {},
+      "checkConstraints": {}
     },
-    "public.todo_items": {
+    "todo_items": {
       "name": "todo_items",
-      "schema": "",
       "columns": {
         "id": {
           "name": "id",
           "type": "text",
           "primaryKey": true,
-          "notNull": true
+          "notNull": true,
+          "autoincrement": false
         },
         "day_note_id": {
           "name": "day_note_id",
           "type": "text",
           "primaryKey": false,
-          "notNull": true
+          "notNull": true,
+          "autoincrement": false
         },
         "title": {
           "name": "title",
           "type": "text",
           "primaryKey": false,
-          "notNull": true
+          "notNull": true,
+          "autoincrement": false
         },
         "status": {
           "name": "status",
           "type": "text",
           "primaryKey": false,
           "notNull": true,
+          "autoincrement": false,
           "default": "'todo'"
         },
         "order": {
           "name": "order",
           "type": "integer",
           "primaryKey": false,
-          "notNull": true
+          "notNull": true,
+          "autoincrement": false
         },
         "source_note_line_meta_id": {
           "name": "source_note_line_meta_id",
           "type": "text",
           "primaryKey": false,
-          "notNull": false
+          "notNull": false,
+          "autoincrement": false
         },
         "carried_from_todo_id": {
           "name": "carried_from_todo_id",
           "type": "text",
           "primaryKey": false,
-          "notNull": false
+          "notNull": false,
+          "autoincrement": false
         },
         "carried_from_date": {
           "name": "carried_from_date",
-          "type": "date",
+          "type": "text",
           "primaryKey": false,
-          "notNull": false
+          "notNull": false,
+          "autoincrement": false
         },
         "created_at": {
           "name": "created_at",
-          "type": "timestamp with time zone",
+          "type": "integer",
           "primaryKey": false,
           "notNull": true,
-          "default": "now()"
+          "autoincrement": false,
+          "default": "(unixepoch())"
         },
         "completed_at": {
           "name": "completed_at",
-          "type": "timestamp with time zone",
+          "type": "integer",
           "primaryKey": false,
-          "notNull": false
+          "notNull": false,
+          "autoincrement": false
         },
         "updated_at": {
           "name": "updated_at",
-          "type": "timestamp with time zone",
+          "type": "integer",
           "primaryKey": false,
           "notNull": true,
-          "default": "now()"
+          "autoincrement": false,
+          "default": "(unixepoch())"
         }
       },
       "indexes": {
         "idx_todo_items_day_note_id_order": {
           "name": "idx_todo_items_day_note_id_order",
           "columns": [
-            {
-              "expression": "day_note_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "order",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
+            "day_note_id",
+            "order"
           ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
+          "isUnique": false
         },
         "idx_todo_items_carried_from_todo_id": {
           "name": "idx_todo_items_carried_from_todo_id",
           "columns": [
-            {
-              "expression": "carried_from_todo_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
+            "carried_from_todo_id"
           ],
           "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
+          "where": "\"carried_from_todo_id\" IS NOT NULL"
         }
       },
       "foreignKeys": {
@@ -639,23 +598,34 @@
         }
       },
       "compositePrimaryKeys": {},
-      "uniqueConstraints": {}
+      "uniqueConstraints": {},
+      "checkConstraints": {
+        "todo_items_status_check": {
+          "name": "todo_items_status_check",
+          "value": "\"status\" IN ('todo', 'done', 'carried')"
+        },
+        "todo_items_carried_from_pair_check": {
+          "name": "todo_items_carried_from_pair_check",
+          "value": "(\"carried_from_todo_id\" IS NULL AND \"carried_from_date\" IS NULL) OR (\"carried_from_todo_id\" IS NOT NULL AND \"carried_from_date\" IS NOT NULL)"
+        }
+      }
     },
-    "public.user_settings": {
+    "user_settings": {
       "name": "user_settings",
-      "schema": "",
       "columns": {
         "id": {
           "name": "id",
           "type": "text",
           "primaryKey": true,
-          "notNull": true
+          "notNull": true,
+          "autoincrement": false
         },
         "keybinding_mode": {
           "name": "keybinding_mode",
           "type": "text",
           "primaryKey": false,
           "notNull": true,
+          "autoincrement": false,
           "default": "'standard'"
         },
         "vim_default_state": {
@@ -663,35 +633,50 @@
           "type": "text",
           "primaryKey": false,
           "notNull": true,
+          "autoincrement": false,
           "default": "'normal'"
         },
         "created_at": {
           "name": "created_at",
-          "type": "timestamp with time zone",
+          "type": "integer",
           "primaryKey": false,
           "notNull": true,
-          "default": "now()"
+          "autoincrement": false,
+          "default": "(unixepoch())"
         },
         "updated_at": {
           "name": "updated_at",
-          "type": "timestamp with time zone",
+          "type": "integer",
           "primaryKey": false,
           "notNull": true,
-          "default": "now()"
+          "autoincrement": false,
+          "default": "(unixepoch())"
         }
       },
       "indexes": {},
       "foreignKeys": {},
       "compositePrimaryKeys": {},
-      "uniqueConstraints": {}
+      "uniqueConstraints": {},
+      "checkConstraints": {
+        "user_settings_keybinding_mode_check": {
+          "name": "user_settings_keybinding_mode_check",
+          "value": "\"keybinding_mode\" IN ('standard', 'vim')"
+        },
+        "user_settings_vim_default_state_check": {
+          "name": "user_settings_vim_default_state_check",
+          "value": "\"vim_default_state\" IN ('normal', 'insert')"
+        }
+      }
     }
   },
+  "views": {},
   "enums": {},
-  "schemas": {},
-  "sequences": {},
   "_meta": {
-    "columns": {},
     "schemas": {},
-    "tables": {}
+    "tables": {},
+    "columns": {}
+  },
+  "internal": {
+    "indexes": {}
   }
 }

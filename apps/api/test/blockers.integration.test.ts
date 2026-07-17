@@ -279,11 +279,12 @@ describe('Blocker API (Integration)', () => {
       await app.request(`/api/todos/${todo.id}`, { method: 'DELETE' });
 
       // 障害は残り、linkedTodoId が null に
-      const pool = getPool();
-      const result = await pool.query('SELECT linked_todo_id FROM blocker_items WHERE id = $1', [
-        blocker.id,
-      ]);
-      expect(result.rows[0].linked_todo_id).toBeNull();
+      const client = getPool();
+      const result = await client.execute({
+        sql: 'SELECT linked_todo_id FROM blocker_items WHERE id = ?',
+        args: [blocker.id],
+      });
+      expect((result.rows[0] as { linked_todo_id: string | null }).linked_todo_id).toBeNull();
     });
   });
 });

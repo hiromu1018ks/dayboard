@@ -2,6 +2,8 @@
 
 本書は、dayborad MVPを [要件定義書](dayborad_requirements.md) のスコープどおりに実装するためのフェーズ分割と実装順を定める。各フェーズは依存関係に基づき、**DayNote CRUD → 自動保存 → 仕事整理モード → ノートモード → 変換 → 持ち越し → キーバインド** の順で進める（ユーザー指定の自然な順序）。
 
+> **注記（2026-07）:** 本書は PostgreSQL を前提に書かれていましたが、その後**データストアを SQLite（libSQL）へ全面移行**しました。現在は PostgreSQL は使われていません。Phase 0/1/8 周りの PostgreSQL 記述（`dayborad_dev` DB、PostgreSQL サービスコンテナ等）は移行前の実装履歴として残しています。現在の姿は [architecture.md §2.2](architecture.md) / [dev_setup.md](dev_setup.md) / [database_schema.md §10](database_schema.md) を参照してください。
+
 - 関連ドキュメント: [architecture.md](architecture.md) / [database_schema.md](database_schema.md) / [api_contract.md](api_contract.md) / [ui_interaction_spec.md](ui_interaction_spec.md) / [autosave_spec.md](autosave_spec.md) / [note_conversion_spec.md](note_conversion_spec.md) / [dev_setup.md](dev_setup.md) / [test_strategy.md](test_strategy.md) / [edge_cases.md](edge_cases.md)
 - 各フェーズの完了定義: 列挙した機能が動作し、[test_strategy.md](test_strategy.md) に基づく該当テストが通ること
 

@@ -131,9 +131,9 @@ describe('TODO API (Integration)', () => {
       expect(t2.id).toBe(t1.id);
 
       // DB には1件しか無い
-      const pool = getPool();
-      const result = await pool.query('SELECT COUNT(*)::int AS count FROM todo_items');
-      expect(result.rows[0].count).toBe(1);
+      const client = getPool();
+      const result = await client.execute('SELECT COUNT(*) AS count FROM todo_items');
+      expect(Number((result.rows[0] as { count: unknown }).count)).toBe(1);
     });
   });
 
@@ -277,12 +277,12 @@ describe('TODO API (Integration)', () => {
       expect(res.status).toBe(204);
 
       // 削除済み
-      const pool = getPool();
-      const result = await pool.query(
-        'SELECT COUNT(*)::int AS count FROM todo_items WHERE id = $1',
-        [todo.id],
-      );
-      expect(result.rows[0].count).toBe(0);
+      const client = getPool();
+      const result = await client.execute({
+        sql: 'SELECT COUNT(*) AS count FROM todo_items WHERE id = ?',
+        args: [todo.id],
+      });
+      expect(Number((result.rows[0] as { count: unknown }).count)).toBe(0);
     });
 
     it('削除後に残りの order が 0,1,2... に再採番される（[edge_cases.md §1.1]）', async () => {
