@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "description": "PC画面を「その日の仕事ノート1枚」として使う日次業務管理アプリ",
-  "packageManager": "pnpm@11.7.0",
+  "packageManager": "pnpm@9.15.9",
   "engines": {
     "node": ">=20",
     "pnpm": ">=9"
